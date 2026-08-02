@@ -63,8 +63,8 @@
             "flags": {}
         }
     ],
-    "flags": {
-        "hotReload": false
-    },
-    "description": "Build contextual bonuses, roll modifiers, filters, optional consumption, auras, and template effects for dnd5e."
+    "url": "https://github.com/TacticalOtaku/Build-n-Action",
+    "manifest": "https://github.com/TacticalOtaku/Build-n-Action/main/module.json",
+    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.0/build-n-action-v1.0.0.zip",
+    "socket": true
 }
