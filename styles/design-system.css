@@ -1,0 +1,569 @@
+/* Canonical Build-n-Action visual system. Component files only add structural behavior. */
+.build-n-action {
+  --bna-accent: #4f72e8;
+  --bna-accent-bright: #6d8cff;
+  --bna-accent-soft: color-mix(in srgb, var(--bna-accent) 14%, transparent);
+  --bna-bg: rgb(244 246 250 / 98%);
+  --bna-bg-deep: #e9edf4;
+  --bna-border: rgb(23 30 44 / 14%);
+  --bna-danger: #c34152;
+  --bna-danger-soft: color-mix(in srgb, var(--bna-danger) 12%, transparent);
+  --bna-focus: 0 0 0 3px color-mix(in srgb, var(--bna-accent) 22%, transparent);
+  --bna-hover: rgb(23 30 44 / 6%);
+  --bna-shadow: 0 8px 24px rgb(24 30 45 / 9%);
+  --bna-shadow-raised: 0 16px 42px rgb(24 30 45 / 18%);
+  --bna-success: #19836c;
+  --bna-success-soft: color-mix(in srgb, var(--bna-success) 12%, transparent);
+  --bna-surface: rgb(255 255 255 / 82%);
+  --bna-surface-raised: rgb(255 255 255 / 98%);
+  --bna-text: #20232b;
+  --bna-text-muted: #687080;
+  --bna-warning: #b87518;
+  --bna-radius-sm: 4px;
+  --bna-radius-md: 6px;
+  --bna-radius-lg: 8px;
+  --bna-motion: 180ms cubic-bezier(.2, .8, .2, 1);
+  color: var(--bna-text);
+  font-family: var(--font-primary, "Signika", "Segoe UI", system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  text-rendering: optimizeLegibility;
+}
+
+.theme-dark .build-n-action,
+.dnd5e-theme-dark .build-n-action,
+body.theme-dark .build-n-action {
+  --bna-accent: #6e8fff;
+  --bna-accent-bright: #91a8ff;
+  --bna-bg: rgb(18 21 27 / 98%);
+  --bna-bg-deep: #101319;
+  --bna-border: rgb(255 255 255 / 12%);
+  --bna-danger: #ff7b86;
+  --bna-hover: rgb(255 255 255 / 7%);
+  --bna-shadow: 0 10px 28px rgb(0 0 0 / 23%);
+  --bna-shadow-raised: 0 18px 48px rgb(0 0 0 / 44%);
+  --bna-success: #55c7a8;
+  --bna-surface: rgb(34 38 47 / 82%);
+  --bna-surface-raised: rgb(38 43 53 / 99%);
+  --bna-text: #f1f2f5;
+  --bna-text-muted: #aeb5c1;
+  --bna-warning: #efb15a;
+}
+
+.build-n-action.dnd5e2,
+.build-n-action.sheet {
+  background: var(--bna-bg);
+  border: 1px solid var(--bna-border);
+  box-shadow: var(--bna-shadow-raised);
+}
+
+.build-n-action.dnd5e2 .window-header,
+.build-n-action.sheet .window-header {
+  background: color-mix(in srgb, var(--bna-bg) 91%, transparent);
+  border-bottom: 1px solid var(--bna-border);
+  color: var(--bna-text);
+  margin: 0;
+}
+
+.build-n-action.dnd5e2:not(.minimized) .window-header .window-title {
+  color: var(--bna-text);
+  visibility: visible;
+}
+
+.build-n-action.dnd5e2 .window-content,
+.build-n-action.sheet .window-content {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--bna-accent) 5%, transparent), transparent 38%),
+    linear-gradient(180deg, var(--bna-bg), var(--bna-bg-deep));
+  color: var(--bna-text);
+  margin: 0;
+  padding: 0;
+}
+
+.build-n-action h1.module-heading {
+  align-items: center;
+  background: color-mix(in srgb, var(--bna-surface) 82%, transparent);
+  border-bottom: 1px solid var(--bna-border);
+  font-family: inherit;
+  gap: 12px;
+  justify-content: flex-start;
+  margin: 0;
+  min-height: 76px;
+  padding: 12px 18px;
+  text-align: left;
+}
+
+.build-n-action h1.module-heading > i {
+  align-items: center;
+  background: linear-gradient(145deg, var(--bna-accent-soft), var(--bna-success-soft));
+  border: 1px solid color-mix(in srgb, var(--bna-accent) 34%, var(--bna-border));
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-accent) !important;
+  display: inline-flex;
+  font-size: 22px;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.build-n-action h1.module-heading .name-stacked {
+  display: grid;
+  gap: 3px;
+}
+
+.build-n-action h1.module-heading .name-stacked .title {
+  border: 0;
+  color: var(--bna-text);
+  font-size: 21px;
+  font-weight: 650;
+  margin: 0;
+  padding: 0;
+}
+
+.build-n-action h1.module-heading .name-stacked .subtitle {
+  color: var(--bna-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* Workshop layout */
+.build-n-action.builder {
+  min-height: 560px;
+  min-width: 620px;
+}
+
+.build-n-action.builder .pages {
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(176px, .27fr) minmax(0, 1fr);
+  height: 100%;
+}
+
+.build-n-action.builder .pages .select-type {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bna-surface) 74%, transparent), color-mix(in srgb, var(--bna-bg-deep) 78%, transparent));
+  border-right: 1px solid var(--bna-border);
+  min-width: 0;
+  padding: 16px 12px;
+}
+
+.build-n-action.builder .pages .current-bonuses {
+  min-width: 0;
+  padding: 18px clamp(16px, 3cqi, 26px) 24px;
+}
+
+.build-n-action.builder .pages .header {
+  background: transparent;
+  border: 0;
+  color: var(--bna-text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  height: auto;
+  line-height: 1.3;
+  padding: 0 8px 10px;
+  text-transform: uppercase;
+}
+
+.build-n-action.builder .pages .select-type .types {
+  display: flex;
+  font-size: 14px;
+  gap: 5px;
+  justify-content: flex-start;
+  max-height: none;
+  min-width: 0;
+}
+
+.build-n-action.builder .pages .select-type .types a {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-text-muted);
+  display: grid;
+  font-size: 13px;
+  font-weight: 550;
+  gap: 9px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 44px;
+  padding: 7px 9px;
+  transition: background var(--bna-motion), border-color var(--bna-motion), color var(--bna-motion), transform var(--bna-motion);
+}
+
+.build-n-action.builder .pages .select-type .types a:hover {
+  background: var(--bna-accent-soft);
+  border-color: color-mix(in srgb, var(--bna-accent) 55%, var(--bna-border));
+  color: var(--bna-text);
+  transform: translateX(2px);
+}
+
+.build-n-action.builder .pages .select-type .types a > i {
+  color: var(--bna-accent);
+  font-size: 16px;
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses {
+  gap: 12px;
+  padding: 2px 4px 16px 0;
+  scrollbar-color: var(--bna-accent) transparent;
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus {
+  background: var(--bna-surface);
+  border: 1px solid var(--bna-border);
+  border-radius: var(--bna-radius-lg);
+  box-shadow: var(--bna-shadow);
+  padding: 13px 14px;
+  position: relative;
+  transition: border-color var(--bna-motion), box-shadow var(--bna-motion), transform var(--bna-motion);
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus:hover {
+  border-color: color-mix(in srgb, var(--bna-accent) 28%, var(--bna-border));
+  box-shadow: var(--bna-shadow-raised);
+  transform: translateY(-1px);
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .bonus-header {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin: 0;
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .bonus-header .label {
+  color: var(--bna-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .bonus-header .label > i {
+  align-items: center;
+  background: var(--bna-accent-soft);
+  border-radius: var(--bna-radius-sm);
+  color: var(--bna-accent);
+  display: inline-flex;
+  height: 27px;
+  justify-content: center;
+  margin-right: 8px;
+  width: 27px;
+}
+
+.build-n-action.builder .bonus-header .functions a {
+  align-items: center;
+  border-radius: var(--bna-radius-sm);
+  color: var(--bna-text-muted);
+  display: inline-flex;
+  height: 28px;
+  justify-content: center;
+  transition: background var(--bna-motion), color var(--bna-motion), transform var(--bna-motion);
+  width: 28px;
+}
+
+.build-n-action.builder .bonus-header .functions a:hover {
+  background: var(--bna-hover);
+  color: var(--bna-accent);
+  transform: translateY(-1px);
+}
+
+.build-n-action.builder .bonus-header .functions [data-action="current-delete"]:hover {
+  background: var(--bna-danger-soft);
+  color: var(--bna-danger);
+}
+
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .description {
+  background: color-mix(in srgb, var(--bna-bg) 72%, var(--bna-surface-raised));
+  border: 1px solid var(--bna-border);
+  color: var(--bna-text-muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.45;
+  margin-top: 10px;
+  padding: 9px 11px;
+}
+
+/* Bonus editor */
+.build-n-action.sheet .window-content {
+  container-type: inline-size;
+  overflow: hidden auto;
+}
+
+.build-n-action.sheet .header.name-stacked {
+  align-items: center;
+  background: color-mix(in srgb, var(--bna-surface) 80%, transparent);
+  border-bottom: 1px solid var(--bna-border);
+  margin: 0;
+  padding: 14px 18px 10px;
+}
+
+.build-n-action.sheet .header.name-stacked img {
+  background: var(--bna-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--bna-accent) 34%, var(--bna-border));
+  border-radius: var(--bna-radius-md);
+  height: 52px;
+  object-fit: cover;
+  width: 52px;
+}
+
+.build-n-action.sheet .header.name-stacked input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--bna-text);
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 650;
+  height: 42px;
+  margin: 5px 8px;
+}
+
+.build-n-action.sheet .header.name-stacked input:hover,
+.build-n-action.sheet .header.name-stacked input:focus {
+  background: var(--bna-surface-raised);
+  border-color: color-mix(in srgb, var(--bna-accent) 40%, var(--bna-border));
+  box-shadow: var(--bna-focus);
+}
+
+.build-n-action.sheet .header.name-stacked .properties {
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.build-n-action.sheet .header.name-stacked .properties .property {
+  background: var(--bna-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--bna-accent) 28%, transparent);
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--bna-accent) 74%, var(--bna-text));
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+}
+
+.build-n-action.sheet .sheet-tabs.tabs {
+  background: color-mix(in srgb, var(--bna-bg) 78%, var(--bna-surface-raised));
+  border: 0;
+  border-bottom: 1px solid var(--bna-border);
+  display: grid;
+  gap: 3px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 7px 10px;
+}
+
+.build-n-action.sheet .sheet-tabs.tabs .item {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-text-muted);
+  display: flex;
+  flex-direction: row;
+  font-size: 12px;
+  gap: 6px;
+  justify-content: center;
+  min-height: 39px;
+  padding: 5px 6px;
+  transition: background var(--bna-motion), border-color var(--bna-motion), color var(--bna-motion), transform var(--bna-motion);
+}
+
+.build-n-action.sheet .sheet-tabs.tabs .item .fa-solid {
+  font-size: 13px;
+}
+
+.build-n-action.sheet .sheet-tabs.tabs .item:hover {
+  background: var(--bna-hover);
+  border-color: var(--bna-border);
+  color: var(--bna-text);
+  transform: translateY(-1px);
+}
+
+.build-n-action.sheet .sheet-tabs.tabs .item.active {
+  background: var(--bna-accent-soft);
+  border-color: color-mix(in srgb, var(--bna-accent) 62%, var(--bna-border));
+  box-shadow: inset 0 -3px 0 var(--bna-accent);
+  color: var(--bna-text);
+}
+
+.build-n-action.sheet .sheet-tabs.tabs .item.active .fa-solid {
+  color: var(--bna-accent);
+}
+
+.build-n-action.sheet .tab.scrollable {
+  gap: 14px;
+  padding: 18px clamp(14px, 3cqi, 26px) 5rem;
+}
+
+.build-n-action.sheet fieldset,
+.build-n-action.optionals,
+.build-n-action.keys-dialog .table {
+  background: var(--bna-surface);
+  border: 1px solid var(--bna-border);
+  border-radius: var(--bna-radius-lg);
+  box-shadow: var(--bna-shadow);
+  color: var(--bna-text);
+  padding: 15px;
+  position: relative;
+  transition: border-color var(--bna-motion), box-shadow var(--bna-motion), transform var(--bna-motion);
+}
+
+.build-n-action.sheet fieldset:hover {
+  border-color: color-mix(in srgb, var(--bna-accent) 24%, var(--bna-border));
+  box-shadow: var(--bna-shadow-raised);
+}
+
+.build-n-action.sheet fieldset > legend,
+.build-n-action.optionals > legend {
+  color: var(--bna-text);
+  font-size: 14px;
+  font-weight: 650;
+  padding: 0 7px;
+}
+
+.build-n-action.sheet .form-group {
+  border-radius: var(--bna-radius-md);
+  padding: 6px 4px;
+}
+
+.build-n-action.sheet .form-group + .form-group {
+  border-top: 1px solid color-mix(in srgb, var(--bna-border) 58%, transparent);
+}
+
+.build-n-action.sheet label,
+.build-n-action.optionals label {
+  color: var(--bna-text);
+  font-weight: 600;
+}
+
+.build-n-action.sheet .hint,
+.build-n-action.optionals .hint {
+  color: var(--bna-text-muted);
+}
+
+.build-n-action.sheet :is(input, select, textarea),
+.build-n-action.optionals :is(input, select, textarea) {
+  background: var(--bna-surface-raised);
+  border: 1px solid var(--bna-border);
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-text);
+  transition: border-color var(--bna-motion), box-shadow var(--bna-motion), background var(--bna-motion);
+}
+
+.build-n-action.sheet :is(input, select, textarea):focus,
+.build-n-action.optionals :is(input, select, textarea):focus {
+  border-color: color-mix(in srgb, var(--bna-accent) 68%, var(--bna-border));
+  box-shadow: var(--bna-focus);
+  outline: 0;
+}
+
+.build-n-action.sheet button,
+.build-n-action.optionals button,
+.build-n-action.keys-dialog button {
+  border-radius: var(--bna-radius-md);
+  transition: border-color var(--bna-motion), box-shadow var(--bna-motion), filter var(--bna-motion), transform var(--bna-motion);
+}
+
+.build-n-action.sheet button:hover,
+.build-n-action.optionals button:hover,
+.build-n-action.keys-dialog button:hover {
+  border-color: color-mix(in srgb, var(--bna-accent) 62%, var(--bna-border));
+  box-shadow: var(--bna-focus);
+  transform: translateY(-1px);
+}
+
+.build-n-action.sheet .notification.info {
+  background: var(--bna-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--bna-accent) 45%, var(--bna-border));
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-text);
+}
+
+.build-n-action.sheet [data-tab="filters"] .toc {
+  background: color-mix(in srgb, var(--bna-surface) 72%, transparent);
+  border: 1px solid var(--bna-border);
+  border-radius: var(--bna-radius-lg);
+  margin: 0;
+  padding: 8px;
+}
+
+.build-n-action.sheet [data-tab="filters"] .toc li {
+  border: 1px solid transparent;
+  border-radius: var(--bna-radius-md);
+  color: var(--bna-text-muted);
+  margin: 2px 0;
+  padding: 7px 9px;
+}
+
+.build-n-action.sheet [data-tab="filters"] .toc li:hover,
+.build-n-action.sheet [data-tab="filters"] .toc li.viewed {
+  background: var(--bna-accent-soft);
+  border-color: color-mix(in srgb, var(--bna-accent) 48%, var(--bna-border));
+  color: var(--bna-text);
+}
+
+.build-n-action.sheet [data-tab="filters"] .picker .filter {
+  cursor: pointer;
+  margin-top: 0;
+}
+
+.build-n-action.sheet [data-tab="filters"] .picker .filter:hover {
+  border-color: color-mix(in srgb, var(--bna-accent) 48%, var(--bna-border));
+  transform: translateY(-1px);
+}
+
+/* Roll-dialog additions */
+.build-n-action.optionals {
+  gap: 10px;
+  margin-bottom: 12px;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.build-n-action.optionals .optional,
+.build-n-action.optionals .reminder {
+  background: color-mix(in srgb, var(--bna-bg) 68%, var(--bna-surface-raised));
+  border: 1px solid var(--bna-border);
+  border-radius: var(--bna-radius-md);
+  padding: 10px;
+}
+
+.build-n-action.optionals .optional:not(:last-child),
+.build-n-action.optionals .reminders:not(:last-child) {
+  border-bottom: 1px solid var(--bna-border);
+}
+
+.build-n-action.optionals .optional.active {
+  background: var(--bna-success-soft);
+  border-color: color-mix(in srgb, var(--bna-success) 48%, var(--bna-border));
+}
+
+@container (max-width: 680px) {
+  .build-n-action.builder .pages {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .build-n-action.builder .pages .select-type .types a {
+    grid-template-columns: 1fr;
+    padding: 8px;
+  }
+
+  .build-n-action.builder .pages .select-type .types .label,
+  .build-n-action.builder .pages .select-type .header {
+    display: none;
+  }
+
+  .build-n-action.sheet .sheet-tabs.tabs .item {
+    font-size: 0;
+  }
+
+  .build-n-action.sheet .sheet-tabs.tabs .item .fa-solid {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .build-n-action *,
+  .build-n-action *::before,
+  .build-n-action *::after {
+    animation-duration: .01ms !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}

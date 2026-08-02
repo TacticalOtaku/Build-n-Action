@@ -1,0 +1,6 @@
+<div class="tab scrollable {{tabs.configuration.cssClass}}" data-tab="configuration" data-group="main">
+  {{#unless filters.length}}
+  <p class="notification info">{{localize "BUILD_N_ACTION.CurrentFiltersTooltip"}}</p>
+  {{/unless}}
+  {{#each filters}} {{{this}}} {{/each}}
+</div>

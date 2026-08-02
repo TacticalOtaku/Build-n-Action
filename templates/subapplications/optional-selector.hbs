@@ -1,0 +1,63 @@
+{{#if reminders.length}}
+<div class="reminders">
+  {{#each reminders}}
+  <div class="reminder notification info" data-bonus-uuid="{{uuid}}" style="--bonus-name: '{{name}}.'">
+    <span class="description">{{{description}}}</span>
+  </div>
+  {{/each}}
+</div>
+{{/if}}
+
+{{#if isV2}}
+
+{{#each bonuses}}
+<div class="optional" data-bonus-uuid="{{build-n-action.uuid}}">
+  <div class="bonus-text" style="--bonus-name: '{{name}}.'">
+    <span class="description">{{{description}}}</span>
+  </div>
+
+  <div class="form-group">
+    <label>{{localize label}}</label>
+    <div class="form-fields">
+      {{#if scales}}
+      {{formInput scaleValue dataset=scaleDataset}}
+      {{/if}}
+      {{#if damageTypes}}
+      {{formInput damageTypes dataset=damageTypeDataset}}
+      {{/if}}
+    </div>
+    <button type="button" data-action="{{action}}">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+  </div>
+</div>
+
+<hr>
+{{/each}}
+
+{{else}}
+
+{{#each bonuses}}
+<div class="optional" data-bonus-uuid="{{build-n-action.uuid}}">
+
+  <div class="bonus-text" style="--bonus-name: '{{name}}.'">
+    <span class="description">{{{description}}}</span>
+  </div>
+
+  {{#if scales}}
+  <div class="consumption">
+    <label class="label">
+      {{localize label}}
+    </label>
+    {{formInput scaleValue dataset=scaleDataset}}
+  </div>
+  {{/if}}
+
+  <button type="button" data-action="{{action}}">
+    <i class="fa-solid fa-plus"></i>
+  </button>
+
+</div>
+{{/each}}
+
+{{/if}}

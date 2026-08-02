@@ -1,0 +1,62 @@
+<div class="workshop-content">
+  <h1 class="module-heading">
+    <i class="{{{ICON}}}"></i>
+    <span class="name-stacked">
+      <span class="title">{{localize "BUILD_N_ACTION.ModuleTitle"}}</span>
+      <span class="subtitle">{{parentName}}</span>
+    </span>
+  </h1>
+
+  <div class="pages">
+    <section class="select-type">
+      <header class="header">
+        {{localize "BUILD_N_ACTION.SelectType"}}
+        <i class="fa-solid fa-circle-question" data-tooltip="BUILD_N_ACTION.SelectTypeTooltip"></i>
+      </header>
+      <div class="types">
+        {{#each createButtons}}
+        <a data-action="pick-type" data-type="{{type}}" data-tooltip="{{label}}">
+          <i class="{{icon}}"></i>
+          <span class="label">{{localize label}}</span>
+        </a>
+        {{/each}}
+      </div>
+    </section>
+
+    <section class="current-bonuses">
+      <header class="header">
+        {{localize "BUILD_N_ACTION.CurrentBonuses"}}
+        <i class="fa-solid fa-circle-question" data-tooltip="BUILD_N_ACTION.CurrentBonusesTooltip"></i>
+      </header>
+      <div class="bonuses">
+        {{#each currentBonuses}}
+        <div class="bonus {{#if context.collapsed}}collapsed{{/if}}" data-id="{{bonus.id}}">
+          <div class="bonus-header">
+            <a class="label {{#unless bonus.enabled}}disabled{{/unless}}" data-action="current-collapse">
+              <i class="{{bonus.icon}}" data-tooltip="{{context.typeTooltip}}"></i> {{bonus.name}}
+            </a>
+            <div class="functions">
+              <a data-action="current-toggle">
+                <i class="fa-solid fa-toggle-{{ifThen bonus.enabled 'on' 'off'}}"></i>
+              </a>
+              <a data-action="current-copy">
+                <i class="fa-solid fa-copy"></i>
+              </a>
+              <a data-action="current-edit">
+                <i class="fa-solid fa-edit"></i>
+              </a>
+              <a data-action="current-delete">
+                <i class="fa-solid fa-trash"></i>
+              </a>
+              <a data-action="current-id">
+                <i class="fa-solid fa-passport"></i>
+              </a>
+            </div>
+          </div>
+          <div class="description">{{{context.description}}}</div>
+        </div>
+        {{/each}}
+      </div>
+    </section>
+  </div>
+</div>

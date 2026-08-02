@@ -1,0 +1,73 @@
+.build-n-action.sheet {
+  max-height: 95%;
+
+  .tab.scrollable {
+    min-height: 400px;
+  }
+
+  .modifiers.example {
+    position: sticky;
+    top: 0;
+  }
+
+  & fieldset:hover > .hint {
+    color: var(--color-form-hint-hover);
+  }
+
+  & select[name^="filters.arbitraryComparisons"] {
+    flex: 0;
+    width: fit-content;
+  }
+
+  & textarea[name^="filters.customScripts"] {
+    min-height: calc(3rem + var(--form-field-height));
+    overflow-y: hidden;
+    resize: vertical;
+  }
+
+  & [data-action="keysDialog"] {
+    height: 26px;
+    max-width: 100px;
+    width: 100px;
+  }
+
+  & [data-action="deleteFilter"] {
+    flex: none;
+    padding-left: 0.5em;
+  }
+
+  .header.name-stacked {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    & img {
+      flex: none;
+    }
+
+    & input {
+      flex: 1;
+    }
+
+    .properties {
+      display: flex;
+      list-style: none;
+      padding: 0;
+      width: 100%;
+
+      .property {
+        margin: 0;
+        white-space: nowrap;
+      }
+    }
+  }
+
+  [data-tab="filters"] {
+    flex-direction: row;
+
+    .toc {
+      flex: 0 0 160px;
+      list-style: none;
+    }
+  }
+}

@@ -1,0 +1,92 @@
+import {MODULE} from "../constants.mjs";
+
+export default class KeysDialog extends foundry.applications.api.DialogV2 {
+  /** @override */
+  static DEFAULT_OPTIONS = {
+    classes: [MODULE.ID, "keys-dialog"],
+    modal: true,
+    window: {
+      resizable: false,
+      icon: MODULE.ICON
+    },
+    position: {
+      height: "auto",
+      width: 400
+    },
+    actions: {
+      cycle: this.#onCycleRight,
+      cycleAll: this.#onCycleAll,
+      cycleLeft: this.#onCycleLeft,
+      cycleRight: this.#onCycleRight
+    }
+  };
+
+  /* -------------------------------------------------- */
+
+  /** @override */
+  static async prompt({canExclude, values, filterId, ...configuration} = {}) {
+    const description = (filterId === "auraBlockers")
+      ? "BUILD_N_ACTION.FIELDS.aura.blockers.hint"
+      : `BUILD_N_ACTION.FIELDS.filters.${filterId}.hint`;
+
+    configuration.content = await foundry.applications.handlebars.renderTemplate(
+      `modules/${MODULE.ID}/templates/subapplications/keys-dialog.hbs`, {
+        canExclude: canExclude,
+        values: values,
+        description: description
+      }
+    );
+    configuration.filterId = filterId;
+    configuration.rejectClose = false;
+    return super.prompt(configuration);
+  }
+
+  /* -------------------------------------------------- */
+
+  /** @override */
+  get title() {
+    const name = (this.options.filterId === "auraBlockers")
+      ? "BUILD_N_ACTION.FIELDS.aura.blockers.label"
+      : `BUILD_N_ACTION.FIELDS.filters.${this.options.filterId}.label`;
+    return game.i18n.format("BUILD_N_ACTION.KeysDialogTitle", {name: game.i18n.localize(name)});
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Cycle all selects in a column between the valid options.
+   * @param {Event} event     The initiating click event.
+   */
+  static #onCycleAll(event, target) {
+    const table = target.closest(".table");
+    const selects = table.querySelectorAll("select");
+    const newIndex = (selects[0].selectedIndex + 1) % selects[0].options.length;
+    selects.forEach(select => select.selectedIndex = newIndex);
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Custom implementation for label-to-checkbox linking.
+   * @param {Event} event     The initiating click event.
+   */
+  static #onCycleRight(event, target) {
+    const select = target.closest(".row").querySelector(".select select");
+    const newIndex = (select.selectedIndex + 1) % select.options.length;
+    select.selectedIndex = newIndex;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Cycle backwards in the select options.
+   * @param {Event} event     The initiating click event.
+   */
+  static #onCycleLeft(event, target) {
+    const select = target.nextElementSibling;
+    const n = select.selectedIndex - 1;
+    const mod = select.options.length;
+    const newIndex = ((n % mod) + mod) % mod;
+    select.selectedIndex = newIndex;
+  }
+}

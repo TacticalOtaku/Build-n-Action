@@ -1,0 +1,3 @@
+.build-n-action.overview table :is(td, th) {
+  text-align: center;
+}

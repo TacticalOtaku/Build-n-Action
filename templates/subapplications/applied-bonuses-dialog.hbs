@@ -1,0 +1,35 @@
+<div class="overview-content">
+  <div class="dialog-content">
+    <table>
+      <thead>
+        <tr>
+          <th>{{localize "BUILD_N_ACTION.OverviewName"}}</th>
+          <th>{{localize "BUILD_N_ACTION.OverviewImmediateParent"}}</th>
+          <th>{{localize "BUILD_N_ACTION.OverviewActor"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each bonuses}}
+        <tr>
+          <td data-tooltip="{{description}}">{{name}}</td>
+          <td>
+            <a data-action="copyUuid" data-uuid="{{parent.uuid}}" data-tooltip="{{parent.uuid}}">
+              {{ifThen parent.name parent.name (localize "Template")}}
+            </a>
+          </td>
+          <td>
+            <a data-action="copyUuid" data-uuid="{{actor.uuid}}" data-tooltip="{{actor.uuid}}">
+              {{actor.name}}
+            </a>
+          </td>
+        </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </div>
+  <div class="dialog-buttons">
+    <button type="button" class="dialog-button ok default" data-action="close">
+      <i class="fa-solid fa-check"></i> {{localize "Close"}}
+    </button>
+  </div>
+</div>
