@@ -1,0 +1,70 @@
+{
+    "id": "build-n-action",
+    "title": "Build-n-Action",
+    "version": "1.0.0",
+    "authors": [
+        {
+            "name": "TacticalOtaku"
+        }
+    ],
+    "compatibility": {
+        "minimum": "14.363",
+        "maximum": "14.363",
+        "verified": "14.363"
+    },
+    "esmodules": [
+        "module.mjs"
+    ],
+    "styles": [
+        "module.css"
+    ],
+    "relationships": {
+        "systems": [
+            {
+                "id": "dnd5e",
+                "type": "system",
+                "compatibility": {
+                    "minimum": "5.3.3",
+                    "maximum": "5.3.3",
+                    "verified": "5.3.3"
+                }
+            }
+        ],
+        "recommends": [
+            {
+                "id": "midi-qol",
+                "type": "module",
+                "compatibility": {
+                    "minimum": "14.0.10",
+                    "verified": "14.0.10"
+                }
+            },
+            {
+                "id": "dae",
+                "type": "module",
+                "compatibility": {
+                    "minimum": "14.0.12",
+                    "verified": "14.0.12"
+                }
+            }
+        ]
+    },
+    "languages": [
+        {
+            "lang": "en",
+            "name": "English",
+            "path": "lang/en.json",
+            "flags": {}
+        },
+        {
+            "lang": "ru",
+            "name": "Русский",
+            "path": "lang/ru.json",
+            "flags": {}
+        }
+    ],
+    "flags": {
+        "hotReload": false
+    },
+    "description": "Build contextual bonuses, roll modifiers, filters, optional consumption, auras, and template effects for dnd5e."
+}

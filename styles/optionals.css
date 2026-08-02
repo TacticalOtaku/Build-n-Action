@@ -1,0 +1,96 @@
+div.build-n-action.optionals {
+  display: flex;
+  flex-direction: column;
+
+  .optional {
+    display: grid;
+    gap: 0.5em;
+
+    & button {
+      display: flex;
+      justify-content: center;
+      padding: 3px;
+    }
+
+    &.active button,
+    &.active .consumption {
+      pointer-events: none;
+    }
+
+    &.active button {
+      background: inherit;
+      border: none;
+      box-shadow: none;
+
+      & > i::before {
+        content: "\f00c";
+      }
+    }
+
+    &.active .consumption > * {
+      color: gray;
+    }
+
+    .bonus-text .name {
+      font-style: italic;
+      font-weight: bold;
+    }
+
+    .consumption {
+      align-items: center;
+      display: flex;
+
+      .label {
+        color: #4b4a44;
+        flex: 1;
+        font-weight: bold;
+      }
+
+      & select {
+        flex: 2;
+      }
+    }
+  }
+}
+
+.build-n-action.optionals {
+  .description:empty::before,
+  .description:not(:empty) > :first-child::before {
+    content: var(--bonus-name);
+    font-weight: bold;
+    margin-right: 5px;
+  }
+
+  .reminder::before {
+    display: none;
+  }
+}
+
+fieldset.build-n-action.optionals {
+  .optional:last-of-type + hr {
+    display: none;
+  }
+
+  .optional .form-group button {
+    flex: 0 0 var(--form-field-height);
+    height: var(--form-field-height);
+    margin-left: 0.5rem;
+    padding: 0;
+
+    .fa-solid {
+      margin: 0;
+    }
+  }
+
+  .optional.active .form-group :is(select, button) {
+    background: inherit;
+    border-color: transparent;
+    box-shadow: none;
+    color: gray;
+    pointer-events: none;
+  }
+
+  .optional.active .form-group button .fa-solid::before {
+    content: "\f00c";
+  }
+}

@@ -1,0 +1,78 @@
+<div class="tab scrollable {{tabs.advanced.cssClass}}" data-tab="advanced" data-group="main">
+
+  <fieldset>
+    <legend>{{localize "BUILD_N_ACTION.Toggles"}}</legend>
+    {{#with fields}}
+    {{formGroup enabled.field value=enabled.value rootId=@root.rootId}}
+    {{formGroup exclusive.field value=exclusive.value rootId=@root.rootId}}
+    {{formGroup optional.field value=optional.value rootId=@root.rootId}}
+    {{formGroup reminder.field value=reminder.value disabled=reminder.disabled rootId=@root.rootId}}
+    {{/with}}
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "BUILD_N_ACTION.FIELDS.consume.label"}}</legend>
+    {{#with consume}}
+    {{formGroup enabled.field value=enabled.value rootId=@root.rootId disabled=enabled.disabled}}
+    {{#if enabled.value}}
+    {{formGroup type.field value=type.value sort=true blank="-"}}
+    {{#unless scales.unavailable}}
+    {{#if subtype.show}}
+    {{formGroup subtype.field value=subtype.value sort=false blank="-" choices=subtype.choices label=subtype.label}}
+    {{/if}}
+    {{#unless scales.unavailable}}
+    {{formGroup scales.field value=scales.value rootId=@root.rootId}}
+    {{/unless}}
+
+    <div class="form-group values">
+      <label>
+        {{value.label}}
+        {{{value.range}}}
+      </label>
+      <div class="form-fields">
+        {{formInput value.min.field value=value.min.value placeholder=value.min.placeholder}}
+        {{#if scales.value}}
+        <span class="sep dash">&mdash;</span>
+        {{formInput value.max.field value=value.max.value placeholder=value.max.placeholder}}
+        {{/if}}
+      </div>
+      <p class="hint">{{value.hint}}</p>
+    </div>
+
+    {{#if step.show}}
+    {{formGroup step.field value=step.value placeholder=step.field.label}}
+    {{/if}}
+
+    {{#if formula.show}}
+    {{formGroup formula.field value=formula.value placeholder=formula.placeholder}}
+    {{/if}}
+
+    {{/unless}}
+
+    {{/if}}
+    {{/with}}
+  </fieldset>
+
+  <fieldset>
+    <legend>{{localize "BUILD_N_ACTION.FIELDS.aura.label"}}</legend>
+    {{#with aura}}
+    {{formGroup enabled.field value=enabled.value rootId=@root.rootId}}
+
+    {{#if enabled.value}}
+    {{formGroup template.field value=template.value rootId=@root.rootId}}
+    {{#unless template.value}}
+    {{formGroup range.field value=range.value label=range.label placeholder=range.field.label}}
+    {{/unless}}
+    {{formGroup disposition.field value=disposition.value sort=false}}
+    {{formGroup self.field value=self.value rootId=@root.rootId}}
+    {{formGroup blockers.field value=blockers.value}}
+    {{#unless template.value}}
+    {{#each requirements}}
+    {{formGroup field value=value rootId=@root.rootId}}
+    {{/each}}
+    {{/unless}}
+    {{/if}}
+    {{/with}}
+  </fieldset>
+
+</div>

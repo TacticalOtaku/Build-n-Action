@@ -1,0 +1,17 @@
+<div class="tab scrollable {{tabs.filters.cssClass}}" data-tab="filters" data-group="main">
+  <ul class="scrollable toc">
+    {{#each filterpickers}}
+    <li data-id="{{id}}">
+      <a data-action="viewFilter">{{field.label}}</a>
+    </li>
+    {{/each}}
+  </ul>
+  <div class="scrollable picker">
+    {{#each filterpickers}}
+    <fieldset class="filter" data-id="{{id}}" data-action="addFilter">
+      <legend>{{field.label}} {{#if repeats}}({{repeats}}){{/if}}</legend>
+      <p class="hint">{{{field.hint}}}</p>
+    </fieldset>
+    {{/each}}
+  </div>
+</div>
