@@ -9,8 +9,8 @@
     ],
     "compatibility": {
         "minimum": "14.363",
-        "maximum": "14.363",
-        "verified": "14.363"
+        "maximum": "14.367",
+        "verified": "14.367"
     },
     "esmodules": [
         "module.mjs"
@@ -65,6 +65,6 @@
     ],
     "url": "https://github.com/TacticalOtaku/Build-n-Action",
     "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
-    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.0/build-n-action-v1.0.0.zip",
+    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.1/build-n-action-v1.0.1.zip",
     "socket": true
 }
