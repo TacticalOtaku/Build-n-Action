@@ -5964,6 +5964,24 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
   _onRender(...T) {
     super._onRender(...T);
 
+    const imageInput = this.element.querySelector("input[name=img]");
+    const imagePreview = this.element.querySelector("[data-bna-image-preview]");
+    const fallbackImage = imagePreview?.dataset.fallbackSrc ?? "icons/svg/dice-target.svg";
+    const showImagePreview = path => {
+      if (imagePreview) imagePreview.src = String(path ?? "").trim() || fallbackImage;
+    };
+    imagePreview?.addEventListener("error", () => {
+      if (!imagePreview.src.endsWith(fallbackImage)) imagePreview.src = fallbackImage;
+    });
+    imageInput?.addEventListener("input", event => showImagePreview(event.currentTarget.value));
+    imageInput?.addEventListener("change", async event => {
+      // Prevent DocumentSheetV2 submit-on-change from persisting nested bonus
+      // data through the parent ActiveEffect. ContextualBonus owns this field.
+      event.stopPropagation();
+      await updateBonusImage(this.bonus, event.currentTarget.value);
+      await this.render({force: true});
+    });
+
     // Keep a single table-of-contents entry synchronized with the right-hand scroll position.
     const tab = this.element.querySelector(".tab[data-tab=filters]");
     const picker = tab?.querySelector(".picker");
@@ -7863,6 +7881,21 @@ function joinFormula(current, addition) {
 }
 
 /**
+ * Keep the dnd5e roll-configuration dialog available when a contextual bonus
+ * still needs a user decision. This intentionally overrides Midi-QOL fast
+ * forward only for rolls that actually have optional Build-n-Action bonuses.
+ *
+ * @param {object} dialog
+ * @param {object} bonuses
+ * @returns {boolean} Whether the dialog was required.
+ */
+function requireOptionalRollDialog(dialog, bonuses) {
+  if (!dialog || !bonuses?.optionals?.size) return false;
+  dialog.configure = true;
+  return true;
+}
+
+/**
  * Append an additive part to every roll in a dnd5e BasicRoll process configuration.
  * @param {object} config  The process configuration to mutate.
  * @param {string} part    The formula part to append.
@@ -8025,6 +8058,7 @@ function preRollAttack(config, dialog, message) {
   const bonuses = itemCheck(subjects, "attack", {spellLevel});
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Gather up all bonuses.
   const mods = {criticalSuccess: 0, criticalFailure: 0};
@@ -8079,6 +8113,7 @@ function preRollDamage(config, dialog, message) {
   const bonuses = itemCheck(subjects, "damage", {spellLevel, attackMode});
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Used in the optional selector to determine which bonuses have and still should apply dice modifications.
   const modifiers = new foundry.utils.Collection();
@@ -8119,6 +8154,7 @@ function preRollSavingThrow(config, dialog, message) {
   const bonuses = throwCheck(subjects, details);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Gather up all bonuses.
   const accum = {targetValue: 0, critical: 0};
@@ -8170,6 +8206,7 @@ function preRollAbilityCheck(config, dialog, message) {
   const bonuses = testCheck(subjects, details);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   for (const bonus of bonuses.nonoptional) {
     if (bonus.hasAdditiveBonus) {
@@ -8203,6 +8240,7 @@ function preRollHitDie(config, dialog, message) {
   const bonuses = hitDieCheck(subjects);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   const modifiers = new foundry.utils.Collection();
   const id = registry.register({
@@ -8230,8 +8268,6 @@ function preRollHitDie(config, dialog, message) {
     if (!bonus._halted) modifiers.set(bonus.uuid, bonus);
   }
 
-  // Force dialog if there is an optional bonus.
-  if (bonuses.optionals.size) dialog.configure = true;
 }
 
 /* -------------------------------------------------- */

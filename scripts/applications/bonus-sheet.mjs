@@ -175,6 +175,24 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
   _onRender(...T) {
     super._onRender(...T);
 
+    const imageInput = this.element.querySelector("input[name=img]");
+    const imagePreview = this.element.querySelector("[data-bna-image-preview]");
+    const fallbackImage = imagePreview?.dataset.fallbackSrc ?? "icons/svg/dice-target.svg";
+    const showImagePreview = path => {
+      if (imagePreview) imagePreview.src = String(path ?? "").trim() || fallbackImage;
+    };
+    imagePreview?.addEventListener("error", () => {
+      if (!imagePreview.src.endsWith(fallbackImage)) imagePreview.src = fallbackImage;
+    });
+    imageInput?.addEventListener("input", event => showImagePreview(event.currentTarget.value));
+    imageInput?.addEventListener("change", async event => {
+      // Prevent DocumentSheetV2 submit-on-change from persisting nested bonus
+      // data through the parent ActiveEffect. ContextualBonus owns this field.
+      event.stopPropagation();
+      await updateBonusImage(this.bonus, event.currentTarget.value);
+      await this.render({force: true});
+    });
+
     // Keep a single table-of-contents entry synchronized with the right-hand scroll position.
     const tab = this.element.querySelector(".tab[data-tab=filters]");
     const picker = tab?.querySelector(".picker");
