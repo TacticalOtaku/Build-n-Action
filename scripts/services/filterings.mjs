@@ -4,6 +4,7 @@ import BonusCollection from "./bonus-collection.mjs";
 import BonusCollector from "./bonus-collector.mjs";
 import {evaluateBonusFilters} from "./filter-evaluator.mjs";
 import {proficiencyTree, speaksLanguage} from "./proficiencies.mjs";
+import {resolveSubjectTarget} from "./roll-target.mjs";
 
 const AURA_CLEANUP_DELAY_MS = 2000;
 
@@ -12,6 +13,7 @@ const AURA_CLEANUP_DELAY_MS = 2000;
  * @property {Activity} [activity]      The activity that was used.
  * @property {Item5e} [item]            The item whose activity was used.
  * @property {Actor5e} actor            The actor performing a roll or using an item.
+ * @property {Token5e|null} [target]     The authoritative target for this roll.
  */
 
 /* -------------------------------------------------- */
@@ -408,7 +410,7 @@ function arbitraryComparisons(subjects, filter, details) {
   if (!filter.length) return true;
 
   const rollData = (subjects.activity ?? subjects.item ?? subjects.actor).getRollData();
-  const target = game.user.targets.first();
+  const target = resolveSubjectTarget(subjects);
   if (target?.actor) rollData.target = target.actor.getRollData();
 
   for (const {one, other, operator} of filter) {
@@ -538,7 +540,7 @@ function baseWeapons(subjects, filter, details) {
  */
 function creatureTypes(subjects, filter, details) {
   if (!filter.size) return true;
-  const target = game.user.targets.first();
+  const target = resolveSubjectTarget(subjects);
   const {included, excluded} = _splitExclusion(filter);
   const ad = target?.actor?.system.details;
   if (!ad) return !included.size;
@@ -712,7 +714,7 @@ function markers(subjects, filter, details) {
   }
 
   if (filter.target.size) {
-    const targetActor = game.user.targets.first()?.actor;
+    const targetActor = resolveSubjectTarget(subjects)?.actor;
     if (!targetActor || !hasMarker(targetActor, filter.target)) return false;
   }
 
@@ -959,7 +961,7 @@ function statusEffects(subjects, filter, details) {
  * @returns {boolean}                   Whether the rolling actor is wearing appropriate armor.
  */
 function targetArmors(subjects, filter, details) {
-  const target = game.user.targets.first()?.actor;
+  const target = resolveSubjectTarget(subjects)?.actor;
   if (!target) return !_splitExclusion(filter).included.size;
   return baseArmors({actor: target}, filter, details);
 }
@@ -978,7 +980,7 @@ function targetArmors(subjects, filter, details) {
 function targetEffects(subjects, filter, details) {
   if (!filter.size) return true;
   const {included, excluded} = _splitExclusion(filter);
-  const actor = game.user.targets.first()?.actor;
+  const actor = resolveSubjectTarget(subjects)?.actor;
   if (!actor) return !included.size;
 
   // Discard any conditions the actor is immune to.
@@ -1024,7 +1026,7 @@ function throwTypes(subjects, filter, details) {
  */
 function tokenSizes(subjects, filter, details) {
   if (!(filter.size > 0)) return true;
-  const target = game.user.targets.first()?.document;
+  const target = resolveSubjectTarget(subjects)?.document;
   if (!target) return false;
   const enemySize = Math.max(target.width, target.height);
 

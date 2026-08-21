@@ -4191,6 +4191,48 @@ function evaluateBonusFilters(bonuses, filterRegistry, subjects, details) {
   return bonuses;
 }
 
+function firstTarget(targets) {
+  if (!targets) return null;
+  if (typeof targets.first === "function") return targets.first() ?? null;
+  return targets[Symbol.iterator]?.().next().value ?? null;
+}
+
+/**
+ * Resolve the target used while evaluating a roll.
+ * @param {object} rollConfig       Current dnd5e roll configuration.
+ * @param {object} [options]
+ * @param {boolean} [options.preferHitTargets]  Prefer confirmed Midi hits for damage rolls.
+ * @param {Iterable} [options.userTargets]      Current Foundry user targets.
+ * @returns {Token|null}
+ */
+function resolveRollTarget(rollConfig = {}, {
+  preferHitTargets = false,
+  userTargets = globalThis.game?.user?.targets
+} = {}) {
+  const workflow = rollConfig.workflow ?? rollConfig.midiOptions?.workflow;
+  const hasWorkflowTargets = workflow && (("targets" in Object(workflow)) || ("hitTargets" in Object(workflow)));
+  if (hasWorkflowTargets) {
+    if (preferHitTargets) {
+      const hitTarget = firstTarget(workflow.hitTargets);
+      if (hitTarget) return hitTarget;
+    }
+    return firstTarget(workflow.targets);
+  }
+  return firstTarget(userTargets);
+}
+
+/**
+ * Resolve the target already attached to a filtering subject, falling back to
+ * native Foundry targeting only for callers which have no explicit roll context.
+ * @param {object} subjects          Filtering subjects.
+ * @param {Iterable} userTargets    Current Foundry user targets.
+ * @returns {Token|null}
+ */
+function resolveSubjectTarget(subjects = {}, userTargets = globalThis.game?.user?.targets) {
+  if (Object.hasOwn(subjects, "target")) return subjects.target ?? null;
+  return firstTarget(userTargets);
+}
+
 const AURA_CLEANUP_DELAY_MS = 2000;
 
 /**
@@ -4198,6 +4240,7 @@ const AURA_CLEANUP_DELAY_MS = 2000;
  * @property {Activity} [activity]      The activity that was used.
  * @property {Item5e} [item]            The item whose activity was used.
  * @property {Actor5e} actor            The actor performing a roll or using an item.
+ * @property {Token5e|null} [target]     The authoritative target for this roll.
  */
 
 /* -------------------------------------------------- */
@@ -4594,7 +4637,7 @@ function arbitraryComparisons(subjects, filter, details) {
   if (!filter.length) return true;
 
   const rollData = (subjects.activity ?? subjects.item ?? subjects.actor).getRollData();
-  const target = game.user.targets.first();
+  const target = resolveSubjectTarget(subjects);
   if (target?.actor) rollData.target = target.actor.getRollData();
 
   for (const {one, other, operator} of filter) {
@@ -4724,7 +4767,7 @@ function baseWeapons(subjects, filter, details) {
  */
 function creatureTypes(subjects, filter, details) {
   if (!filter.size) return true;
-  const target = game.user.targets.first();
+  const target = resolveSubjectTarget(subjects);
   const {included, excluded} = _splitExclusion(filter);
   const ad = target?.actor?.system.details;
   if (!ad) return !included.size;
@@ -4898,7 +4941,7 @@ function markers(subjects, filter, details) {
   }
 
   if (filter.target.size) {
-    const targetActor = game.user.targets.first()?.actor;
+    const targetActor = resolveSubjectTarget(subjects)?.actor;
     if (!targetActor || !hasMarker(targetActor, filter.target)) return false;
   }
 
@@ -5145,7 +5188,7 @@ function statusEffects(subjects, filter, details) {
  * @returns {boolean}                   Whether the rolling actor is wearing appropriate armor.
  */
 function targetArmors(subjects, filter, details) {
-  const target = game.user.targets.first()?.actor;
+  const target = resolveSubjectTarget(subjects)?.actor;
   if (!target) return !_splitExclusion(filter).included.size;
   return baseArmors({actor: target}, filter);
 }
@@ -5164,7 +5207,7 @@ function targetArmors(subjects, filter, details) {
 function targetEffects(subjects, filter, details) {
   if (!filter.size) return true;
   const {included, excluded} = _splitExclusion(filter);
-  const actor = game.user.targets.first()?.actor;
+  const actor = resolveSubjectTarget(subjects)?.actor;
   if (!actor) return !included.size;
 
   // Discard any conditions the actor is immune to.
@@ -5210,7 +5253,7 @@ function throwTypes(subjects, filter, details) {
  */
 function tokenSizes(subjects, filter, details) {
   if (!(filter.size > 0)) return true;
-  const target = game.user.targets.first()?.document;
+  const target = resolveSubjectTarget(subjects)?.document;
   if (!target) return false;
   const enemySize = Math.max(target.width, target.height);
 
@@ -7940,7 +7983,8 @@ function postActivityConsumption(activity, usageConfig, messageConfig, updates) 
   const subjects = {
     activity: activity,
     item: activity.item,
-    actor: activity.item.actor
+    actor: activity.item.actor,
+    target: resolveRollTarget(usageConfig)
   };
 
   const rollData = activity.getRollData({deterministic: true});
@@ -7949,7 +7993,7 @@ function postActivityConsumption(activity, usageConfig, messageConfig, updates) 
   const bonuses = itemCheck(subjects, "save", {spellLevel: rollData.item.level});
   if (!bonuses.size) return;
 
-  _addTargetData({data: rollData}, true);
+  _addTargetData({data: rollData}, subjects.target, true);
   const totalBonus = bonuses.all.reduce((acc, bonus) => {
     return acc + dnd5e.utils.simplifyBonus(bonus.bonuses.bonus, rollData);
   }, 0);
@@ -7969,13 +8013,18 @@ function preRollAttack(config, dialog, message) {
   const item = config.subject?.item;
   if (!item) return;
 
-  const subjects = {activity: config.subject, item: item, actor: item.actor};
+  const subjects = {
+    activity: config.subject,
+    item: item,
+    actor: item.actor,
+    target: resolveRollTarget(config)
+  };
   // get bonuses:
   const rollData = config.subject.getRollData();
   const spellLevel = rollData.item.level;
   const bonuses = itemCheck(subjects, "attack", {spellLevel});
   if (!bonuses.size) return;
-  _addTargetData(config);
+  _addTargetData(config, subjects.target);
 
   // Gather up all bonuses.
   const mods = {criticalSuccess: 0, criticalFailure: 0};
@@ -8021,10 +8070,15 @@ function preRollDamage(config, dialog, message) {
   const spellLevel = config.subject.getRollData().item.level;
   const attackMode = config.attackMode ?? null;
 
-  const subjects = {activity: config.subject, item: item, actor: item.actor};
+  const subjects = {
+    activity: config.subject,
+    item: item,
+    actor: item.actor,
+    target: resolveRollTarget(config, {preferHitTargets: true})
+  };
   const bonuses = itemCheck(subjects, "damage", {spellLevel, attackMode});
   if (!bonuses.size) return;
-  _addTargetData(config);
+  _addTargetData(config, subjects.target);
 
   // Used in the optional selector to determine which bonuses have and still should apply dice modifications.
   const modifiers = new foundry.utils.Collection();
@@ -8061,9 +8115,10 @@ function preRollSavingThrow(config, dialog, message) {
     isDeath: config.hookNames?.includes("deathSave") ?? false
   };
 
-  const bonuses = throwCheck({actor}, details);
+  const subjects = {actor, target: resolveRollTarget(config)};
+  const bonuses = throwCheck(subjects, details);
   if (!bonuses.size) return;
-  _addTargetData(config);
+  _addTargetData(config, subjects.target);
 
   // Gather up all bonuses.
   const accum = {targetValue: 0, critical: 0};
@@ -8104,7 +8159,8 @@ function preRollAbilityCheck(config, dialog, message) {
   if (!actor) return;
   const subjects = {
     actor: actor,
-    item: config.item
+    item: config.item,
+    target: resolveRollTarget(config)
   };
   const details = {
     abilityId: config.ability,
@@ -8113,7 +8169,7 @@ function preRollAbilityCheck(config, dialog, message) {
   };
   const bonuses = testCheck(subjects, details);
   if (!bonuses.size) return;
-  _addTargetData(config);
+  _addTargetData(config, subjects.target);
 
   for (const bonus of bonuses.nonoptional) {
     if (bonus.hasAdditiveBonus) {
@@ -8143,9 +8199,10 @@ function preRollAbilityCheck(config, dialog, message) {
  */
 function preRollHitDie(config, dialog, message) {
   const actor = config.subject;
-  const bonuses = hitDieCheck({actor});
+  const subjects = {actor, target: resolveRollTarget(config)};
+  const bonuses = hitDieCheck(subjects);
   if (!bonuses.size) return;
-  _addTargetData(config);
+  _addTargetData(config, subjects.target);
 
   const modifiers = new foundry.utils.Collection();
   const id = registry.register({
@@ -8206,10 +8263,10 @@ function preCreateActivityTemplate(activity, templateData) {
 /**
  * Add the target's roll data to the actor's roll data.
  * @param {object} config               The roll config for this roll. **will be mutated**
+ * @param {Token5e|null} target         The authoritative target for this roll.
  * @param {boolean} [deterministic]     Whether to force flat values for properties that could be a die or flat term.
  */
-function _addTargetData(config, deterministic = false) {
-  const target = game.user.targets.first();
+function _addTargetData(config, target, deterministic = false) {
   if (target?.actor) {
     const targetData = target.actor.getRollData({deterministic});
     injectTargetData(config, targetData);
