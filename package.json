@@ -1,6 +1,6 @@
 {
   "name": "build-n-action",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Build-n-Action",
   "scripts": {
     "build": "rollup -c rollup.config.mjs && node ./tools/build-css.mjs",
