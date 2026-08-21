@@ -8,7 +8,21 @@
   </h1>
 
   <dnd5e-effects class="inventory-element" v2>
-    <item-list-controls for="build-n-action" label="{{localize 'BUILD_N_ACTION.SearchBonuses'}}" sort="toggle" group group-label="{{localize 'BUILD_N_ACTION.GroupByType'}}" collection="build-n-action"></item-list-controls>
+    <div class="bna-list-controls">
+      <search>
+        <i class="fa-solid fa-magnifying-glass" inert></i>
+        <input type="search" data-bna-search value="{{searchQuery}}" placeholder="{{localize 'BUILD_N_ACTION.SearchBonuses'}}" aria-label="{{localize 'BUILD_N_ACTION.SearchBonuses'}}">
+        <button type="button" class="unbutton" data-action="clearSearch" data-tooltip="{{localize 'BUILD_N_ACTION.SearchBonuses'}}" aria-label="{{localize 'BUILD_N_ACTION.SearchBonuses'}}">
+          <i class="fa-solid fa-xmark" inert></i>
+        </button>
+      </search>
+      {{#if isEdit}}
+      <button type="button" data-action="create">
+        <i class="fa-solid fa-plus" inert></i>
+        {{localize "BUILD_N_ACTION.Create"}}
+      </button>
+      {{/if}}
+    </div>
 
     <section class="items-list build-n-action-list" data-item-list="build-n-action">
 
@@ -33,6 +47,7 @@
             data-item-sort="{{bonus.sort}}"
             data-grouped="{{bonus.type}}"
             data-ungrouped="all"
+            data-search-value="{{bonus.name}} {{bonus.parent.name}}"
             draggable="true">
             <div class="item-name item-action item-tooltip rollable" role="button" aria-label="{{bonus.name}}" data-tooltip="{{tooltip}}" data-tooltip-class="dnd5e2 dnd5e-tooltip item-tooltip" data-tooltip-direction="LEFT" data-action="edit">
               <img class="item-image gold-icon" src="{{bonus.img}}" alt="{{bonus.name}}">

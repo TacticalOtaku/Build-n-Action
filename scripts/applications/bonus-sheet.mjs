@@ -2,6 +2,7 @@ import {ContextualBonus} from "../models/contextual-bonus-model.mjs";
 import {MODULE} from "../constants.mjs";
 import fields from "../fields/_module.mjs";
 import {getCollection} from "../services/bonus-repository.mjs";
+import {updateBonusImage} from "../services/bonus-image.mjs";
 import {scrollFilterIntoView} from "./filter-navigation.mjs";
 import KeysDialog from "./keys-dialog.mjs";
 
@@ -65,6 +66,7 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
       addFilter: this.#onAddFilter,
       copyUuid: {handler: this.#onCopyUuid, buttons: [0, 2]},
       deleteFilter: this.#onDeleteFilter,
+      editImage: this.#onEditImage,
       keysDialog: this.#onKeysDialog,
       viewFilter: this.#onViewFilter
     },
@@ -623,6 +625,31 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
     const label = game.i18n.localize(bonus.constructor.metadata.label);
     game.clipboard.copyPlainText(id);
     ui.notifications.info(game.i18n.format("DOCUMENT.IdCopiedClipboard", {label, type, id}));
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Select and persist a bonus image without routing it through the parent
+   * DocumentSheet form submission.
+   */
+  static async #onEditImage() {
+    if (!this.isEditable) return;
+    const bonus = this.bonus;
+    const picker = new foundry.applications.apps.FilePicker.implementation({
+      current: bonus.img,
+      type: "image",
+      document: bonus.parent,
+      callback: async path => {
+        await updateBonusImage(bonus, path);
+        await this.render({force: true});
+      },
+      position: {
+        top: this.position.top + 40,
+        left: this.position.left + 10
+      }
+    });
+    return picker.browse();
   }
 
   /* -------------------------------------------------- */
