@@ -5613,6 +5613,23 @@ async function hotbarToggle(uuid) {
 }
 
 /**
+ * Persist an explicitly selected image on a contextual bonus.
+ *
+ * Image selection is kept out of the parent DocumentSheet form submission so
+ * the ContextualBonus remains the only owner of its nested flag data.
+ *
+ * @param {ContextualBonus} bonus
+ * @param {string} path
+ * @returns {Promise<ContextualBonus>}
+ */
+async function updateBonusImage(bonus, path) {
+  path = String(path ?? "").trim();
+  if (!path || (path === bonus.img)) return bonus;
+  await bonus.update({img: path});
+  return bonus;
+}
+
+/**
  * Scroll one filter card into view inside the filter picker.
  * Using the picker's own scroll offset avoids scrollIntoView selecting an outer
  * ApplicationV2 scroll container when the filter tab has two scrollable columns.
@@ -5795,6 +5812,7 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
       addFilter: this.#onAddFilter,
       copyUuid: {handler: this.#onCopyUuid, buttons: [0, 2]},
       deleteFilter: this.#onDeleteFilter,
+      editImage: this.#onEditImage,
       keysDialog: this.#onKeysDialog,
       viewFilter: this.#onViewFilter
     },
@@ -6358,6 +6376,31 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
   /* -------------------------------------------------- */
 
   /**
+   * Select and persist a bonus image without routing it through the parent
+   * DocumentSheet form submission.
+   */
+  static async #onEditImage() {
+    if (!this.isEditable) return;
+    const bonus = this.bonus;
+    const picker = new foundry.applications.apps.FilePicker.implementation({
+      current: bonus.img,
+      type: "image",
+      document: bonus.parent,
+      callback: async path => {
+        await updateBonusImage(bonus, path);
+        await this.render({force: true});
+      },
+      position: {
+        top: this.position.top + 40,
+        left: this.position.left + 10
+      }
+    });
+    return picker.browse();
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
    * Scroll a filter into view in the picker.
    * @param {Event} event             The initiating click event.
    * @param {HTMLElement} target      Targeted html element.
@@ -6904,7 +6947,22 @@ var applications = {
   TokenAura
 };
 
-const SHEET_MAPPINGS = new Map();
+/**
+ * Match a contextual bonus row against a user-entered search query.
+ *
+ * @param {string} text
+ * @param {string} query
+ * @param {string} [locale]
+ * @returns {boolean}
+ */
+function matchesBonusSearch(text, query, locale) {
+  query = String(query ?? "").trim().toLocaleLowerCase(locale);
+  if (!query) return true;
+  return String(text ?? "").toLocaleLowerCase(locale).includes(query);
+}
+
+const SHEET_MAPPINGS = new WeakMap();
+const SHEET_SEARCHES = new WeakMap();
 
 /**
  * Resolve a bonus from the current render mapping, falling back to its UUID.
@@ -6917,7 +6975,7 @@ const SHEET_MAPPINGS = new Map();
  */
 function _resolveBonus(sheet, uuid) {
   if (!uuid) return null;
-  return SHEET_MAPPINGS.get(sheet.document.uuid)?.get(uuid) ?? fromUuidSync$1(uuid);
+  return SHEET_MAPPINGS.get(sheet)?.get(uuid) ?? fromUuidSync$1(uuid);
 }
 
 /**
@@ -6929,7 +6987,7 @@ function _resolveBonus(sheet, uuid) {
  * @param {Set<string>} uuids
  */
 async function _prepareBonusRow(sheet, bonus, rollData, sections, uuids) {
-  SHEET_MAPPINGS.get(sheet.document.uuid).set(bonus.uuid, bonus);
+  SHEET_MAPPINGS.get(sheet).set(bonus.uuid, bonus);
   uuids.add(bonus.uuid);
   const section = sections[bonus.type] ??= {
     label: `BUILD_N_ACTION.${bonus.type.toUpperCase()}.Label`,
@@ -6956,7 +7014,7 @@ async function _prepareBonusRow(sheet, bonus, rollData, sections, uuids) {
 async function _collectSheetBonuses(sheet) {
   const sections = {};
   const uuids = new Set();
-  SHEET_MAPPINGS.set(sheet.document.uuid, new Map());
+  SHEET_MAPPINGS.set(sheet, new Map());
 
   const actorRollData = sheet.actor.getRollData();
   for (const bonus of getCollection(sheet.actor)) {
@@ -6978,7 +7036,9 @@ async function _collectSheetBonuses(sheet) {
       await _prepareBonusRow(sheet, bonus, actorRollData, sections, uuids);
     }
   }
-  sections.all = {label: "BUILD_N_ACTION.Bonuses", key: "all", bonuses: []};
+  for (const section of Object.values(sections)) {
+    section.bonuses.sort((a, b) => a.bonus.name.localeCompare(b.bonus.name, game.i18n.lang));
+  }
   return {sections, uuids};
 }
 
@@ -6992,16 +7052,52 @@ async function _renderSheetTab(sheet, sections) {
   const template = `modules/${MODULE.ID}/templates/subapplications/character-sheet-tab.hbs`;
   const div = document.createElement("DIV");
   const isActive = sheet.tabGroups.primary === MODULE.ID ? "active" : "";
-  const isEdit = sheet.constructor.MODES.EDIT === sheet._mode;
-  sheet._filters[MODULE.ID] ??= {name: "", properties: new Set()};
+  const isEdit = sheet.isEditMode;
   div.innerHTML = await foundry.applications.handlebars.renderTemplate(template, {
     ICON: MODULE.ICON,
     parentName: sheet.document.name,
     isActive,
     isEdit,
+    searchQuery: SHEET_SEARCHES.get(sheet) ?? "",
     sections: Object.values(sections).sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang))
   });
   return div;
+}
+
+/**
+ * Add the Build-n-Action control to the public tab markup rendered by the
+ * dnd5e 5.3.3 character and NPC sheets. The target structure comes from the
+ * system's templates/shared/sidebar-tabs.hbs contract for the supported
+ * version; no sheet class or prototype is mutated.
+ *
+ * @param {ActorSheet} sheet
+ * @param {HTMLElement} html
+ * @returns {HTMLElement|null}
+ */
+function _ensureTabControl(sheet, html) {
+  const nav = html.querySelector("nav.tabs[data-group=primary]");
+  if (!nav) return null;
+  let control = nav.querySelector(`[data-tab="${MODULE.ID}"]`);
+  if (control) return control;
+
+  control = document.createElement("A");
+  control.classList.add("item", "control");
+  control.dataset.group = "primary";
+  control.dataset.tab = MODULE.ID;
+  const label = game.i18n.localize("BUILD_N_ACTION.ModuleTitle");
+  control.dataset.tooltip = label;
+  control.setAttribute("aria-label", label);
+  const icon = document.createElement("I");
+  icon.classList.add(...MODULE.ICON.split(" "));
+  icon.inert = true;
+  control.append(icon);
+  nav.append(control);
+  control.classList.toggle("active", sheet.tabGroups.primary === MODULE.ID);
+  control.addEventListener("click", event => {
+    event.preventDefault();
+    sheet.changeTab(MODULE.ID, "primary", {event, navElement: control, updatePosition: true});
+  });
+  return control;
 }
 
 /**
@@ -7018,6 +7114,32 @@ function _configureTabControl(html, hasBonuses) {
   tabControl.setAttribute("aria-label", tooltip);
 }
 
+/** Register the tab-owned bonus search without dnd5e private list methods. */
+function _registerSearch(sheet, div) {
+  const input = div.querySelector("[data-bna-search]");
+  const clear = div.querySelector("[data-action=clearSearch]");
+  const apply = query => {
+    SHEET_SEARCHES.set(sheet, query);
+    let visible = 0;
+    for (const row of div.querySelectorAll(".item[data-search-value]")) {
+      row.hidden = !matchesBonusSearch(row.dataset.searchValue, query, game.i18n.lang);
+      if (!row.hidden) visible++;
+    }
+    for (const section of div.querySelectorAll(".items-section")) {
+      section.hidden = !section.querySelector(".item:not([hidden])");
+    }
+    clear?.classList.toggle("active", !!String(query).trim());
+    input?.setAttribute("aria-label", `${game.i18n.localize("BUILD_N_ACTION.SearchBonuses")}: ${visible}`);
+  };
+  input?.addEventListener("input", event => apply(event.currentTarget.value));
+  clear?.addEventListener("click", () => {
+    if (input) input.value = "";
+    apply("");
+    input?.focus();
+  });
+  apply(input?.value ?? "");
+}
+
 /**
  * Register actions that operate on a rendered bonus row.
  * @param {ActorSheet} sheet
@@ -7027,6 +7149,8 @@ function _registerBonusActions(sheet, div) {
   div.querySelectorAll("[data-action]").forEach(node => {
     node.addEventListener("click", async event => {
       const target = event.currentTarget;
+      if (target.dataset.action === "create") return _createChildBonus.call(sheet);
+      if (target.dataset.action === "clearSearch") return;
       const uuid = target.closest("[data-item-uuid]")?.dataset.itemUuid;
       const bonus = _resolveBonus(sheet, uuid);
       if (!bonus) return;
@@ -7099,19 +7223,19 @@ function _registerSourceActions(div) {
 async function _onRenderCharacterSheet2(sheet, html) {
   const {sections, uuids} = await _collectSheetBonuses(sheet);
   const div = await _renderSheetTab(sheet, sections);
+  _ensureTabControl(sheet, html);
   _configureTabControl(html, uuids.size > 0);
   _registerBonusActions(sheet, div);
   _registerDragAndDrop(sheet, div, uuids);
   _registerSourceActions(div);
+  _registerSearch(sheet, div);
 
   const body = html.querySelector(".tab-body");
-  if (!body || body.querySelector(`:scope > .tab.${MODULE.ID}`)) return;
-
-  body.appendChild(div.firstElementChild);
-  html.querySelectorAll("button.create-child").forEach(button => {
-    // Assigning listener to all buttons due to weirdness on npc sheet.
-    button.addEventListener("click", _createChildBonus.bind(sheet));
-  });
+  if (!body) return;
+  const tab = div.firstElementChild;
+  const current = body.querySelector(`:scope > .tab.${MODULE.ID}`);
+  if (current) current.replaceWith(tab);
+  else body.appendChild(tab);
 
   new dnd5e.applications.ContextMenu5e(html, ".build-n-action-list .item[data-item-uuid]", [], {
     jQuery: false,
@@ -7207,43 +7331,10 @@ async function _createChildBonus() {
 
 /* -------------------------------------------------- */
 
-/**
- * Add a new tab to the v2 character sheet.
- */
-function _addCharacterTab() {
-  const classes = [
-    dnd5e.applications.actor.CharacterActorSheet,
-    dnd5e.applications.actor.NPCActorSheet
-  ];
-  for (const cls of classes) {
-    cls.TABS.push({
-      tab: MODULE.ID, label: MODULE.NAME, icon: MODULE.ICON
-    });
-    const fn = cls.prototype._filterChildren;
-    class sheet extends cls {
-      /** @override */
-      _filterChildren(collection, filters) {
-        if (collection !== MODULE.ID) return fn.call(this, collection, filters);
-
-        const embedded = findEmbeddedDocumentsWithBonuses(this.document);
-
-        const actor = getCollection(this.document).contents;
-        const items = embedded.items?.flatMap(item => getCollection(item).contents) ?? [];
-        const effects = embedded.effects?.flatMap(effect => getCollection(effect).contents) ?? [];
-        return actor.concat(items).concat(effects);
-      }
-    }
-    cls.prototype._filterChildren = sheet.prototype._filterChildren;
-  }
-}
-
-/* -------------------------------------------------- */
-
 /** Initialize this part of the module. */
 function characterSheetTabSetup() {
   if (!game.settings.get(MODULE.ID, SETTINGS.SHEET_TAB)) return;
   if (!game.user.isGM && !game.settings.get(MODULE.ID, SETTINGS.PLAYERS)) return;
-  _addCharacterTab();
   Hooks.on("renderCharacterActorSheet", _onRenderCharacterSheet2);
   Hooks.on("renderNPCActorSheet", _onRenderCharacterSheet2);
 }

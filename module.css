@@ -758,12 +758,30 @@ fieldset.build-n-action.optionals {
 }
 
 .dnd5e2.sheet.actor {
-  & form.tab-build-n-action .create-child {
-    display: block;
-  }
-
   .tab.build-n-action {
     flex-direction: column;
+
+    .bna-list-controls {
+      align-items: center;
+      display: flex;
+      gap: 0.5rem;
+      margin-block-end: 0.75rem;
+
+      search {
+        align-items: center;
+        display: flex;
+        flex: 1;
+        gap: 0.4rem;
+      }
+
+      input {
+        flex: 1;
+      }
+
+      [data-action="clearSearch"]:not(.active) {
+        visibility: hidden;
+      }
+    }
 
     .items-section {
       .item {
