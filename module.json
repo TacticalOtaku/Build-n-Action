@@ -1,7 +1,7 @@
 {
     "id": "build-n-action",
     "title": "Build-n-Action",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "authors": [
         {
             "name": "TacticalOtaku"
@@ -36,7 +36,7 @@
                 "type": "module",
                 "compatibility": {
                     "minimum": "14.0.10",
-                    "verified": "14.0.10"
+                    "verified": "14.0.11"
                 }
             },
             {
@@ -65,6 +65,6 @@
     ],
     "url": "https://github.com/TacticalOtaku/Build-n-Action",
     "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
-    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.3/build-n-action-v1.0.3.zip",
+    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.4/build-n-action-v1.0.4.zip",
     "socket": true
 }

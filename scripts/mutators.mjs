@@ -7,6 +7,7 @@ import {
   sanitizeCriticalBonuses
 } from "./services/damage-roll.mjs";
 import registry from "./registry.mjs";
+import {requireOptionalRollDialog} from "./services/roll-dialog.mjs";
 import {resolveRollTarget} from "./services/roll-target.mjs";
 import {
   adjustCriticalRanges,
@@ -81,6 +82,7 @@ function preRollAttack(config, dialog, message) {
   const bonuses = filterings.itemCheck(subjects, "attack", {spellLevel});
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Gather up all bonuses.
   const mods = {criticalSuccess: 0, criticalFailure: 0};
@@ -135,6 +137,7 @@ function preRollDamage(config, dialog, message) {
   const bonuses = filterings.itemCheck(subjects, "damage", {spellLevel, attackMode});
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Used in the optional selector to determine which bonuses have and still should apply dice modifications.
   const modifiers = new foundry.utils.Collection();
@@ -175,6 +178,7 @@ function preRollSavingThrow(config, dialog, message) {
   const bonuses = filterings.throwCheck(subjects, details);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   // Gather up all bonuses.
   const accum = {targetValue: 0, critical: 0};
@@ -226,6 +230,7 @@ function preRollAbilityCheck(config, dialog, message) {
   const bonuses = filterings.testCheck(subjects, details);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   for (const bonus of bonuses.nonoptional) {
     if (bonus.hasAdditiveBonus) {
@@ -259,6 +264,7 @@ function preRollHitDie(config, dialog, message) {
   const bonuses = filterings.hitDieCheck(subjects);
   if (!bonuses.size) return;
   _addTargetData(config, subjects.target);
+  requireOptionalRollDialog(dialog, bonuses);
 
   const modifiers = new foundry.utils.Collection();
   const id = registry.register({
@@ -286,8 +292,6 @@ function preRollHitDie(config, dialog, message) {
     if (!bonus._halted) modifiers.set(bonus.uuid, bonus);
   }
 
-  // Force dialog if there is an optional bonus.
-  if (bonuses.optionals.size) dialog.configure = true;
 }
 
 /* -------------------------------------------------- */
