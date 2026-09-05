@@ -260,6 +260,7 @@ function preRollAbilityCheck(config, dialog, message) {
  */
 function preRollHitDie(config, dialog, message) {
   const actor = config.subject;
+  if (!actor) return;
   const subjects = {actor, target: resolveRollTarget(config)};
   const bonuses = filterings.hitDieCheck(subjects);
   if (!bonuses.size) return;

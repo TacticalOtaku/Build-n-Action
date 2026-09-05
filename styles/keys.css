@@ -1,5 +1,10 @@
-.build-n-action.keys-dialog {
+/* Guarded for the same reason as .build-n-action.builder: an unguarded minimum width
+   prevents the window from collapsing when minimized. */
+.build-n-action.keys-dialog:not(.minimizing, .minimized, .maximizing) {
   min-width: 400px;
+}
+
+.build-n-action.keys-dialog {
 
   .dialog-content {
 

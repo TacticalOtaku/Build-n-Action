@@ -1,4 +1,4 @@
-import {MODULE} from "../constants.mjs";
+import {MODIFIER_MODE, MODULE} from "../constants.mjs";
 
 const {SchemaField, BooleanField, NumberField, StringField} = foundry.data.fields;
 
@@ -9,12 +9,12 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
     return {
       amount: new SchemaField({
         enabled: new BooleanField(),
-        mode: new NumberField({initial: 0, choices: MODULE.MODIFIER_MODES}),
+        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
         value: new StringField({required: true})
       }),
       size: new SchemaField({
         enabled: new BooleanField(),
-        mode: new NumberField({initial: 0, choices: MODULE.MODIFIER_MODES}),
+        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
         value: new StringField({required: true})
       }),
       reroll: new SchemaField({
@@ -65,8 +65,7 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
 
   /** @override */
   prepareDerivedData() {
-    if (!this.bonus) return;
-    const rollData = this.bonus.getRollData({deterministic: true});
+    const rollData = this.bonus?.getRollData?.({deterministic: true}) ?? {};
     for (const m of ["amount", "size", "reroll", "explode", "minimum", "maximum"]) {
       const value = this[m].value;
       if (!value) this[m].value = null;
@@ -124,7 +123,7 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
    */
   _modifyAmount(die) {
     if (!this.hasAmount) return;
-    const isMult = this.amount.mode === MODULE.MODIFIER_MODES.MULTIPLY;
+    const isMult = this.amount.mode === MODIFIER_MODE.MULTIPLY;
 
     if ((die._number instanceof Roll) && die._number.isDeterministic) {
       const total = die._number.evaluateSync().total;
@@ -145,7 +144,7 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
    */
   _modifySize(die) {
     if (!this.hasSize) return;
-    const isMult = this.size.mode === MODULE.MODIFIER_MODES.MULTIPLY;
+    const isMult = this.size.mode === MODIFIER_MODE.MULTIPLY;
 
     if ((die._faces instanceof Roll) && die._faces.isDeterministic) {
       const total = die._faces.evaluateSync().total;
@@ -291,7 +290,7 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
    * @type {ContextualBonus}
    */
   get bonus() {
-    return this.parent?.parent ?? null;
+    return this.parent ?? null;
   }
 
   /* -------------------------------------------------- */

@@ -528,8 +528,13 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
       const idx = parseInt(target.dataset.idx);
       const property = foundry.utils.deepClone(data.filters[id]);
       property.splice(idx, 1);
-      if (!property.length) delete data.filters[id];
-      data.filters[id] = property;
+      // Removing the last repeat drops the filter entirely, the same as a single one.
+      if (property.length) {
+        data.filters[id] = property;
+      } else {
+        this._filters.delete(id);
+        delete data.filters[id];
+      }
     } else {
       this._filters.delete(id);
       delete data.filters[id];

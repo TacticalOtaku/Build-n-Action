@@ -15,7 +15,6 @@ export default class OptionalSelector {
    */
   constructor(id) {
     const registered = registry.get(id);
-    this.#id = id;
     this.#registry = registered;
 
     /* -------------------------------------------------- */
@@ -90,14 +89,6 @@ export default class OptionalSelector {
      * @type {object}
      */
   #registry = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The id used to register data for this optional selector.
-   * @type {string}
-   */
-  #id = null;
 
   /* -------------------------------------------------- */
 
@@ -243,8 +234,6 @@ export default class OptionalSelector {
       group.append(this.form);
       this.dialog.setPosition({height: "auto"});
     }
-
-    registry.delete(this.#id);
   }
 
   /* -------------------------------------------------- */

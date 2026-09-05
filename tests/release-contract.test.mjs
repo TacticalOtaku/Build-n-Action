@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("release metadata targets version 1.0.4 and Foundry 14.367", async () => {
+test("release metadata targets version 1.0.5 and Foundry 14.367", async () => {
   const [manifest, packageJson, packageLock] = await Promise.all([
     read("module.json").then(JSON.parse),
     read("package.json").then(JSON.parse),
@@ -12,14 +12,14 @@ test("release metadata targets version 1.0.4 and Foundry 14.367", async () => {
   ]);
   const midi = manifest.relationships.recommends.find(entry => entry.id === "midi-qol");
 
-  assert.equal(manifest.version, "1.0.4");
+  assert.equal(manifest.version, "1.0.5");
   assert.equal(packageJson.version, manifest.version);
   assert.equal(packageLock.version, manifest.version);
   assert.equal(packageLock.packages[""].version, manifest.version);
   assert.equal(manifest.compatibility.maximum, "14.367");
   assert.equal(manifest.compatibility.verified, "14.367");
   assert.equal(midi.compatibility.verified, "14.0.11");
-  assert.match(manifest.download, /v1\.0\.4\/build-n-action-v1\.0\.4\.zip$/);
+  assert.match(manifest.download, /v1\.0\.5\/build-n-action-v1\.0\.5\.zip$/);
 
   const referencedFiles = [
     ...manifest.esmodules,

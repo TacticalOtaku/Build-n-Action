@@ -41,7 +41,7 @@ export default class IdentifiersField extends FilterMixin(SchemaField) {
       hint: schema.hint,
       field: field,
       value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.identifiers.value.placeholder")
+      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.identifiers.placeholder")
     };
 
     return Handlebars.compile(template)(data);

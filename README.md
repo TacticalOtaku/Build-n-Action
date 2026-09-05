@@ -11,7 +11,7 @@ Build-n-Action is a contextual bonus engine for Foundry Virtual Tabletop and the
 
 midi-qol and DAE are optional integrations. Build-n-Action works with native dnd5e rolls when they are disabled.
 
-## Version 1.0.4
+## Version 1.0.5
 
 - verified for Foundry VTT 14.367 and midi-qol 14.0.11;
 - preserves midi-qol workflow targets for BnA filters and `@target` roll data;

@@ -11,6 +11,8 @@
     "ThrowBonus": "Бонус спасброска",
     "BasicBonuses": "Основные бонусы",
     "BonusCopy": "{name} (копия)",
+    "BonusNotFound": "Этот бонус больше не найден.",
+    "BaseContextualBonus": "Контекстный бонус",
     "OptionalSelector": {
       "LabelApply": "Применить",
       "LabelConsume": "Израсходовать"
