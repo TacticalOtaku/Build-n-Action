@@ -58,6 +58,22 @@ test("resolveRollTarget does not leak a user target into an empty Midi workflow"
   assert.equal(target, null);
 });
 
+test("resolveRollTarget reads a Midi workflow nested under midiOptions", () => {
+  const workflowTarget = {id: "workflow-target"};
+  const hitTarget = {id: "hit-target"};
+  const config = {
+    midiOptions: {
+      workflow: {
+        hitTargets: new Set([hitTarget]),
+        targets: new Set([workflowTarget])
+      }
+    }
+  };
+
+  assert.equal(resolveRollTarget(config), workflowTarget);
+  assert.equal(resolveRollTarget(config, {preferHitTargets: true}), hitTarget);
+});
+
 test("resolveRollTarget falls back to native Foundry user targeting", () => {
   const userTarget = {id: "user-target"};
 

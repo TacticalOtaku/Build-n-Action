@@ -49,7 +49,9 @@ export default class AppliedBonusesDialog extends HandlebarsApplicationMixin(App
 
   /** @override */
   async _prepareContext() {
-    return {bonuses: registry.get(this.options.registryId)?.bonuses ?? []};
+    // The registry holds a BonusCollection; the template needs an iterable list.
+    const bonuses = registry.get(this.options.registryId)?.bonuses;
+    return {bonuses: bonuses ? Array.from(bonuses.all) : []};
   }
 
   /* -------------------------------------------------- */

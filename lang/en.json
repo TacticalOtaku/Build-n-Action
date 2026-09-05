@@ -10,6 +10,8 @@
   "ThrowBonus": "Saving Throw Bonus",
   "BasicBonuses": "Basic Bonuses",
   "BonusCopy": "{name} (Copy)",
+  "BonusNotFound": "That bonus could no longer be found.",
+  "BaseContextualBonus": "Contextual Bonus",
   "OptionalSelector": {
     "LabelApply": "Apply",
     "LabelConsume": "Consume"

@@ -122,11 +122,12 @@ async function persistBonus(document, bonus) {
   for (const id of Object.keys(data.filters)) {
     if (!fields[id].storage(bonus)) delete data.filters[id];
   }
+  // Embedding always appends a new entry: the same bonus can be dropped onto a
+  // second document, and duplicateBonus re-embeds a copy of an existing one, so a
+  // fresh id is required to avoid overwriting the source.
   data.id = foundry.utils.randomID();
 
-  const collection = getCollection(document);
-  collection.delete(data.id);
-  const stored = collection.map(entry => entry.toObject());
+  const stored = getCollection(document).map(entry => entry.toObject());
   stored.push(data);
   await document.setFlag(MODULE.ID, "bonuses", stored);
   return data.id;

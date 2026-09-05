@@ -127,7 +127,11 @@ body.theme-dark .build-n-action {
 }
 
 /* Workshop layout */
-.build-n-action.builder {
+/* Minimum sizes win over maximum sizes in CSS, and this unlayered module rule outranks
+   core's layered '.application.minimizing { min-width: unset }'. Without the :not() guard
+   these minimums block the inline max-width/max-height ApplicationV2 sets while collapsing
+   the window, so the workshop cannot be minimized. */
+.build-n-action.builder:not(.minimizing, .minimized, .maximizing) {
   min-height: 560px;
   min-width: 620px;
 }
@@ -570,8 +574,13 @@ body.theme-dark .build-n-action {
 }
 
 /* keys.css */
-.build-n-action.keys-dialog {
+/* Guarded for the same reason as .build-n-action.builder: an unguarded minimum width
+   prevents the window from collapsing when minimized. */
+.build-n-action.keys-dialog:not(.minimizing, .minimized, .maximizing) {
   min-width: 400px;
+}
+
+.build-n-action.keys-dialog {
 
   .dialog-content {
 

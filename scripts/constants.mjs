@@ -1,3 +1,15 @@
+/**
+ * Numeric values of the dice-modifier modes. MODULE.MODIFIER_MODES maps these to
+ * localized labels for the schema choices and is mutated into localized strings on
+ * i18nInit, so comparisons must use these values and never that label map.
+ */
+export const MODIFIER_MODE = Object.freeze({
+  ADD: 0,
+  MULTIPLY: 1
+});
+
+/* -------------------------------------------------- */
+
 export const MODULE = {
   ID: "build-n-action",
   NAME: "Build-n-Action",
@@ -37,8 +49,8 @@ export const MODULE = {
     1: "BUILD_N_ACTION.FIELDS.filters.tokenSizes.type.optionLT"
   },
   MODIFIER_MODES: {
-    0: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionAdd",
-    1: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionMultiply"
+    [MODIFIER_MODE.ADD]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionAdd",
+    [MODIFIER_MODE.MULTIPLY]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionMultiply"
   }
 };
 

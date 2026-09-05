@@ -149,6 +149,23 @@ export class ContextualBonus extends foundry.abstract.DataModel {
   /* -------------------------------------------------- */
 
   /**
+   * The item that created the measured template this bonus lives on, if any.
+   * The dnd5e origin flag holds an activity uuid, whose last two parts address the
+   * activity within its item.
+   * @returns {Item5e|null}
+   */
+  #templateOriginItem() {
+    const uuid = this.template?.flags.dnd5e?.origin ?? "";
+    if (!uuid) return null;
+    const parts = uuid.split(".");
+    parts.pop(); parts.pop();
+    const item = fromUuidSync(parts.join("."));
+    return (item instanceof Item) ? item : null;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
    * The actor that this bonus is currently directly or indirectly embedded on, if any.
    * @type {Actor5e|null}
    */
@@ -162,15 +179,7 @@ export class ContextualBonus extends foundry.abstract.DataModel {
       if (this.parent.parent instanceof Item) return this.parent.parent.parent ?? null;
     }
 
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? (item.parent ?? null) : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem()?.parent ?? null;
 
     return null;
   }
@@ -380,15 +389,7 @@ export class ContextualBonus extends foundry.abstract.DataModel {
 
     if (this.parent instanceof Item) return this.parent;
 
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? item : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
 
     if (this.parent instanceof ActiveEffect) {
       let item;
@@ -414,15 +415,7 @@ export class ContextualBonus extends foundry.abstract.DataModel {
    * @type {Actor5e|Item5e|null}
    */
   get origin() {
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? item : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
 
     if (this.parent instanceof Item) return this.parent;
 

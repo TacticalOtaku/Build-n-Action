@@ -1,3 +1,15 @@
+/**
+ * Numeric values of the dice-modifier modes. MODULE.MODIFIER_MODES maps these to
+ * localized labels for the schema choices and is mutated into localized strings on
+ * i18nInit, so comparisons must use these values and never that label map.
+ */
+const MODIFIER_MODE = Object.freeze({
+  ADD: 0,
+  MULTIPLY: 1
+});
+
+/* -------------------------------------------------- */
+
 const MODULE = {
   ID: "build-n-action",
   NAME: "Build-n-Action",
@@ -37,8 +49,8 @@ const MODULE = {
     1: "BUILD_N_ACTION.FIELDS.filters.tokenSizes.type.optionLT"
   },
   MODIFIER_MODES: {
-    0: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionAdd",
-    1: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionMultiply"
+    [MODIFIER_MODE.ADD]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionAdd",
+    [MODIFIER_MODE.MULTIPLY]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionMultiply"
   }
 };
 
@@ -705,7 +717,7 @@ class IdentifiersField extends FilterMixin(SchemaField$8) {
       hint: schema.hint,
       field: field,
       value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.identifiers.value.placeholder")
+      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.identifiers.placeholder")
     };
 
     return Handlebars.compile(template)(data);
@@ -1406,7 +1418,7 @@ class SourceClassesField extends FilterMixin(SchemaField$5) {
       hint: schema.hint,
       field: field,
       value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.sourceClasses.value.placeholder")
+      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.sourceClasses.placeholder")
     };
 
     return Handlebars.compile(template)(data);
@@ -1943,12 +1955,12 @@ class ModifiersModel extends foundry.abstract.DataModel {
     return {
       amount: new SchemaField$1({
         enabled: new BooleanField$1(),
-        mode: new NumberField({initial: 0, choices: MODULE.MODIFIER_MODES}),
+        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
         value: new StringField$1({required: true})
       }),
       size: new SchemaField$1({
         enabled: new BooleanField$1(),
-        mode: new NumberField({initial: 0, choices: MODULE.MODIFIER_MODES}),
+        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
         value: new StringField$1({required: true})
       }),
       reroll: new SchemaField$1({
@@ -1999,8 +2011,7 @@ class ModifiersModel extends foundry.abstract.DataModel {
 
   /** @override */
   prepareDerivedData() {
-    if (!this.bonus) return;
-    const rollData = this.bonus.getRollData({deterministic: true});
+    const rollData = this.bonus?.getRollData?.({deterministic: true}) ?? {};
     for (const m of ["amount", "size", "reroll", "explode", "minimum", "maximum"]) {
       const value = this[m].value;
       if (!value) this[m].value = null;
@@ -2058,7 +2069,7 @@ class ModifiersModel extends foundry.abstract.DataModel {
    */
   _modifyAmount(die) {
     if (!this.hasAmount) return;
-    const isMult = this.amount.mode === MODULE.MODIFIER_MODES.MULTIPLY;
+    const isMult = this.amount.mode === MODIFIER_MODE.MULTIPLY;
 
     if ((die._number instanceof Roll) && die._number.isDeterministic) {
       const total = die._number.evaluateSync().total;
@@ -2079,7 +2090,7 @@ class ModifiersModel extends foundry.abstract.DataModel {
    */
   _modifySize(die) {
     if (!this.hasSize) return;
-    const isMult = this.size.mode === MODULE.MODIFIER_MODES.MULTIPLY;
+    const isMult = this.size.mode === MODIFIER_MODE.MULTIPLY;
 
     if ((die._faces instanceof Roll) && die._faces.isDeterministic) {
       const total = die._faces.evaluateSync().total;
@@ -2225,7 +2236,7 @@ class ModifiersModel extends foundry.abstract.DataModel {
    * @type {ContextualBonus}
    */
   get bonus() {
-    return this.parent?.parent ?? null;
+    return this.parent ?? null;
   }
 
   /* -------------------------------------------------- */
@@ -2449,6 +2460,23 @@ class ContextualBonus extends foundry.abstract.DataModel {
   /* -------------------------------------------------- */
 
   /**
+   * The item that created the measured template this bonus lives on, if any.
+   * The dnd5e origin flag holds an activity uuid, whose last two parts address the
+   * activity within its item.
+   * @returns {Item5e|null}
+   */
+  #templateOriginItem() {
+    const uuid = this.template?.flags.dnd5e?.origin ?? "";
+    if (!uuid) return null;
+    const parts = uuid.split(".");
+    parts.pop(); parts.pop();
+    const item = fromUuidSync(parts.join("."));
+    return (item instanceof Item) ? item : null;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
    * The actor that this bonus is currently directly or indirectly embedded on, if any.
    * @type {Actor5e|null}
    */
@@ -2462,15 +2490,7 @@ class ContextualBonus extends foundry.abstract.DataModel {
       if (this.parent.parent instanceof Item) return this.parent.parent.parent ?? null;
     }
 
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? (item.parent ?? null) : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem()?.parent ?? null;
 
     return null;
   }
@@ -2680,15 +2700,7 @@ class ContextualBonus extends foundry.abstract.DataModel {
 
     if (this.parent instanceof Item) return this.parent;
 
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? item : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
 
     if (this.parent instanceof ActiveEffect) {
       let item;
@@ -2714,15 +2726,7 @@ class ContextualBonus extends foundry.abstract.DataModel {
    * @type {Actor5e|Item5e|null}
    */
   get origin() {
-    if (this.parent instanceof MeasuredTemplateDocument) {
-      const uuid = this.parent.flags.dnd5e?.origin ?? "";
-      if (!uuid) return null;
-      const parts = uuid.split(".");
-      parts.pop(); parts.pop();
-      const itemUuid = parts.join(".");
-      const item = fromUuidSync(itemUuid);
-      return (item instanceof Item) ? item : null;
-    }
+    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
 
     if (this.parent instanceof Item) return this.parent;
 
@@ -3757,11 +3761,12 @@ async function persistBonus(document, bonus) {
   for (const id of Object.keys(data.filters)) {
     if (!fields[id].storage(bonus)) delete data.filters[id];
   }
+  // Embedding always appends a new entry: the same bonus can be dropped onto a
+  // second document, and duplicateBonus re-embeds a copy of an existing one, so a
+  // fresh id is required to avoid overwriting the source.
   data.id = foundry.utils.randomID();
 
-  const collection = getCollection(document);
-  collection.delete(data.id);
-  const stored = collection.map(entry => entry.toObject());
+  const stored = getCollection(document).map(entry => entry.toObject());
   stored.push(data);
   await document.setFlag(MODULE.ID, "bonuses", stored);
   return data.id;
@@ -6317,8 +6322,13 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
       const idx = parseInt(target.dataset.idx);
       const property = foundry.utils.deepClone(data.filters[id]);
       property.splice(idx, 1);
-      if (!property.length) delete data.filters[id];
-      data.filters[id] = property;
+      // Removing the last repeat drops the filter entirely, the same as a single one.
+      if (property.length) {
+        data.filters[id] = property;
+      } else {
+        this._filters.delete(id);
+        delete data.filters[id];
+      }
     } else {
       this._filters.delete(id);
       delete data.filters[id];
@@ -7446,8 +7456,21 @@ document.addEventListener("click", async (event) => {
 
 /**
  * Utility extension of Map to keep track of rolls and bonuses that apply to them.
+ *
+ * An entry is created for every roll that has applicable bonuses, but there is no
+ * single point at which it becomes obsolete: a fast-forwarded roll never opens a
+ * dialog, and a dialog can be dismissed without notice. Entries therefore expire by
+ * age -- only the most recent rolls can still have a dialog or an overview open.
  */
 class RollRegistry extends Map {
+  /**
+   * How many roll configurations to retain. Older entries are evicted on registration.
+   * @type {number}
+   */
+  static MAX_ENTRIES = 20;
+
+  /* -------------------------------------------------- */
+
   /**
    * Register an object of data with a generated id.
    * @param {object} config     The data to store.
@@ -7456,7 +7479,21 @@ class RollRegistry extends Map {
   register(config) {
     const id = foundry.utils.randomID();
     this.set(id, config);
+    this.#evictOldest();
     return id;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Drop the least recently registered entries once the cap is exceeded. A Map
+   * iterates in insertion order, so the first key is always the oldest.
+   */
+  #evictOldest() {
+    while (this.size > this.constructor.MAX_ENTRIES) {
+      const [oldest] = this.keys();
+      this.delete(oldest);
+    }
   }
 }
 
@@ -7516,7 +7553,9 @@ class AppliedBonusesDialog extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** @override */
   async _prepareContext() {
-    return {bonuses: registry.get(this.options.registryId)?.bonuses ?? []};
+    // The registry holds a BonusCollection; the template needs an iterable list.
+    const bonuses = registry.get(this.options.registryId)?.bonuses;
+    return {bonuses: bonuses ? Array.from(bonuses.all) : []};
   }
 
   /* -------------------------------------------------- */
@@ -7730,9 +7769,30 @@ class HeaderButtonDialog extends HeaderButton {
 
 /* -------------------------------------------------- */
 
+/** Inject form element on scene region configs. */
+function injectRegionConfigElement(config, element) {
+  if (!config.isEditable) return;
+  const fg = element.querySelector("[name=visibility]").closest(".form-group");
+  const div = document.createElement("FIELDSET");
+  div.classList.add(MODULE.ID);
+  div.innerHTML = `
+  <legend>${game.i18n.localize("BUILD_N_ACTION.ModuleTitle")}</legend>
+  <button type="button" data-action="buildNActionBuilder">
+    <i class="${MODULE.ICON}"></i>
+    ${game.i18n.localize("BUILD_N_ACTION.ModuleTitle")}
+  </button>
+  <p class="hint">${game.i18n.localize("BUILD_N_ACTION.RegionConfigHint")}</p>`;
+  div.querySelector("[data-action]").addEventListener("click", () => openBonusWorkshop(config.document));
+  fg.after(div);
+}
+
+/* -------------------------------------------------- */
+
 var injections = {
   HeaderButton,
-  HeaderButtonDialog};
+  HeaderButtonDialog,
+  injectRegionConfigElement
+};
 
 const SUPPORTED_INTEGRATIONS = Object.freeze({
   "midi-qol": Object.freeze({label: "Midi QOL", minimum: "14.0.10"}),
@@ -8236,6 +8296,7 @@ function preRollAbilityCheck(config, dialog, message) {
  */
 function preRollHitDie(config, dialog, message) {
   const actor = config.subject;
+  if (!actor) return;
   const subjects = {actor, target: resolveRollTarget(config)};
   const bonuses = hitDieCheck(subjects);
   if (!bonuses.size) return;
@@ -8396,7 +8457,6 @@ class OptionalSelector {
    */
   constructor(id) {
     const registered = registry.get(id);
-    this.#id = id;
     this.#registry = registered;
 
     /* -------------------------------------------------- */
@@ -8471,14 +8531,6 @@ class OptionalSelector {
      * @type {object}
      */
   #registry = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The id used to register data for this optional selector.
-   * @type {string}
-   */
-  #id = null;
 
   /* -------------------------------------------------- */
 
@@ -8624,8 +8676,6 @@ class OptionalSelector {
       group.append(this.form);
       this.dialog.setPosition({height: "auto"});
     }
-
-    registry.delete(this.#id);
   }
 
   /* -------------------------------------------------- */

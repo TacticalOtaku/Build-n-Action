@@ -41,7 +41,7 @@ export default class SourceClassesField extends FilterMixin(SchemaField) {
       hint: schema.hint,
       field: field,
       value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.sourceClasses.value.placeholder")
+      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.sourceClasses.placeholder")
     };
 
     return Handlebars.compile(template)(data);
