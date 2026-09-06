@@ -1,4 +1,5 @@
 import {MODULE, SETTINGS} from "../constants.mjs";
+import {collectTokenCenters} from "../utils/canvas-shapes.mjs";
 
 const currentAuras = {};
 
@@ -483,24 +484,7 @@ export default class TokenAura {
    */
   contains(token) {
     if (!this.element || !token) return false;
-
-    const shape = token.shape;
-    const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
-    const delta = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size : 1;
-    const offset = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size / 2 : 0;
-    for (let x = i; x < i1; x += delta) {
-      for (let y = j; y < j1; y += delta) {
-        const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
-        const p = {
-          x: point.x - token.document.x,
-          y: point.y - token.document.y
-        };
-        if (shape.contains(p.x, p.y) && this.element.containsPoint(point)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return collectTokenCenters(token).some(point => this.element.containsPoint(point));
   }
 
   /* -------------------------------------------------- */

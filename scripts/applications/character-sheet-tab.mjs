@@ -164,17 +164,17 @@ function _configureTabControl(html, hasBonuses) {
 }
 
 /** Register the tab-owned bonus search without dnd5e private list methods. */
-function _registerSearch(sheet, div) {
-  const input = div.querySelector("[data-bna-search]");
-  const clear = div.querySelector("[data-action=clearSearch]");
+function _registerSearch(sheet, tab) {
+  const input = tab.querySelector("[data-bna-search]");
+  const clear = tab.querySelector("[data-action=clearSearch]");
   const apply = query => {
     SHEET_SEARCHES.set(sheet, query);
     let visible = 0;
-    for (const row of div.querySelectorAll(".item[data-search-value]")) {
+    for (const row of tab.querySelectorAll(".item[data-search-value]")) {
       row.hidden = !matchesBonusSearch(row.dataset.searchValue, query, game.i18n.lang);
       if (!row.hidden) visible++;
     }
-    for (const section of div.querySelectorAll(".items-section")) {
+    for (const section of tab.querySelectorAll(".items-section")) {
       section.hidden = !section.querySelector(".item:not([hidden])");
     }
     clear?.classList.toggle("active", !!String(query).trim());
@@ -192,10 +192,10 @@ function _registerSearch(sheet, div) {
 /**
  * Register actions that operate on a rendered bonus row.
  * @param {ActorSheet} sheet
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  */
-function _registerBonusActions(sheet, div) {
-  div.querySelectorAll("[data-action]").forEach(node => {
+function _registerBonusActions(sheet, tab) {
+  tab.querySelectorAll("[data-action]").forEach(node => {
     node.addEventListener("click", async event => {
       const target = event.currentTarget;
       if (target.dataset.action === "create") return _createChildBonus.call(sheet);
@@ -230,18 +230,18 @@ function _registerBonusActions(sheet, div) {
 /**
  * Register drag-and-drop behavior for bonus rows and sources.
  * @param {ActorSheet} sheet
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  * @param {Set<string>} uuids
  */
-function _registerDragAndDrop(sheet, div, uuids) {
-  div.firstElementChild.addEventListener("drop", async event => {
+function _registerDragAndDrop(sheet, tab, uuids) {
+  tab.addEventListener("drop", async event => {
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     if (!sheet.isEditable) return;
     const bonus = await fromUuid(data.uuid);
     if (!bonus || uuids.has(bonus.uuid)) return;
     embedBonus(sheet.document, bonus);
   });
-  div.querySelectorAll("[data-item-uuid][draggable]").forEach(node => {
+  tab.querySelectorAll("[data-item-uuid][draggable]").forEach(node => {
     node.addEventListener("dragstart", event => {
       const bonus = _resolveBonus(sheet, event.currentTarget.dataset.itemUuid);
       const dragData = bonus?.toDragData();
@@ -253,10 +253,10 @@ function _registerDragAndDrop(sheet, div, uuids) {
 
 /**
  * Register links back to a bonus source document.
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  */
-function _registerSourceActions(div) {
-  div.querySelectorAll("[data-action='bonus-source']").forEach(node => {
+function _registerSourceActions(tab) {
+  tab.querySelectorAll("[data-action='bonus-source']").forEach(node => {
     node.addEventListener("click", async event => {
       const item = await fromUuid(event.currentTarget.dataset.uuid);
       return item?.sheet.render(true);
@@ -272,16 +272,19 @@ function _registerSourceActions(div) {
 async function _onRenderCharacterSheet2(sheet, html) {
   const {sections, uuids} = await _collectSheetBonuses(sheet);
   const div = await _renderSheetTab(sheet, sections);
+  // Listeners must be bound to the tab itself rather than the wrapper it was rendered in:
+  // the tab is moved into the sheet below, leaving that wrapper empty, so a handler which
+  // queries the wrapper later - the search box - would find no rows left to filter.
+  const tab = div.firstElementChild;
   _ensureTabControl(sheet, html);
   _configureTabControl(html, uuids.size > 0);
-  _registerBonusActions(sheet, div);
-  _registerDragAndDrop(sheet, div, uuids);
-  _registerSourceActions(div);
-  _registerSearch(sheet, div);
+  _registerBonusActions(sheet, tab);
+  _registerDragAndDrop(sheet, tab, uuids);
+  _registerSourceActions(tab);
+  _registerSearch(sheet, tab);
 
   const body = html.querySelector(".tab-body");
   if (!body) return;
-  const tab = div.firstElementChild;
   const current = body.querySelector(`:scope > .tab.${MODULE.ID}`);
   if (current) current.replaceWith(tab);
   else body.appendChild(tab);

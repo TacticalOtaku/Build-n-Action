@@ -148,19 +148,55 @@ export class ContextualBonus extends foundry.abstract.DataModel {
 
   /* -------------------------------------------------- */
 
+  // These two helpers are reached from getRollData during DataModel#_initialize, before
+  // this class's own constructor body has run, so they cannot be private methods: the
+  // brand check for a # method would not yet be installed on the instance.
+
   /**
    * The item that created the measured template this bonus lives on, if any.
    * The dnd5e origin flag holds an activity uuid, whose last two parts address the
    * activity within its item.
    * @returns {Item5e|null}
    */
-  #templateOriginItem() {
+  _templateOriginItem() {
     const uuid = this.template?.flags.dnd5e?.origin ?? "";
     if (!uuid) return null;
     const parts = uuid.split(".");
     parts.pop(); parts.pop();
     const item = fromUuidSync(parts.join("."));
     return (item instanceof Item) ? item : null;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * The document that an effect-embedded bonus draws its roll data from.
+   *
+   * An effect records in its origin the document that applied it, which is what a bonus
+   * on an effect applied to someone else has to scale from. That flag is empty for an
+   * effect authored directly on an item or actor, and points outside the world when the
+   * effect came from a compendium item, so the document the effect is embedded in is the
+   * fallback. Without it every formula on such a bonus silently evaluated to zero.
+   *
+   * @returns {Actor5e|Item5e|null}
+   */
+  _effectSource() {
+    const effect = this.effect;
+    if (!effect) return null;
+
+    let origin;
+    try {
+      origin = fromUuidSync(effect.origin ?? "");
+    } catch (err) {
+      console.warn(err);
+      origin = null;
+    }
+    if (origin instanceof ActiveEffect) origin = origin.parent;
+    if ((origin instanceof Item) || (origin instanceof Actor)) return origin;
+
+    const embedded = effect.parent;
+    if ((embedded instanceof Item) || (embedded instanceof Actor)) return embedded;
+    return null;
   }
 
   /* -------------------------------------------------- */
@@ -179,7 +215,7 @@ export class ContextualBonus extends foundry.abstract.DataModel {
       if (this.parent.parent instanceof Item) return this.parent.parent.parent ?? null;
     }
 
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem()?.parent ?? null;
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem()?.parent ?? null;
 
     return null;
   }
@@ -389,17 +425,11 @@ export class ContextualBonus extends foundry.abstract.DataModel {
 
     if (this.parent instanceof Item) return this.parent;
 
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
 
     if (this.parent instanceof ActiveEffect) {
-      let item;
-      try {
-        item = fromUuidSync(this.parent.origin ?? "");
-      } catch (err) {
-        console.warn(err);
-        return null;
-      }
-      return (item instanceof Item) ? item : null;
+      const source = this._effectSource();
+      return (source instanceof Item) ? source : null;
     }
 
     return null;
@@ -415,27 +445,13 @@ export class ContextualBonus extends foundry.abstract.DataModel {
    * @type {Actor5e|Item5e|null}
    */
   get origin() {
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
 
     if (this.parent instanceof Item) return this.parent;
 
     if (this.parent instanceof Actor) return this.parent;
 
-    if (this.parent instanceof ActiveEffect) {
-      let origin;
-      try {
-        origin = fromUuidSync(this.parent.origin);
-        if (!origin) return null;
-      } catch (err) {
-        console.warn(err);
-        return null;
-      }
-
-      if (origin instanceof Item) return origin;
-      if (origin instanceof Actor) return origin;
-      if (origin instanceof ActiveEffect) return origin.parent;
-      return null;
-    }
+    if (this.parent instanceof ActiveEffect) return this._effectSource();
 
     return null;
   }

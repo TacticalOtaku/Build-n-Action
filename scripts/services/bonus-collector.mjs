@@ -1,4 +1,5 @@
 import {MODULE} from "../constants.mjs";
+import {collectTokenCenters, templateContainsPoint} from "../utils/canvas-shapes.mjs";
 import {createTokenAura} from "./application-factories.mjs";
 import {getCollection} from "./bonus-repository.mjs";
 
@@ -21,7 +22,7 @@ export default class BonusCollector {
 
     // Set up canvas elements.
     this.token = this.actor.token?.object ?? this.actor.getActiveTokens()[0];
-    if (this.token) this.tokenCenters = this.constructor._collectTokenCenters(this.token);
+    if (this.token) this.tokenCenters = collectTokenCenters(this.token);
 
     this.bonuses = this._collectBonuses();
   }
@@ -302,39 +303,12 @@ export default class BonusCollector {
   /* -------------------------------------------------- */
 
   /**
-   * Get the centers of all grid spaces that overlap with a token document.
-   * @param {Token5e} token     The token document on the scene.
-   * @returns {object[]}        An array of xy coordinates.
-   */
-  static _collectTokenCenters(token) {
-    const points = [];
-    const shape = token.shape;
-    const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
-    const delta = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size : 1;
-    const offset = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size / 2 : 0;
-    for (let x = i; x < i1; x += delta) {
-      for (let y = j; y < j1; y += delta) {
-        const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
-        const p = {
-          x: point.x - token.document.x,
-          y: point.y - token.document.y
-        };
-        if (shape.contains(p.x, p.y)) points.push(point);
-      }
-    }
-    return points;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
    * Get whether the rolling token has any grid center within a given template.
    * @param {MeasuredTemplate} template     A measured template placeable.
    * @returns {boolean}                     Whether the rolling token is contained.
    */
   _tokenWithinTemplate(template) {
-    const {shape, x: tx, y: ty} = template;
-    return this.tokenCenters.some(({x, y}) => shape.contains(x - tx, y - ty));
+    return this.tokenCenters.some(point => templateContainsPoint(template, point));
   }
 
   /* -------------------------------------------------- */
