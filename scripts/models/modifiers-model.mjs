@@ -275,10 +275,37 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
         this.modifyDie(die);
         if (first) break;
       }
-      parts[i] = Roll.fromTerms(roll.terms).formula;
+      parts[i] = this.constructor._rebuildFormula(roll.terms);
       if (first) return true;
     }
     return false;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Rebuild a formula from roll terms whose dice have just been mutated.
+   *
+   * Roll#dice reaches dice nested inside function and parenthetical terms, but those
+   * terms serialize from a cached string copy of their arguments, so a modifier pushed
+   * onto a nested die is dropped when the formula is regenerated. dnd5e wraps hit die
+   * rolls in max(1, ...), which silently discarded every dice modifier on those rolls.
+   *
+   * @param {RollTerm[]} terms      Roll terms to serialize.
+   * @returns {string}              The regenerated formula.
+   */
+  static _rebuildFormula(terms) {
+    const {FunctionTerm, ParentheticalTerm} = foundry.dice.terms;
+    for (const term of terms) {
+      if (term instanceof FunctionTerm) {
+        for (let i = 0; i < term.rolls.length; i++) {
+          term.terms[i] = this._rebuildFormula(term.rolls[i].terms);
+        }
+      } else if (term instanceof ParentheticalTerm) {
+        term.term = this._rebuildFormula(term.roll.terms);
+      }
+    }
+    return Roll.fromTerms(terms).formula;
   }
 
   /* -------------------------------------------------- */
@@ -312,7 +339,7 @@ export default class ModifiersModel extends foundry.abstract.DataModel {
    */
   get hasExplode() {
     if (!this.explode.enabled) return false;
-    return (this.maximum.value === null) || Number.isInteger(this.explode.value);
+    return (this.explode.value === null) || Number.isInteger(this.explode.value);
   }
 
   /* -------------------------------------------------- */

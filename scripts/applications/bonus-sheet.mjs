@@ -303,7 +303,7 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
       if (key === "damageType") {
         options = {isDamage: true, options: []};
         const damageGroup = game.i18n.localize("DND5E.Damage");
-        const healingGroup = game.i18n.localize("DND5E.Healing");
+        const healingGroup = game.i18n.localize("DND5E.HEAL.Type.HealingShort");
         for (const [value, config] of Object.entries(CONFIG.DND5E.damageTypes)) {
           options.options.push({group: damageGroup, value, label: config.label});
         }

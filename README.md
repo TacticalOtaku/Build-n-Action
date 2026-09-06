@@ -11,6 +11,24 @@ Build-n-Action is a contextual bonus engine for Foundry Virtual Tabletop and the
 
 midi-qol and DAE are optional integrations. Build-n-Action works with native dnd5e rolls when they are disabled.
 
+## Version 1.0.6
+
+- applies bonuses again for actors whose token is on the active scene: the bonus collector
+  read `Token#shape`, which Foundry v14 only assigns while a placeable is being drawn, and
+  the resulting error aborted the roll hook before any bonus was collected;
+- keeps dice modifiers on hit-die rolls and on any formula wrapped in a function or
+  parentheses, which dnd5e uses for `max(1, ...)`;
+- lets optional bonuses be applied at all, and only once per roll, instead of stacking a
+  duplicate selector on every dialog rebuild;
+- resolves roll data for bonuses stored on an active effect from the document the effect is
+  embedded in, so formulas no longer evaluate to zero on effects with no origin;
+- honours the multiply mode of the dice amount and size modifiers;
+- fixes the explosive-dice toggle, which was decided by the unrelated maximum field;
+- filters the character-sheet tab from its search box;
+- restores window minimizing, the applied-bonuses overview, and the removal of the last
+  repeat of a filter;
+- localizes the spell-slot and healing labels that rendered as raw keys under dnd5e 5.3.3.
+
 ## Version 1.0.5
 
 - verified for Foundry VTT 14.367 and midi-qol 14.0.11;

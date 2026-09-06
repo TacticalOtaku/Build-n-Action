@@ -212,6 +212,14 @@ export default class OptionalSelector {
    */
   async render() {
     const isV2 = !!this.dialog.element?.classList?.contains("dnd5e2");
+    const root = isV2 ? this.dialog.element : this.dialog.element?.[0];
+
+    // Applying an optional bonus rebuilds the dialog, which re-fires the render hook.
+    // The injected element survives that rebuild and records which optionals were already
+    // applied, so injecting a second copy would stack duplicate blocks and let the same
+    // bonus be applied - and its resource consumed - again on every rebuild.
+    if (root?.querySelector(`.${MODULE.ID}.optionals`)) return;
+
     this.form = document.createElement(isV2 ? "FIELDSET" : "DIV");
 
     if (isV2) this.form.insertAdjacentHTML("beforeend", `<legend>${MODULE.NAME}</legend>`);
@@ -227,10 +235,10 @@ export default class OptionalSelector {
     this.activateListeners(this.form);
 
     if (isV2) {
-      const group = this.dialog.element.querySelector("fieldset[data-application-part=configuration]");
+      const group = root.querySelector("fieldset[data-application-part=configuration]");
       group.insertAdjacentElement("afterend", this.form);
     } else {
-      const group = this.dialog.element[0].querySelector(".dialog-content > form");
+      const group = root.querySelector(".dialog-content > form");
       group.append(this.form);
       this.dialog.setPosition({height: "auto"});
     }
@@ -318,8 +326,10 @@ export default class OptionalSelector {
       if (!slot.value || !slot.max || !slot.level || (slot.level < (bonus.consume.value.min || 1))) {
         return options;
       }
+      // dnd5e labels a leveled slot with DND5E.SpellLevelSpell and a pact slot with
+      // DND5E.SpellLevelPact; there is no "...Slot" key, so that suffix rendered raw.
       const isLeveled = /spell[0-9]+/.test(key);
-      options[key] = game.i18n.format(`DND5E.SpellLevel${isLeveled ? "Slot" : key.capitalize()}`, {
+      options[key] = game.i18n.format(`DND5E.SpellLevel${isLeveled ? "Spell" : key.capitalize()}`, {
         level: isLeveled ? game.i18n.localize(`DND5E.SpellLevel${slot.level}`) : slot.level,
         n: `${slot.value}/${slot.max}`
       });

@@ -2221,10 +2221,37 @@ class ModifiersModel extends foundry.abstract.DataModel {
         this.modifyDie(die);
         if (first) break;
       }
-      parts[i] = Roll.fromTerms(roll.terms).formula;
+      parts[i] = this.constructor._rebuildFormula(roll.terms);
       if (first) return true;
     }
     return false;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * Rebuild a formula from roll terms whose dice have just been mutated.
+   *
+   * Roll#dice reaches dice nested inside function and parenthetical terms, but those
+   * terms serialize from a cached string copy of their arguments, so a modifier pushed
+   * onto a nested die is dropped when the formula is regenerated. dnd5e wraps hit die
+   * rolls in max(1, ...), which silently discarded every dice modifier on those rolls.
+   *
+   * @param {RollTerm[]} terms      Roll terms to serialize.
+   * @returns {string}              The regenerated formula.
+   */
+  static _rebuildFormula(terms) {
+    const {FunctionTerm, ParentheticalTerm} = foundry.dice.terms;
+    for (const term of terms) {
+      if (term instanceof FunctionTerm) {
+        for (let i = 0; i < term.rolls.length; i++) {
+          term.terms[i] = this._rebuildFormula(term.rolls[i].terms);
+        }
+      } else if (term instanceof ParentheticalTerm) {
+        term.term = this._rebuildFormula(term.roll.terms);
+      }
+    }
+    return Roll.fromTerms(terms).formula;
   }
 
   /* -------------------------------------------------- */
@@ -2258,7 +2285,7 @@ class ModifiersModel extends foundry.abstract.DataModel {
    */
   get hasExplode() {
     if (!this.explode.enabled) return false;
-    return (this.maximum.value === null) || Number.isInteger(this.explode.value);
+    return (this.explode.value === null) || Number.isInteger(this.explode.value);
   }
 
   /* -------------------------------------------------- */
@@ -2459,19 +2486,55 @@ class ContextualBonus extends foundry.abstract.DataModel {
 
   /* -------------------------------------------------- */
 
+  // These two helpers are reached from getRollData during DataModel#_initialize, before
+  // this class's own constructor body has run, so they cannot be private methods: the
+  // brand check for a # method would not yet be installed on the instance.
+
   /**
    * The item that created the measured template this bonus lives on, if any.
    * The dnd5e origin flag holds an activity uuid, whose last two parts address the
    * activity within its item.
    * @returns {Item5e|null}
    */
-  #templateOriginItem() {
+  _templateOriginItem() {
     const uuid = this.template?.flags.dnd5e?.origin ?? "";
     if (!uuid) return null;
     const parts = uuid.split(".");
     parts.pop(); parts.pop();
     const item = fromUuidSync(parts.join("."));
     return (item instanceof Item) ? item : null;
+  }
+
+  /* -------------------------------------------------- */
+
+  /**
+   * The document that an effect-embedded bonus draws its roll data from.
+   *
+   * An effect records in its origin the document that applied it, which is what a bonus
+   * on an effect applied to someone else has to scale from. That flag is empty for an
+   * effect authored directly on an item or actor, and points outside the world when the
+   * effect came from a compendium item, so the document the effect is embedded in is the
+   * fallback. Without it every formula on such a bonus silently evaluated to zero.
+   *
+   * @returns {Actor5e|Item5e|null}
+   */
+  _effectSource() {
+    const effect = this.effect;
+    if (!effect) return null;
+
+    let origin;
+    try {
+      origin = fromUuidSync(effect.origin ?? "");
+    } catch (err) {
+      console.warn(err);
+      origin = null;
+    }
+    if (origin instanceof ActiveEffect) origin = origin.parent;
+    if ((origin instanceof Item) || (origin instanceof Actor)) return origin;
+
+    const embedded = effect.parent;
+    if ((embedded instanceof Item) || (embedded instanceof Actor)) return embedded;
+    return null;
   }
 
   /* -------------------------------------------------- */
@@ -2490,7 +2553,7 @@ class ContextualBonus extends foundry.abstract.DataModel {
       if (this.parent.parent instanceof Item) return this.parent.parent.parent ?? null;
     }
 
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem()?.parent ?? null;
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem()?.parent ?? null;
 
     return null;
   }
@@ -2700,17 +2763,11 @@ class ContextualBonus extends foundry.abstract.DataModel {
 
     if (this.parent instanceof Item) return this.parent;
 
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
 
     if (this.parent instanceof ActiveEffect) {
-      let item;
-      try {
-        item = fromUuidSync(this.parent.origin ?? "");
-      } catch (err) {
-        console.warn(err);
-        return null;
-      }
-      return (item instanceof Item) ? item : null;
+      const source = this._effectSource();
+      return (source instanceof Item) ? source : null;
     }
 
     return null;
@@ -2726,27 +2783,13 @@ class ContextualBonus extends foundry.abstract.DataModel {
    * @type {Actor5e|Item5e|null}
    */
   get origin() {
-    if (this.parent instanceof MeasuredTemplateDocument) return this.#templateOriginItem();
+    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
 
     if (this.parent instanceof Item) return this.parent;
 
     if (this.parent instanceof Actor) return this.parent;
 
-    if (this.parent instanceof ActiveEffect) {
-      let origin;
-      try {
-        origin = fromUuidSync(this.parent.origin);
-        if (!origin) return null;
-      } catch (err) {
-        console.warn(err);
-        return null;
-      }
-
-      if (origin instanceof Item) return origin;
-      if (origin instanceof Actor) return origin;
-      if (origin instanceof ActiveEffect) return origin.parent;
-      return null;
-    }
+    if (this.parent instanceof ActiveEffect) return this._effectSource();
 
     return null;
   }
@@ -3642,6 +3685,68 @@ class BonusCollection {
   #nonoptional = null;
 }
 
+/**
+ * Canvas geometry helpers.
+ *
+ * Foundry v14 assigns `Token#shape` and `MeasuredTemplate#shape` only while the
+ * placeable is being refreshed, so those properties are undefined until the object
+ * has been drawn. Reading them directly threw inside the bonus collector, and because
+ * that runs before every roll, a single undrawn placeable silently removed every
+ * bonus from the roll. These helpers use the public v14 APIs and never throw.
+ */
+
+/**
+ * The geometry of a token placeable, in the token's local coordinate space.
+ * @param {Token5e} token           A token placeable.
+ * @returns {PIXI.Polygon|PIXI.Rectangle|PIXI.Circle|PIXI.Ellipse|null}
+ */
+function getTokenShape(token) {
+  if (!token) return null;
+  // Token#getShape computes the same geometry that Token#shape caches once drawn.
+  if (typeof token.getShape === "function") return token.getShape() ?? null;
+  return token.shape ?? null;
+}
+
+/**
+ * The center point of every grid space that a token placeable occupies.
+ * @param {Token5e} token     A token placeable.
+ * @returns {object[]}        An array of xy coordinates, empty if the token has no geometry.
+ */
+function collectTokenCenters(token) {
+  const points = [];
+  const shape = getTokenShape(token);
+  if (!shape) return points;
+
+  const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
+  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
+  const delta = gridless ? canvas.dimensions.size : 1;
+  const offset = gridless ? canvas.dimensions.size / 2 : 0;
+  for (let x = i; x < i1; x += delta) {
+    for (let y = j; y < j1; y += delta) {
+      const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
+      const p = {
+        x: point.x - token.document.x,
+        y: point.y - token.document.y
+      };
+      if (shape.contains(p.x, p.y)) points.push(point);
+    }
+  }
+  return points;
+}
+
+/**
+ * Whether a point on the canvas falls inside a measured template.
+ * @param {MeasuredTemplate} template     A measured template placeable.
+ * @param {object} point                  An xy coordinate in canvas space.
+ * @returns {boolean}                     False when the template has no computed geometry.
+ */
+function templateContainsPoint(template, point) {
+  // Both branches read the cached shape, so an undrawn template simply contains nothing.
+  if (!template?.shape) return false;
+  if (typeof template.testPoint === "function") return template.testPoint(point);
+  return template.shape.contains(point.x - template.document.x, point.y - template.document.y);
+}
+
 const EMBEDDABLE_DOCUMENT_TYPES = new Set(["Actor", "Item", "ActiveEffect", "Region"]);
 
 /** @param {Document|object|null} document */
@@ -3798,7 +3903,7 @@ class BonusCollector {
 
     // Set up canvas elements.
     this.token = this.actor.token?.object ?? this.actor.getActiveTokens()[0];
-    if (this.token) this.tokenCenters = this.constructor._collectTokenCenters(this.token);
+    if (this.token) this.tokenCenters = collectTokenCenters(this.token);
 
     this.bonuses = this._collectBonuses();
   }
@@ -4079,39 +4184,12 @@ class BonusCollector {
   /* -------------------------------------------------- */
 
   /**
-   * Get the centers of all grid spaces that overlap with a token document.
-   * @param {Token5e} token     The token document on the scene.
-   * @returns {object[]}        An array of xy coordinates.
-   */
-  static _collectTokenCenters(token) {
-    const points = [];
-    const shape = token.shape;
-    const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
-    const delta = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size : 1;
-    const offset = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size / 2 : 0;
-    for (let x = i; x < i1; x += delta) {
-      for (let y = j; y < j1; y += delta) {
-        const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
-        const p = {
-          x: point.x - token.document.x,
-          y: point.y - token.document.y
-        };
-        if (shape.contains(p.x, p.y)) points.push(point);
-      }
-    }
-    return points;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
    * Get whether the rolling token has any grid center within a given template.
    * @param {MeasuredTemplate} template     A measured template placeable.
    * @returns {boolean}                     Whether the rolling token is contained.
    */
   _tokenWithinTemplate(template) {
-    const {shape, x: tx, y: ty} = template;
-    return this.tokenCenters.some(({x, y}) => shape.contains(x - tx, y - ty));
+    return this.tokenCenters.some(point => templateContainsPoint(template, point));
   }
 
   /* -------------------------------------------------- */
@@ -6097,7 +6175,7 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
       if (key === "damageType") {
         options = {isDamage: true, options: []};
         const damageGroup = game.i18n.localize("DND5E.Damage");
-        const healingGroup = game.i18n.localize("DND5E.Healing");
+        const healingGroup = game.i18n.localize("DND5E.HEAL.Type.HealingShort");
         for (const [value, config] of Object.entries(CONFIG.DND5E.damageTypes)) {
           options.options.push({group: damageGroup, value, label: config.label});
         }
@@ -6967,24 +7045,7 @@ class TokenAura {
    */
   contains(token) {
     if (!this.element || !token) return false;
-
-    const shape = token.shape;
-    const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
-    const delta = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size : 1;
-    const offset = (canvas.grid.type === CONST.GRID_TYPES.GRIDLESS) ? canvas.dimensions.size / 2 : 0;
-    for (let x = i; x < i1; x += delta) {
-      for (let y = j; y < j1; y += delta) {
-        const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
-        const p = {
-          x: point.x - token.document.x,
-          y: point.y - token.document.y
-        };
-        if (shape.contains(p.x, p.y) && this.element.containsPoint(point)) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return collectTokenCenters(token).some(point => this.element.containsPoint(point));
   }
 
   /* -------------------------------------------------- */
@@ -7186,17 +7247,17 @@ function _configureTabControl(html, hasBonuses) {
 }
 
 /** Register the tab-owned bonus search without dnd5e private list methods. */
-function _registerSearch(sheet, div) {
-  const input = div.querySelector("[data-bna-search]");
-  const clear = div.querySelector("[data-action=clearSearch]");
+function _registerSearch(sheet, tab) {
+  const input = tab.querySelector("[data-bna-search]");
+  const clear = tab.querySelector("[data-action=clearSearch]");
   const apply = query => {
     SHEET_SEARCHES.set(sheet, query);
     let visible = 0;
-    for (const row of div.querySelectorAll(".item[data-search-value]")) {
+    for (const row of tab.querySelectorAll(".item[data-search-value]")) {
       row.hidden = !matchesBonusSearch(row.dataset.searchValue, query, game.i18n.lang);
       if (!row.hidden) visible++;
     }
-    for (const section of div.querySelectorAll(".items-section")) {
+    for (const section of tab.querySelectorAll(".items-section")) {
       section.hidden = !section.querySelector(".item:not([hidden])");
     }
     clear?.classList.toggle("active", !!String(query).trim());
@@ -7214,10 +7275,10 @@ function _registerSearch(sheet, div) {
 /**
  * Register actions that operate on a rendered bonus row.
  * @param {ActorSheet} sheet
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  */
-function _registerBonusActions(sheet, div) {
-  div.querySelectorAll("[data-action]").forEach(node => {
+function _registerBonusActions(sheet, tab) {
+  tab.querySelectorAll("[data-action]").forEach(node => {
     node.addEventListener("click", async event => {
       const target = event.currentTarget;
       if (target.dataset.action === "create") return _createChildBonus.call(sheet);
@@ -7252,18 +7313,18 @@ function _registerBonusActions(sheet, div) {
 /**
  * Register drag-and-drop behavior for bonus rows and sources.
  * @param {ActorSheet} sheet
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  * @param {Set<string>} uuids
  */
-function _registerDragAndDrop(sheet, div, uuids) {
-  div.firstElementChild.addEventListener("drop", async event => {
+function _registerDragAndDrop(sheet, tab, uuids) {
+  tab.addEventListener("drop", async event => {
     const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
     if (!sheet.isEditable) return;
     const bonus = await fromUuid(data.uuid);
     if (!bonus || uuids.has(bonus.uuid)) return;
     embedBonus(sheet.document, bonus);
   });
-  div.querySelectorAll("[data-item-uuid][draggable]").forEach(node => {
+  tab.querySelectorAll("[data-item-uuid][draggable]").forEach(node => {
     node.addEventListener("dragstart", event => {
       const bonus = _resolveBonus(sheet, event.currentTarget.dataset.itemUuid);
       const dragData = bonus?.toDragData();
@@ -7275,10 +7336,10 @@ function _registerDragAndDrop(sheet, div, uuids) {
 
 /**
  * Register links back to a bonus source document.
- * @param {HTMLDivElement} div
+ * @param {HTMLElement} tab
  */
-function _registerSourceActions(div) {
-  div.querySelectorAll("[data-action='bonus-source']").forEach(node => {
+function _registerSourceActions(tab) {
+  tab.querySelectorAll("[data-action='bonus-source']").forEach(node => {
     node.addEventListener("click", async event => {
       const item = await fromUuid(event.currentTarget.dataset.uuid);
       return item?.sheet.render(true);
@@ -7294,16 +7355,19 @@ function _registerSourceActions(div) {
 async function _onRenderCharacterSheet2(sheet, html) {
   const {sections, uuids} = await _collectSheetBonuses(sheet);
   const div = await _renderSheetTab(sheet, sections);
+  // Listeners must be bound to the tab itself rather than the wrapper it was rendered in:
+  // the tab is moved into the sheet below, leaving that wrapper empty, so a handler which
+  // queries the wrapper later - the search box - would find no rows left to filter.
+  const tab = div.firstElementChild;
   _ensureTabControl(sheet, html);
   _configureTabControl(html, uuids.size > 0);
-  _registerBonusActions(sheet, div);
-  _registerDragAndDrop(sheet, div, uuids);
-  _registerSourceActions(div);
-  _registerSearch(sheet, div);
+  _registerBonusActions(sheet, tab);
+  _registerDragAndDrop(sheet, tab, uuids);
+  _registerSourceActions(tab);
+  _registerSearch(sheet, tab);
 
   const body = html.querySelector(".tab-body");
   if (!body) return;
-  const tab = div.firstElementChild;
   const current = body.querySelector(`:scope > .tab.${MODULE.ID}`);
   if (current) current.replaceWith(tab);
   else body.appendChild(tab);
@@ -8654,6 +8718,14 @@ class OptionalSelector {
    */
   async render() {
     const isV2 = !!this.dialog.element?.classList?.contains("dnd5e2");
+    const root = isV2 ? this.dialog.element : this.dialog.element?.[0];
+
+    // Applying an optional bonus rebuilds the dialog, which re-fires the render hook.
+    // The injected element survives that rebuild and records which optionals were already
+    // applied, so injecting a second copy would stack duplicate blocks and let the same
+    // bonus be applied - and its resource consumed - again on every rebuild.
+    if (root?.querySelector(`.${MODULE.ID}.optionals`)) return;
+
     this.form = document.createElement(isV2 ? "FIELDSET" : "DIV");
 
     if (isV2) this.form.insertAdjacentHTML("beforeend", `<legend>${MODULE.NAME}</legend>`);
@@ -8669,10 +8741,10 @@ class OptionalSelector {
     this.activateListeners(this.form);
 
     if (isV2) {
-      const group = this.dialog.element.querySelector("fieldset[data-application-part=configuration]");
+      const group = root.querySelector("fieldset[data-application-part=configuration]");
       group.insertAdjacentElement("afterend", this.form);
     } else {
-      const group = this.dialog.element[0].querySelector(".dialog-content > form");
+      const group = root.querySelector(".dialog-content > form");
       group.append(this.form);
       this.dialog.setPosition({height: "auto"});
     }
@@ -8760,8 +8832,10 @@ class OptionalSelector {
       if (!slot.value || !slot.max || !slot.level || (slot.level < (bonus.consume.value.min || 1))) {
         return options;
       }
+      // dnd5e labels a leveled slot with DND5E.SpellLevelSpell and a pact slot with
+      // DND5E.SpellLevelPact; there is no "...Slot" key, so that suffix rendered raw.
       const isLeveled = /spell[0-9]+/.test(key);
-      options[key] = game.i18n.format(`DND5E.SpellLevel${isLeveled ? "Slot" : key.capitalize()}`, {
+      options[key] = game.i18n.format(`DND5E.SpellLevel${isLeveled ? "Spell" : key.capitalize()}`, {
         level: isLeveled ? game.i18n.localize(`DND5E.SpellLevel${slot.level}`) : slot.level,
         n: `${slot.value}/${slot.max}`
       });
