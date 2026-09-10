@@ -57,6 +57,8 @@ export const MODULE = {
 /* -------------------------------------------------- */
 
 export const SETTINGS = {
+  EFFECTS: "visualEffects",
+  MOTION: "interfaceMotion",
   AURA: "showAuraRanges",
   LABEL: "headerLabel",
   PLAYERS: "allowPlayers",

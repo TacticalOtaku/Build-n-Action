@@ -6,4 +6,6 @@
     <li class="property">{{this}}</li>
     {{/each}}
   </ul>
+  <button type="button" class="bna-blueprint-launch" data-action="openBlueprint"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i> {{localize "BUILD_N_ACTION.Blueprint.Open"}}</button>
+  {{#if hasGraph}}<p class="bna-blueprint-banner">{{localize "BUILD_N_ACTION.Blueprint.ActiveGraph"}}</p>{{/if}}
 </div>

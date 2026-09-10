@@ -1,3 +1,114 @@
+/* blueprint.css */
+/* Condition editor geometry. Shared colors and motion preferences come from the visual system. */
+.build-n-action.blueprint:not(.minimized, .minimizing, .maximizing) { min-width: min(920px, 96vw); min-height: min(640px, 94dvh); }
+.build-n-action.blueprint { --bna-node-bg: var(--bna-surface-raised); --bna-wire: #9a9483; }
+.build-n-action.blueprint .window-content { display: flex; flex-direction: column; padding: 0; overflow: hidden; gap: 0; background: var(--bna-bg); color: var(--bna-text); }
+.bna-blueprint-root { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; }
+.build-n-action.blueprint .bna-blueprint-root button:not(.bna-port) { height: auto; min-height: 30px; line-height: 1.4; }
+.bna-blueprint-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--bna-border); flex-shrink: 0; }
+.bna-blueprint-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.bna-blueprint-brand > i { color: var(--bna-accent); font-size: 26px; }
+.bna-blueprint-brand span { font-size: 10px; color: var(--bna-text-muted); letter-spacing: .08em; text-transform: uppercase; }
+.bna-blueprint-brand h2 { font-family: inherit; font-size: 22px; font-weight: 650; color: var(--bna-text); border: 0; margin: 4px 0 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 45vw; }
+.bna-blueprint-save { display: flex; align-items: center; gap: 14px; }
+.bna-blueprint-save > span { font-size: 11px; color: var(--bna-text-muted); }
+.build-n-action .bna-primary { background: var(--bna-accent); border: 1px solid var(--bna-accent); color: #181b1d; font-weight: 650; padding: 9px 16px; }
+.bna-blueprint-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 18px; background: var(--bna-surface); border-bottom: 1px solid var(--bna-border); flex-shrink: 0; }
+.bna-blueprint-toolbar > div { display: flex; align-items: center; gap: 5px; }
+.bna-blueprint-toolbar button { min-height: 30px; padding: 4px 9px; font-size: 11px; width: auto; box-shadow: none; }
+.bna-blueprint-toolbar output { color: var(--bna-text-muted); text-align: center; min-width: 42px; font-size: 11px; }
+.bna-blueprint-workspace { display: grid; grid-template-columns: 200px minmax(260px, 1fr) 280px; flex: 1; min-height: 260px; overflow: hidden; }
+.bna-blueprint-catalog, .bna-blueprint-inspector { overflow-y: auto; padding: 18px 14px; min-width: 0; scrollbar-width: thin; background: var(--bna-surface); }
+.bna-blueprint-catalog { border-right: 1px solid var(--bna-border); }
+.bna-blueprint-inspector { border-left: 1px solid var(--bna-border); }
+.build-n-action.blueprint h3 { margin: 0 0 12px; font-family: inherit; font-size: 14px; font-weight: 650; border: 0; color: var(--bna-text); }
+.build-n-action.blueprint h4 { font-family: inherit; font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--bna-text-muted); margin: 22px 0 10px; }
+.bna-blueprint-search { display: flex; align-items: center; gap: 8px; background: var(--bna-bg); border: 1px solid var(--bna-border); border-radius: 5px; padding: 4px 8px; color: var(--bna-text-muted); }
+.bna-blueprint-search input { width: 100%; min-width: 0; background: transparent; border: 0; font-size: 12px; box-shadow: none; height: 28px; color: var(--bna-text); }
+.bna-logic-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.bna-logic-tools button { font-size: 11px; padding: 6px 2px; font-weight: 600; }
+.build-n-action.blueprint .bna-catalog-entry { display: flex; align-items: start; justify-content: flex-start; flex: 0 0 auto; height: auto; min-height: 38px; text-align: left; white-space: normal; width: 100%; gap: 9px; padding: 9px 6px; background: transparent; border: 0; border-bottom: 1px solid var(--bna-border); border-radius: 0; font-size: 12px; line-height: 1.4; color: var(--bna-text); }
+.bna-catalog-entry > span { min-width: 0; overflow-wrap: anywhere; }
+.bna-catalog-entry > i { flex-shrink: 0; }
+.build-n-action.blueprint :is(.bna-logic-tools button, .bna-diagnostic, .bna-trial-row) { height: auto; white-space: normal; line-height: 1.5; min-height: 30px; }
+.bna-catalog-entry i { color: var(--bna-accent); width: 12px; padding-top: 2px; font-size: 10px; flex: 0 0 12px; }
+.bna-catalog-entry:hover { background: var(--bna-hover) !important; }
+.bna-blueprint-canvas { position: relative; overflow: hidden; touch-action: none; cursor: grab; background-color: var(--bna-bg-deep); background-image: radial-gradient(circle, var(--bna-border) 1px, transparent 1px); background-size: 22px 22px; outline-offset: -3px; }
+.bna-blueprint-canvas:active { cursor: grabbing; }
+.bna-blueprint-world { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; will-change: transform; }
+.bna-blueprint-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.bna-edge { fill: none; stroke: var(--bna-wire); stroke-width: 2; opacity: .55; }
+.bna-edge.selected { stroke: var(--bna-accent); opacity: 1; stroke-width: 2.5; }
+.bna-node { position: absolute; left: 0; top: 0; width: 218px; height: 148px; border: 1px solid var(--bna-border); border-radius: 7px; background: var(--bna-node-bg); box-shadow: 0 5px 15px rgb(0 0 0 / 14%); color: var(--bna-text); padding: 0 14px 10px; cursor: grab; user-select: none; isolation: isolate; }
+.bna-node.selected { border-color: var(--bna-accent); box-shadow: 0 0 0 2px var(--bna-accent-soft), 0 7px 20px rgb(0 0 0 / 18%); }
+.bna-node.invalid { border-color: var(--bna-danger); }
+.bna-node-heading { display: flex; align-items: center; gap: 7px; margin: 0 -14px 11px; padding: 7px 12px; border-bottom: 1px solid var(--bna-border); border-radius: 6px 6px 0 0; background: var(--bna-hover); font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--bna-text-muted); }
+.bna-node-heading > i { color: var(--bna-accent); }
+.bna-node > strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; max-height: 37px; font-size: 13px; line-height: 1.4; font-weight: 650; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
+.bna-node > small { display: block; color: var(--bna-text-muted); margin-top: 5px; font-size: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bna-node[data-type=result] .bna-node-heading { background: var(--bna-accent-soft); }
+.bna-node[data-trace=pass] { border-color: var(--bna-success); }
+.bna-node[data-trace=fail] { border-color: var(--bna-danger); }
+.bna-node[data-trace=unknown] { border-color: var(--bna-warning); }
+.bna-node-trace { margin-left: auto; font-size: 8px; }
+.build-n-action.blueprint .bna-port { position: absolute; top: 45px; width: 18px; height: 18px; min-height: 18px; padding: 0; border: 3px solid var(--bna-node-bg); border-radius: 50%; background: var(--bna-wire); box-shadow: 0 0 0 1px var(--bna-border); cursor: crosshair; z-index: 2; }
+.bna-port-in { left: -9px; }
+.bna-port-out { right: -9px; }
+.bna-port > span { position: absolute; top: -3px; font: 10px/18px "Segoe UI", sans-serif; color: var(--bna-text-muted); white-space: nowrap; pointer-events: none; }
+.bna-port-in > span { left: 20px; }
+.bna-port-out > span { right: 20px; }
+.bna-port[data-port=true] { --bna-wire: var(--bna-success); }
+.bna-port[data-port=false] { --bna-wire: var(--bna-danger); }
+.build-n-action.blueprint .bna-port:hover, .build-n-action.blueprint .bna-port.connecting { background: var(--bna-accent); box-shadow: 0 0 0 4px var(--bna-accent-soft); }
+.bna-blueprint-canvas-hint { position: absolute; bottom: 12px; left: 14px; right: 14px; text-align: center; font-size: 10px; line-height: 1.5; color: var(--bna-text-muted); pointer-events: none; background: var(--bna-bg); padding: 6px 9px; border-radius: 4px; margin: 0; opacity: .9; }
+.bna-inspector-title { display: flex; align-items: center; gap: 12px; }
+.bna-inspector-title > i { color: var(--bna-accent); font-size: 19px; }
+.bna-inspector-title span { font-size: 10px; color: var(--bna-text-muted); }
+.bna-inspector-title h3 { margin: 4px 0 !important; }
+.bna-blueprint-inspector p { font-size: 12px; line-height: 1.6; color: var(--bna-text-muted); }
+.bna-help-example { padding: 10px 12px; background: var(--bna-accent-soft); border-left: 2px solid var(--bna-accent); border-radius: 0 4px 4px 0; font-size: 12px; line-height: 1.6; }
+.bna-help-example > strong { color: var(--bna-text); font-size: 11px; }
+.bna-help-example p { margin: 5px 0 0; }
+.bna-help-context strong { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+.bna-blueprint-parameters { border-top: 1px solid var(--bna-border); margin-top: 18px; padding-top: 12px; }
+.bna-blueprint-parameters fieldset { margin: 0; padding: 0; border: 0; box-shadow: none; min-width: 0; background: transparent; }
+.bna-blueprint-parameters legend { display: none; }
+.bna-blueprint-parameters .hint { display: none; }
+.bna-blueprint-parameters .form-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; margin: 0 0 12px; }
+.bna-blueprint-parameters label { font-size: 11px; color: var(--bna-text); }
+.bna-blueprint-parameters .form-fields { display: flex; flex-wrap: wrap; gap: 4px; }
+.bna-blueprint-parameters input, .bna-blueprint-parameters select, .bna-blueprint-parameters textarea { font-size: 12px; min-width: 0; width: 100%; }
+.bna-blueprint-parameters input[type=checkbox] { width: auto; }
+.bna-blueprint-parameters .checkbox { display: flex; flex-direction: row; align-items: center; gap: 6px; }
+.bna-blueprint-parameters textarea { min-height: 100px; }
+.bna-blueprint-parameters .form-fields > button { width: auto; }
+.bna-connections > div { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--bna-border); font-size: 11px; padding: 6px 0; }
+.bna-connections > div > span { flex: 1; }
+.bna-connections button { width: auto; font-size: 11px; padding: 3px 6px; }
+.bna-remove-node { margin-top: 18px; color: var(--bna-danger) !important; width: 100%; font-size: 12px; }
+.bna-blueprint-footer { max-height: 230px; overflow: auto; border-top: 1px solid var(--bna-border); background: var(--bna-surface); flex-shrink: 0; }
+.bna-blueprint-footer details { padding: 10px 18px; }
+.bna-blueprint-footer details + details { border-top: 1px solid var(--bna-border); }
+.bna-blueprint-footer summary { font-size: 11px; font-weight: 600; cursor: pointer; color: var(--bna-text); }
+.bna-blueprint-footer p { font-size: 11px; line-height: 1.5; color: var(--bna-text-muted); margin: 7px 0; }
+.bna-blueprint-diagnostics [data-bp-diagnostics] { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 5px; }
+.bna-blueprint-diagnostics .bna-valid { color: var(--bna-success); }
+.bna-diagnostic { display: flex; align-items: center; gap: 6px; max-width: 100%; background: var(--bna-danger-soft); color: var(--bna-danger) !important; width: auto; text-align: left; font-size: 11px; padding: 4px 8px; }
+.bna-diagnostic.warning { color: var(--bna-warning) !important; background: var(--bna-hover); }
+.bna-blueprint-trial-fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; align-items: end; gap: 10px; }
+.bna-blueprint-trial-fields label { display: grid; gap: 4px; font-size: 10px; color: var(--bna-text-muted); }
+.bna-blueprint-trial-fields select { font-size: 11px; width: 100%; }
+.bna-trial-row { display: flex; justify-content: space-between; gap: 12px; padding: 5px 8px; width: 100%; font-size: 11px; text-align: left; border: 0; border-bottom: 1px solid var(--bna-border); border-radius: 0; }
+.build-n-action .bna-blueprint-launch { margin: 10px 0 3px; width: auto; align-self: flex-start; font-size: 12px; background: var(--bna-accent-soft); color: var(--bna-text); border: 1px solid var(--bna-accent); padding: 7px 12px; }
+.build-n-action.blueprint button:disabled { opacity: .4; cursor: default; transform: none; }
+.build-n-action.blueprint :is(button, input, select, textarea):focus-visible, .bna-node:focus-visible { outline: 2px solid var(--bna-accent); outline-offset: 3px; }
+@media (max-width: 1000px) {
+  .bna-blueprint-workspace { grid-template-columns: 164px minmax(220px, 1fr) 235px; }
+  .bna-blueprint-toolbar button span { display: none; }
+  .bna-blueprint-heading { padding: 12px 16px; }
+  .bna-blueprint-brand h2 { font-size: 18px; }
+}
+
 /* design-system.css */
 /* Canonical Build-n-Action visual system. Component files only add structural behavior. */
 .build-n-action {
@@ -1015,4 +1126,164 @@ fieldset.build-n-action.optionals {
   .locked a {
     color: gray;
   }
+}
+
+/* z-modern.css */
+/* Shared visual refresh: paper and graphite surfaces, restrained amber accents. */
+.build-n-action {
+  --bna-accent: #a16a23;
+  --bna-accent-bright: #c18a3c;
+  --bna-accent-soft: color-mix(in srgb, var(--bna-accent) 11%, transparent);
+  --bna-bg: #f5f3ed;
+  --bna-bg-deep: #eae7df;
+  --bna-surface: #faf9f5;
+  --bna-surface-raised: #fffefa;
+  --bna-border: #d8d5cb;
+  --bna-text: #272c2d;
+  --bna-text-muted: #69706c;
+  --bna-hover: #eeece4;
+  --bna-success: #387b62;
+  --bna-danger: #b34545;
+  --bna-warning: #9c6c20;
+  --bna-radius-sm: 4px;
+  --bna-radius-md: 6px;
+  --bna-radius-lg: 9px;
+  --bna-shadow: 0 3px 12px rgb(43 49 38 / 5%);
+  --bna-shadow-raised: 0 14px 40px rgb(35 42 34 / 14%);
+  --bna-motion: 170ms cubic-bezier(.2,.75,.3,1);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0;
+}
+.theme-dark .build-n-action, .dnd5e-theme-dark .build-n-action, body.theme-dark .build-n-action {
+  --bna-accent: #dbb16c;
+  --bna-accent-bright: #eed3a2;
+  --bna-bg: #202528;
+  --bna-bg-deep: #191e21;
+  --bna-surface: #252b2e;
+  --bna-surface-raised: #2c3336;
+  --bna-border: #3c4446;
+  --bna-text: #e9ece7;
+  --bna-text-muted: #a6b0ae;
+  --bna-hover: #313a3d;
+  --bna-success: #8bcbac;
+  --bna-danger: #eb9590;
+  --bna-warning: #e7bd70;
+  --bna-shadow: 0 3px 14px rgb(5 12 14 / 13%);
+  --bna-shadow-raised: 0 18px 45px rgb(4 9 11 / 34%);
+}
+.build-n-action .window-header { background: var(--bna-bg-deep); color: var(--bna-text); border-bottom: 1px solid var(--bna-border); padding: 8px 12px; }
+.build-n-action .window-title { font-family: inherit; font-size: 12px; font-weight: 500; }
+.build-n-action :is(.window-content, .tab) { scrollbar-width: thin; scrollbar-color: var(--bna-border) transparent; }
+.build-n-action.dnd5e2 .window-content, .build-n-action.sheet .window-content { background: var(--bna-bg); }
+.build-n-action h1.module-heading { min-height: 86px; padding: 18px 22px; background: var(--bna-surface); }
+.build-n-action h1.module-heading > i { background: var(--bna-accent-soft); border: 0; border-radius: 8px; width: 44px; height: 44px; }
+.build-n-action h1.module-heading .name-stacked .title { font-size: 22px; letter-spacing: -.035em; font-weight: 650; }
+.build-n-action h1.module-heading .name-stacked .subtitle { font-size: 11px; margin-top: 3px; }
+.build-n-action.builder .pages { grid-template-columns: 180px minmax(0, 1fr); }
+.build-n-action.builder .pages .select-type { background: var(--bna-surface); padding: 24px 12px; }
+.build-n-action.builder .pages .select-type .types { gap: 6px; }
+.build-n-action.builder .pages .select-type .types a { border-radius: 5px; min-height: 46px; font-size: 12px; font-weight: 500; }
+.build-n-action.builder .pages .select-type .types a.active, .build-n-action.builder .pages .select-type .types a[aria-selected=true] { background: var(--bna-accent-soft); color: var(--bna-text); border-color: var(--bna-border); }
+.build-n-action.builder .pages .header { font-size: 10px; letter-spacing: .08em; }
+.build-n-action.builder .pages .current-bonuses { padding: 22px; }
+.build-n-action.builder .pages .current-bonuses .bonuses { gap: 10px; }
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus { border: 1px solid var(--bna-border); padding: 16px; box-shadow: none; }
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus:hover { box-shadow: var(--bna-shadow); border-color: var(--bna-accent); }
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .description { background: transparent; border: 0; border-top: 1px solid var(--bna-border); padding: 12px 0 0; font-size: 12px; line-height: 1.65; }
+.build-n-action.builder .pages .current-bonuses .bonuses .bonus .bonus-header .label { font-weight: 600; font-size: 14px; }
+.build-n-action.sheet .header.name-stacked { padding: 18px 22px 14px; background: var(--bna-surface); }
+.build-n-action.sheet .header.name-stacked input { font-size: 23px; font-weight: 600; letter-spacing: -.025em; }
+.build-n-action.sheet .header.name-stacked .properties .property { background: var(--bna-hover); color: var(--bna-text-muted); border: 0; border-radius: 3px; padding: 4px 7px; font-size: 10px; }
+.build-n-action.sheet .sheet-tabs.tabs { padding: 6px 12px; background: var(--bna-surface); gap: 5px; }
+.build-n-action.sheet .sheet-tabs.tabs .item { border: 0; border-radius: 4px; font-size: 11px; font-weight: 600; min-height: 40px; }
+.build-n-action.sheet .sheet-tabs.tabs .item.active { box-shadow: inset 0 -2px var(--bna-accent); border: 0; }
+.build-n-action.sheet .tab.scrollable { padding: 22px 22px 40px; gap: 18px; }
+.build-n-action.sheet fieldset { box-shadow: none; padding: 17px; border-radius: 7px; }
+.build-n-action.sheet fieldset:hover { box-shadow: none; transform: none; }
+.build-n-action.sheet fieldset > legend { font-size: 13px; font-weight: 650; }
+.build-n-action.sheet .form-group { padding: 8px 2px; }
+.build-n-action :is(input, select, textarea) { border-radius: 4px; border: 1px solid var(--bna-border); background: var(--bna-surface-raised); color: var(--bna-text); }
+.build-n-action :is(input, select):not([type=checkbox], [type=radio]) { min-height: 30px; }
+.build-n-action button { border: 1px solid var(--bna-border); border-radius: 5px; color: var(--bna-text); background: var(--bna-surface-raised); transition: background var(--bna-motion), color var(--bna-motion), box-shadow var(--bna-motion); }
+.build-n-action button:not(.icon):not([class*="fa-"]) { font-family: inherit; }
+.build-n-action button:hover { background: var(--bna-hover); color: var(--bna-accent); }
+.build-n-action button:active { transform: translateY(1px); }
+.build-n-action .bna-primary { color: var(--bna-bg); background: var(--bna-accent); border-color: var(--bna-accent); }
+.build-n-action :is(button, a, input, select, textarea):focus-visible { outline: 2px solid var(--bna-accent); outline-offset: 2px; }
+.build-n-action .hint { font-size: 12px; line-height: 1.65; }
+.build-n-action.optionals { padding: 14px; box-shadow: none; border-radius: 7px; }
+.build-n-action.optionals .optional, .build-n-action.optionals .reminder { padding: 12px; border-radius: 5px; background: var(--bna-surface-raised); }
+.build-n-action.optionals .optional.active { background: var(--bna-success-soft); border-color: var(--bna-success); }
+.build-n-action.keys-dialog .table { border-radius: 6px; padding: 8px; box-shadow: none; }
+.build-n-action.keys-dialog .table .row { padding: 6px 8px; border-bottom: 1px solid var(--bna-border); }
+.build-n-action :is(.overview, .character-sheet-tab, .bna-character-tab) { color: var(--bna-text); background: var(--bna-bg); }
+.build-n-action .bna-blueprint-banner { padding: 8px 12px; background: var(--bna-accent-soft); border-left: 2px solid var(--bna-accent); font-size: 11px; line-height: 1.6; width: 100%; }
+
+/* Procedural effects have their own clipped, non-interactive drawing surface. */
+.bna-elemental-canvas { position: absolute; left: -80px; top: -80px; pointer-events: none; z-index: 1; border: 0; max-width: none; max-height: none; }
+body[data-bna-effects=off] .bna-elemental-canvas { display: none; }
+.build-n-action.overview .window-content, .build-n-action.keys-dialog .window-content { background: var(--bna-bg); padding: 16px; color: var(--bna-text); }
+.build-n-action.overview table { border: 1px solid var(--bna-border); border-radius: 5px; overflow: hidden; margin: 0 0 16px; background: var(--bna-surface); }
+.build-n-action.overview thead { background: var(--bna-hover); color: var(--bna-text-muted); border-bottom: 1px solid var(--bna-border); }
+.build-n-action.overview table :is(td, th) { padding: 10px 12px; text-align: left; font-size: 12px; }
+.build-n-action.overview tbody tr { border-bottom: 1px solid var(--bna-border); }
+.build-n-action.overview tbody tr:nth-child(even) { background: var(--bna-hover); }
+.tab.build-n-action .bna-list-controls { margin: 14px 0; gap: 12px; }
+.tab.build-n-action .items-section.card { border: 1px solid var(--bna-border); border-radius: 7px; box-shadow: none; background: var(--bna-surface); margin-bottom: 14px; overflow: hidden; }
+.tab.build-n-action .items-header.header { background: var(--bna-hover); color: var(--bna-text); padding: 9px 12px; }
+.tab.build-n-action .item-list .item { border-bottom: 1px solid var(--bna-border); padding: 8px 12px; transition: background var(--bna-motion); }
+.tab.build-n-action .item-list .item:hover { background: var(--bna-hover); }
+.tab.build-n-action .bonus-source.item-detail { color: var(--bna-text-muted) !important; }
+.tab.build-n-action .item-name h4 { color: var(--bna-text); font-family: inherit; font-weight: 600; font-size: 13px; }
+body[data-bna-effects=off] .bna-node::before, body[data-bna-effects=off] .bna-node::after { display: none; animation: none; }
+body[data-bna-motion=off] .build-n-action *, body[data-bna-motion=off] .build-n-action *::before, body[data-bna-motion=off] .build-n-action *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { .build-n-action *, .build-n-action *::before, .build-n-action *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* These are resizable desktop windows: respond to their content box, not the screen. */
+.build-n-action:is(.builder,.sheet):not(.minimizing,.minimized,.maximizing) { min-width: 280px; min-height: 360px; }
+.build-n-action:is(.builder,.sheet) .window-content { container: bna-window / inline-size; min-width: 0; }
+.build-n-action.builder :is(.workshop-content,.pages,.current-bonuses,.bonuses,.bonus) { min-width: 0; }
+.build-n-action.builder .pages { grid-template-columns: 180px minmax(0,1fr); }
+.build-n-action.builder .pages .current-bonuses { grid-column: 2; }
+.build-n-action.builder .bonus-header .label { overflow-wrap: anywhere; }
+.build-n-action.builder .bonus-header .functions { flex-wrap: wrap; }
+.build-n-action.builder h1.module-heading { flex-shrink: 0; }
+.build-n-action.sheet .window-content { display: flex; flex-direction: column; overflow: auto; }
+.build-n-action.sheet :is(.header.name-stacked,.sheet-tabs.tabs) { flex-shrink: 0; }
+.build-n-action.sheet .header.name-stacked input { min-width: 0; }
+.build-n-action.sheet .header.name-stacked .properties { flex-wrap: wrap; }
+.build-n-action.sheet .sheet-tabs.tabs { grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); }
+.build-n-action.sheet .sheet-tabs.tabs .item { font-size: 11px; white-space: normal; overflow-wrap: anywhere; min-width: 0; height: auto; }
+.build-n-action.sheet .tab.scrollable { min-height: 0; overflow: visible; flex-shrink: 0; margin: 0; }
+.build-n-action.sheet .tab .scrollable { margin-right: 0; }
+.build-n-action.sheet :is(fieldset,.form-group,.form-fields,.picker) { min-width: 0; max-width: 100%; }
+.build-n-action.sheet :is(input,select,textarea,range-picker) { min-width: 0; max-width: 100%; }
+.build-n-action.sheet .form-fields > :is(input,select,textarea,range-picker) { flex: 1 1 100px; }
+.build-n-action.sheet .form-fields > button { flex: 0 0 auto; }
+.build-n-action.sheet :is(.hint,legend) { overflow-wrap: anywhere; }
+@container bna-window (max-width: 680px) {
+  .build-n-action.builder .pages { grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); min-height: 0; }
+  .build-n-action.builder .pages .current-bonuses { grid-column: 1; padding: 14px; }
+  .build-n-action.builder .pages .select-type { padding: 10px 14px; border-right: 0; border-bottom: 1px solid var(--bna-border); }
+  .build-n-action.builder .pages .select-type .header { display: none; }
+  .build-n-action.builder .pages .select-type .types { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px; }
+  .build-n-action.builder .pages .select-type .types a { display: flex; padding: 6px; gap: 6px; min-height: 36px; }
+  .build-n-action.builder .pages .select-type .types a .label { display: block; overflow-wrap: anywhere; }
+  .build-n-action.builder .pages .select-type .types a > i { font-size: 15px; flex: none; }
+  .build-n-action.sheet .tab.scrollable { padding: 14px; }
+  .build-n-action.sheet [data-tab=filters] { flex-direction: column; }
+  .build-n-action.sheet [data-tab=filters] .toc { flex: none; max-height: 120px; overflow: auto; }
+  .build-n-action.sheet [data-tab=filters] .picker { overflow: visible; }
+}
+@container bna-window (max-width: 440px) {
+  .build-n-action.builder .pages .select-type .types { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .build-n-action.builder .pages .current-bonuses .bonuses .bonus { padding: 12px; }
+  .build-n-action.builder .pages .current-bonuses .bonuses .bonus .bonus-header { grid-template-columns: minmax(0,1fr); gap: 10px; }
+  .build-n-action.builder .bonus-header .functions { justify-content: flex-start; }
+  .build-n-action.sheet .header.name-stacked { padding: 12px; }
+  .build-n-action.sheet .header.name-stacked input { font-size: 19px; }
+  .build-n-action.sheet .form-group { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+  .build-n-action.sheet .form-group > label { flex: none; }
+  .build-n-action.sheet .form-group .form-fields { width: 100%; flex-wrap: wrap; }
+  .build-n-action.sheet fieldset { padding: 12px; }
 }
