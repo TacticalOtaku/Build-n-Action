@@ -5,6 +5,8 @@ import {getCollection} from "../services/bonus-repository.mjs";
 import {updateBonusImage} from "../services/bonus-image.mjs";
 import {scrollFilterIntoView} from "./filter-navigation.mjs";
 import KeysDialog from "./keys-dialog.mjs";
+import ConditionBlueprint from "./condition-blueprint.mjs";
+import {getConditionHelp} from "../services/condition-help.mjs";
 
 export default class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.DocumentSheetV2
@@ -68,6 +70,7 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
       deleteFilter: this.#onDeleteFilter,
       editImage: this.#onEditImage,
       keysDialog: this.#onKeysDialog,
+      openBlueprint: this.#onOpenBlueprint,
       viewFilter: this.#onViewFilter
     },
     bonusId: null
@@ -227,6 +230,7 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
     return {
       aura: this.#prepareAura(makeField),
       bonus,
+      hasGraph: !!bonus.conditionGraph?.enabled,
       bonuses: this.#prepareBonuses(makeField, source),
       consume: this.#prepareConsumption(makeField, source),
       fields: await this.#prepareRootFields(makeField, rollData),
@@ -451,6 +455,7 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
       if (!this._filters.has(key) || fields[key].repeatable) acc.push({
         id: key,
         repeats: fields[key].repeatable ? bonus.filters[key].length : null,
+        example: getConditionHelp(key).example,
         field: bonus.schema.getField(`filters.${key}`)
       });
       return acc;
@@ -543,6 +548,13 @@ export default class BonusSheet extends foundry.applications.api.HandlebarsAppli
     const collection = getCollection(this.document).contents.map(k => k.toObject());
     collection.findSplice(k => k.id === bonus.id, data);
     this.document.update({[`flags.${MODULE.ID}.bonuses`]: collection});
+  }
+
+  static #onOpenBlueprint() {
+    const id = `bna-blueprint-${this.bonus.uuid.replaceAll(".", "-")}`;
+    const existing = foundry.applications.instances.get(id);
+    if (existing) { existing.render({force: true}); existing.bringToFront(); }
+    else new ConditionBlueprint({bonus: this.bonus}).render({force: true});
   }
 
   /* -------------------------------------------------- */

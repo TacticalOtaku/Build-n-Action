@@ -1,5 +1,6 @@
 import {MODULE, SETTINGS} from "./constants.mjs";
 import {refreshTokenAuras} from "./services/application-factories.mjs";
+import {applyInterfacePreferences} from "./services/interface-preferences.mjs";
 
 /** Document types whose open sheets expose Build-n-Action header controls. */
 const DOCUMENT_TYPES = new Set(["Actor", "Item", "ActiveEffect", "Region"]);
@@ -65,8 +66,16 @@ export function registerSettings({
   settings = game.settings,
   refreshDocuments = refreshDocumentApplications,
   refreshAuraDisplays = refreshAuras,
-  reload = reloadWorld
+  reload = reloadWorld,
+  refreshInterface = () => applyInterfacePreferences({settings})
 } = {}) {
+  for (const [key, prefix] of [[SETTINGS.EFFECTS, "Effects"], [SETTINGS.MOTION, "Motion"]]) {
+    registerBooleanSetting(settings, key, {
+      scope: "client", default: true,
+      name: `BUILD_N_ACTION.Blueprint.${prefix}Name`, hint: `BUILD_N_ACTION.Blueprint.${prefix}Hint`,
+      onChange: refreshInterface
+    });
+  }
   registerBooleanSetting(settings, SETTINGS.PLAYERS, {
     name: "BUILD_N_ACTION.SettingsShowBuilderForPlayersName",
     hint: "BUILD_N_ACTION.SettingsShowBuilderForPlayersHint",

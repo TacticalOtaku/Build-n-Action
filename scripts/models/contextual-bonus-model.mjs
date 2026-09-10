@@ -540,6 +540,7 @@ export class ContextualBonus extends foundry.abstract.DataModel {
       optional: new BooleanField(),
       reminder: new BooleanField(),
       description: new HTMLField(),
+      conditionGraph: new ObjectField({nullable: true, initial: null}),
       consume: new EmbeddedDataField(ConsumptionModel),
       aura: new EmbeddedDataField(AuraModel),
       flags: new ObjectField()

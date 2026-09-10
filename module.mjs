@@ -57,6 +57,8 @@ const MODULE = {
 /* -------------------------------------------------- */
 
 const SETTINGS = {
+  EFFECTS: "visualEffects",
+  MOTION: "interfaceMotion",
   AURA: "showAuraRanges",
   LABEL: "headerLabel",
   PLAYERS: "allowPlayers",
@@ -2878,6 +2880,7 @@ class ContextualBonus extends foundry.abstract.DataModel {
       optional: new BooleanField(),
       reminder: new BooleanField(),
       description: new HTMLField(),
+      conditionGraph: new ObjectField({nullable: true, initial: null}),
       consume: new EmbeddedDataField(ConsumptionModel),
       aura: new EmbeddedDataField(AuraModel),
       flags: new ObjectField()
@@ -4246,6 +4249,144 @@ class BonusCollector {
 
 /* -------------------------------------------------- */
 
+const GRAPH_TYPES = new Set(['condition', 'context', 'and', 'or', 'not', 'result', 'branch', 'xor', 'nand', 'nor']);
+const BINARY_TYPES = new Set(['xor', 'nand', 'nor']);
+const CONTEXT_PREDICATES = ['inCombat', 'hasTarget', 'hasItem'];
+const outputPort = edge => edge.fromPort ?? 'out';
+const inputPort = edge => edge.toPort ?? 'in';
+function inputPorts(node) {
+  if (['condition', 'context'].includes(node.type)) return [];
+  return BINARY_TYPES.has(node.type) ? ['a', 'b'] : ['in'];
+}
+function outputPorts(node) { return node.type === 'result' ? [] : node.type === 'branch' ? ['true', 'false'] : ['out']; }
+function portY(node, port) { return ['a','true'].includes(port) ? 100 : ['b','false'].includes(port) ? 128 : 114; }
+
+/** Presence checks use the supplied roll context, never stale global user targets. */
+function evaluateContextCondition(node, subjects = {}, {combatActive} = {}) {
+  if (node.predicate === 'hasTarget') return !!subjects.target?.actor;
+  if (node.predicate === 'hasItem') return !!subjects.item;
+  if (node.predicate === 'inCombat') return typeof combatActive === 'boolean' ? combatActive : null;
+  return null;
+}
+
+const MAX_NODES = 256, MAX_EDGES = 1024;
+
+/** Convert existing conjunctive filters without changing their meaning. */
+function createConditionGraph(filterIds) {
+  const filters = [...new Set(filterIds)];
+  const nodes = filters.map((filter, i) => ({id: `condition-${i + 1}`, type: "condition", filter, x: 40, y: i * 150 + 30}));
+  const edges = [];
+  if (filters.length) {
+    nodes.push({id: "all", type: "and", x: 350, y: Math.max(30, (filters.length - 1) * 75 + 30)});
+    edges.push(...nodes.filter(n => n.type === "condition").map(n => ({from: n.id, to: "all"})), {from: "all", to: "result"});
+  }
+  nodes.push({id: "result", type: "result", x: filters.length ? 660 : 300, y: Math.max(30, (filters.length - 1) * 75 + 30)});
+  return {version: 1, enabled: true, nodes, edges};
+}
+
+/** Pure structural validation, including an explicit configured-field contract. */
+function validateConditionGraph(graph, {knownFilters, configuredFilters} = {}) {
+  const issues = [];
+  const error = (code, nodeId) => issues.push({code, nodeId, severity: "error"});
+  const done = () => ({valid: !issues.some(i => i.severity === "error"), issues});
+  if (!graph || graph.version !== 1 || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) { error("Malformed"); return done(); }
+  if (graph.nodes.length > MAX_NODES || graph.edges.length > MAX_EDGES) { error("TooLarge"); return done(); }
+  const nodes = new Map(), conditionIds = new Set();
+  const known = knownFilters === undefined ? null : new Set(knownFilters);
+  const configured = configuredFilters === undefined ? null : new Set(configuredFilters);
+  for (const node of graph.nodes) {
+    if (!node || typeof node.id !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(node.id) || !GRAPH_TYPES.has(node.type)) { error("Malformed"); continue; }
+    if (nodes.has(node.id)) error("DuplicateNode", node.id);
+    nodes.set(node.id, node);
+    if (node.type === "context" && !CONTEXT_PREDICATES.includes(node.predicate)) error("UnknownFilter", node.id);
+    if (node.type === "condition") {
+      if (typeof node.filter !== "string" || !node.filter || (known && !known.has(node.filter))) error("UnknownFilter", node.id);
+      if (configured && !configured.has(node.filter)) error("MissingParameters", node.id);
+      if (conditionIds.has(node.filter)) error("DuplicateFilter", node.id);
+      conditionIds.add(node.filter);
+    }
+  }
+  if (configured) for (const id of configured) if (!conditionIds.has(id)) error("OmittedFilter");
+  const results = [...nodes.values()].filter(n => n.type === "result");
+  if (results.length !== 1) error("ResultCount");
+  const inputs = new Map([...nodes.keys()].map(id => [id, []]));
+  const outputs = new Map([...nodes.keys()].map(id => [id, []]));
+  const edgeIds = new Set();
+  for (const edge of graph.edges) {
+    if (!edge || typeof edge.from !== "string" || typeof edge.to !== "string" || !nodes.has(edge.from) || !nodes.has(edge.to)) { error("DanglingEdge"); continue; }
+    const key = `${edge.from}/${outputPort(edge)}/${edge.to}/${inputPort(edge)}`;
+    if (edgeIds.has(key)) error("DuplicateEdge", edge.to);
+    edgeIds.add(key);
+    inputs.get(edge.to).push(edge.from); outputs.get(edge.from).push(edge.to);
+    if (!inputPorts(nodes.get(edge.to)).includes(inputPort(edge)) || !outputPorts(nodes.get(edge.from)).includes(outputPort(edge))) error("PortDirection", edge.to);
+  }
+  for (const node of nodes.values()) {
+    const count = inputs.get(node.id).length;
+    if (["not", "branch"].includes(node.type) && count !== 1) error("SingleInput", node.id);
+    if (BINARY_TYPES.has(node.type) && (count !== 2 || ['a','b'].some(port => graph.edges.filter(e => e?.to === node.id && inputPort(e) === port).length !== 1))) error('BinaryInputs', node.id);
+    if (["and", "or"].includes(node.type) && count < 1) error("MissingInput", node.id);
+    if (node.type === "result" && count !== 1 && !(nodes.size === 1 && count === 0)) error("SingleInput", node.id);
+  }
+  // Kahn's algorithm handles imported cycles without recursive stack overflow.
+  const degrees = new Map([...inputs].map(([id, incoming]) => [id, incoming.length]));
+  const queue = [...degrees].filter(([, degree]) => degree === 0).map(([id]) => id);
+  let count = 0;
+  while (queue.length) {
+    const id = queue.pop(); count++;
+    for (const next of outputs.get(id)) { degrees.set(next, degrees.get(next) - 1); if (!degrees.get(next)) queue.push(next); }
+  }
+  if (count !== nodes.size) for (const [id, degree] of degrees) if (degree > 0) error("Cycle", id);
+  if (results.length === 1) {
+    const reached = new Set(), stack = [results[0].id];
+    while (stack.length) { const id = stack.pop(); if (reached.has(id)) continue; reached.add(id); stack.push(...inputs.get(id)); }
+    for (const id of nodes.keys()) if (!reached.has(id)) error("Disconnected", id);
+  }
+  return done();
+}
+
+/** Tri-state evaluation; only strict booleans are accepted from condition callbacks. */
+function evaluateConditionGraph(graph, evaluateCondition, options = {}) {
+  const report = validateConditionGraph(graph, options);
+  if (!report.valid) return {result: null, trace: [], issues: report.issues};
+  const nodes = new Map(graph.nodes.map(n => [n.id, n]));
+  const inputs = new Map(graph.nodes.map(n => [n.id, []]));
+  for (const edge of graph.edges) inputs.get(edge.to).push(edge);
+  const values = new Map(), trace = [];
+  const read = edge => { const value = visit(edge.from); return outputPort(edge) === 'false' && value !== null ? !value : value; };
+  const visit = id => {
+    if (values.has(id)) return values.get(id);
+    const node = nodes.get(id), incoming = inputs.get(id);
+    let value = null, reason;
+    if (["condition", "context"].includes(node.type)) {
+      try {
+        const evaluated = evaluateCondition(node);
+        if (evaluated === true || evaluated === false) value = evaluated;
+        else if (evaluated?.then) { evaluated.catch?.(() => {}); reason = "AsyncUnsupported"; }
+      } catch { reason = "EvaluationError"; }
+    } else if (node.type === "result") value = incoming.length ? read(incoming[0]) : true;
+    else if (node.type === "branch") value = read(incoming[0]);
+    else if (node.type === "not") { const child = read(incoming[0]); value = child === null ? null : !child; }
+    else if (node.type === 'xor') { const a = read(incoming[0]), b = read(incoming[1]); value = a === null || b === null ? null : a !== b; }
+    else {
+      const isAnd = ['and','nand'].includes(node.type); value = isAnd;
+      let unknown = false;
+      for (const child of incoming) {
+        const next = read(child);
+        if (next === null) unknown = true;
+        else if (next !== isAnd) { value = next; unknown = false; break; }
+      }
+      if (unknown) value = null;
+      if (['nand','nor'].includes(node.type) && value !== null) value = !value;
+    }
+    values.set(id, value);
+    trace.push({nodeId: id, result: value, status: value === null ? "unknown" : value ? "pass" : "fail", ...(reason ? {reason} : {})});
+    return value;
+  };
+  const result = visit(graph.nodes.find(n => n.type === "result").id);
+  for (const node of graph.nodes) if (!values.has(node.id)) trace.push({nodeId: node.id, result: null, status: "skipped"});
+  return {result, trace, issues: report.issues};
+}
+
 /**
  * Remove bonuses that fail any configured filter.
  *
@@ -4260,6 +4401,19 @@ class BonusCollector {
  */
 function evaluateBonusFilters(bonuses, filterRegistry, subjects, details) {
   for (const [key, bonus] of bonuses.entries()) {
+    if (bonus.conditionGraph?.enabled) {
+      const configuredFilters = Object.keys(bonus.filters).filter(id => {
+        const field = bonus.schema?.getField?.(`filters.${id}`);
+        return field?.constructor?.storage ? field.constructor.storage(bonus) : true;
+      });
+      const evaluated = evaluateConditionGraph(bonus.conditionGraph, node => node.type === 'context'
+        ? evaluateContextCondition(node, subjects, {combatActive: !!globalThis.game?.combat?.started})
+        : filterRegistry[node.filter].call(bonus, subjects, bonus.filters[node.filter], details), {
+        knownFilters: Object.keys(bonus.filters).filter(id => typeof filterRegistry[id] === "function"), configuredFilters
+      });
+      if (evaluated.result !== true) bonuses.delete(key);
+      continue;
+    }
     for (const [filterId, value] of Object.entries(bonus.filters)) {
       const filter = filterRegistry[filterId];
       if (!filter) {
@@ -5539,7 +5693,7 @@ class BonusWorkshop extends HandlebarsApplicationMixin$1(ApplicationV2$1) {
   /** Keep the type selector usable at narrow window sizes. */
   #updateResponsiveLayout(width) {
     const selector = this.element?.querySelector(".pages .select-type");
-    selector?.classList.toggle("hidden", Number.parseInt(width) < 680);
+    selector?.classList.toggle("bna-compact", Number.parseInt(width) < 680);
   }
 
   /* -------------------------------------------------- */
@@ -5878,6 +6032,887 @@ class KeysDialog extends foundry.applications.api.DialogV2 {
   }
 }
 
+const copy = value => structuredClone(value);
+const NODE_WIDTH = 218;
+const NODE_HEIGHT = 148;
+
+/** Find a nearby free slot, including clearance for connection ports. */
+function freeNodePosition(nodes, preferred) {
+  const available = point => nodes.every(node => Math.abs(node.x - point.x) >= NODE_WIDTH + 24 || Math.abs(node.y - point.y) >= NODE_HEIGHT + 24);
+  if (available(preferred)) return {...preferred};
+  for (let radius = 1; radius <= nodes.length + 1; radius++) {
+    for (let y = -radius; y <= radius; y++) for (let x = -radius; x <= radius; x++) {
+      if (Math.abs(x) !== radius && Math.abs(y) !== radius) continue;
+      const point = {x: preferred.x + x * (NODE_WIDTH + 48), y: preferred.y + y * (NODE_HEIGHT + 40)};
+      if (available(point)) return point;
+    }
+  }
+}
+
+/** Bounded, detached history includes filter parameters as well as graph topology. */
+class BlueprintHistory {
+  constructor(initial) { this.entries = [copy(initial)]; this.index = 0; }
+  get current() { return copy(this.entries[this.index]); }
+  get canUndo() { return this.index > 0; }
+  get canRedo() { return this.index < this.entries.length - 1; }
+  push(value) {
+    if (JSON.stringify(value) === JSON.stringify(this.entries[this.index])) return;
+    this.entries.splice(this.index + 1);
+    this.entries.push(copy(value));
+    if (this.entries.length > 60) this.entries.shift();
+    this.index = this.entries.length - 1;
+  }
+  undo() { if (this.canUndo) this.index--; return this.current; }
+  redo() { if (this.canRedo) this.index++; return this.current; }
+}
+
+/** Reject invalid port directions and cycles before changing the graph. */
+function connectNodes(graph, from, to, fromPort = 'out', toPort = 'in') {
+  const source = graph.nodes.find(n => n.id === from);
+  const target = graph.nodes.find(n => n.id === to);
+  if (!source || !target || from === to || !outputPorts(source).includes(fromPort) || !inputPorts(target).includes(toPort)) return false;
+  if (graph.edges.some(e => e.from === from && e.to === to && outputPort(e) === fromPort && inputPort(e) === toPort)) return false;
+  const visit = [to], seen = new Set();
+  while (visit.length) {
+    const id = visit.pop();
+    if (id === from) return false;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    for (const edge of graph.edges) if (edge.from === id) visit.push(edge.to);
+  }
+  if (["not", "result", "branch"].includes(target.type) || BINARY_TYPES.has(target.type)) graph.edges = graph.edges.filter(e => e.to !== to || inputPort(e) !== toPort);
+  graph.edges.push({from, to, ...(fromPort !== 'out' ? {fromPort} : {}), ...(toPort !== 'in' ? {toPort} : {})});
+  return true;
+}
+
+function removeNode(graph, id) {
+  const node = graph.nodes.find(n => n.id === id);
+  if (!node || node.type === "result") return false;
+  graph.nodes = graph.nodes.filter(n => n.id !== id);
+  graph.edges = graph.edges.filter(e => e.from !== id && e.to !== id);
+  return true;
+}
+
+function fitGraph(graph, width, height) {
+  if (!graph.nodes.length || width <= 0 || height <= 0) return {x: 40, y: 40, scale: 1};
+  const minX = Math.min(...graph.nodes.map(n => n.x || 0));
+  const minY = Math.min(...graph.nodes.map(n => n.y || 0));
+  const w = Math.max(...graph.nodes.map(n => n.x || 0)) - minX + NODE_WIDTH;
+  const h = Math.max(...graph.nodes.map(n => n.y || 0)) - minY + NODE_HEIGHT;
+  const scale = Math.max(.15, Math.min(1, (width - 72) / w, (height - 72) / h));
+  return {x: (width - w * scale) / 2 - minX * scale, y: (height - h * scale) / 2 - minY * scale, scale};
+}
+
+function graphPoint(point, view) {
+  return {x: (point.x - view.x) / view.scale, y: (point.y - view.y) / view.scale};
+}
+
+function connectionPath(from, to, edge = {}) {
+  const x1 = from.x + NODE_WIDTH, y1 = from.y + portY(from, outputPort(edge));
+  const x2 = to.x, y2 = to.y + portY(to, inputPort(edge));
+  const bend = Math.max(64, Math.abs(x2 - x1) * .5);
+  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
+}
+
+const ACTOR = new Set(["actorCreatureSizes", "actorCreatureTypes", "actorLanguages", "baseArmors", "healthPercentages", "remainingSpellSlots", "statusEffects"]);
+const ITEM = new Set(["baseTools", "baseWeapons", "creatureTypes", "featureTypes", "identifiers", "itemTypes", "preparationModes", "sourceClasses", "spellComponents", "spellLevels", "spellSchools", "weaponProperties"]);
+const ACTIVITY = new Set(["attackModes", "damageTypes", "saveAbilities"]);
+const TARGET = new Set(["targetArmors", "targetEffects", "tokenSizes"]);
+const SPECIAL = new Set(["abilities", "markers", "proficiencyLevels", "skillIds", "throwTypes"]);
+
+/** A deliberately limited read-only trial: never dispatch scripts or dice formulas. */
+function evaluateTrialCondition(id, bonus, registry, subjects = {}, details = {}) {
+  if (id === "customScripts") return {result: null, reason: "ScriptSkipped"};
+  if (id === "arbitraryComparisons") return {result: null, reason: "FormulaSkipped"};
+  if (![ACTOR, ITEM, ACTIVITY, TARGET, SPECIAL].some(set => set.has(id))) return {result: null, reason: "EvaluationError"};
+  let missing = !subjects.actor;
+  if (ITEM.has(id)) missing ||= !subjects.item;
+  if (ACTIVITY.has(id)) missing ||= !subjects.activity;
+  if (TARGET.has(id)) missing ||= !subjects.target?.actor;
+  if (id === "tokenSizes") missing ||= !subjects.target?.document;
+  if (id === "abilities") missing ||= !(subjects.activity?.ability || details.abilityId);
+  if (id === "skillIds") missing ||= !details.skillId;
+  if (id === "throwTypes") missing ||= !(details.ability || details.isDeath || details.isConcentration);
+  if (id === "proficiencyLevels") missing ||= !(subjects.item || details.abilityId || details.ability || details.skillId || details.toolId || details.isDeath);
+  if (id === "markers" && bonus.filters.markers?.target?.size) missing ||= !subjects.target?.actor;
+  if (missing) return {result: null, reason: "MissingContext"};
+  try {
+    const value = registry[id].call(bonus, {...subjects, target: subjects.target ?? null}, bonus.filters[id], details);
+    return typeof value === "boolean" ? {result: value} : {result: null, reason: "EvaluationError"};
+  } catch { return {result: null, reason: "EvaluationError"}; }
+}
+
+/** One source of field help for the visual editor and the existing filter picker. */
+function getConditionHelp(id, localize = key => globalThis.game.i18n.localize(key)) {
+  return {
+    description: localize(`BUILD_N_ACTION.FIELDS.filters.${id}.hint`).replace(/<[^>]*>/g, ""),
+    example: localize(`BUILD_N_ACTION.ConditionHelp.${id}.example`),
+    context: localize(`BUILD_N_ACTION.ConditionHelp.${id}.context`)
+  };
+}
+
+/** Texture-driven fire, shared by the editor's active node surfaces. */
+class FireVFX {
+  constructor(canvas, textureUrl, {width=218,height=148,padding=80}={}) {
+    this.canvas=canvas;this.width=width;this.height=height;this.padding=padding;
+    const gl=this.gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,antialias:false,preserveDrawingBuffer:true});
+    if(!gl)throw Error('WebGL unavailable');
+    const vertex=`attribute vec2 aPosition;void main(){gl_Position=vec4(aPosition,0.,1.);}`;
+    const fragment=`precision highp float;
+      uniform vec2 uResolution;uniform vec2 uSize;uniform float uPadding;uniform float uTime;uniform float uIntensity;uniform sampler2D uFire;
+      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+      float fbm(vec2 p){float n=0.,a=.5;for(int i=0;i<4;i++){n+=a*noise(p);p=mat2(.8,-.6,.6,.8)*p*2.03+13.7;a*=.5;}return n;}
+      vec3 sampleFire(vec2 q,float seed){
+        vec2 flow=vec2(q.x*3.5+seed,q.y*2.5-uTime*.48);
+        vec2 curl=vec2(fbm(flow+vec2(0,fbm(flow+6.))),fbm(flow+vec2(8.,2.)))-.5;
+        vec2 uv=q+curl*vec2(.13,.17)*(.3+q.y);
+        uv.x+=sin(uTime*.23+seed)*.018;
+        uv.y*=.89+.16*fbm(vec2(q.x*5.+seed,uTime*.34));
+        vec3 c=texture2D(uFire,clamp(uv,vec2(.001),vec2(.999))).rgb;
+        float edge=smoothstep(0.,.05,q.x)*(1.-smoothstep(.95,1.,q.x));
+        return c*edge*(.78+.3*fbm(flow*2.5+4.));
+      }
+      void main(){
+        vec2 extent=uSize+2.*uPadding;
+        vec2 p=vec2(gl_FragCoord.x/uResolution.x,1.-gl_FragCoord.y/uResolution.y)*extent-uPadding;
+        // Signed distance masks the inside of the rounded node, leaving its content untouched.
+        vec2 box=abs(p-uSize*.5)-(uSize*.5-vec2(6.));
+        float sd=length(max(box,0.))+min(max(box.x,box.y),0.)-6.;
+        float outside=smoothstep(-1.,1.,sd);
+        vec3 color=vec3(0.);
+        // Overlapping fields blend continuously around the shoulders; no horizontal cut plane.
+        vec3 crown=vec3(0.);
+        {
+          float rise=max(-p.y,0.);
+          float plume=.5+.5*sin(p.x*.071+sin(p.x*.033)+uTime*.32);
+          float wind=sin(rise*.043-uTime*.9)*9.+(fbm(vec2(rise*.035,uTime*.4))-.5)*22.;
+          float spread=28.+rise*.22;
+          vec2 uv=vec2((p.x+spread-wind)/(uSize.x+spread*2.),rise/142.+.38+(1.-plume)*.12);
+          float perimeter=smoothstep(-spread,-spread+22.,p.x-wind)*(1.-smoothstep(uSize.x+spread-22.,uSize.x+spread,p.x-wind));
+          crown=sampleFire(uv,0.)*perimeter*(1.-smoothstep(58.,78.,rise))*.9;
+        }
+        // Vertical edge sheets keep their upward flow instead of rotating flames sideways.
+        float side=min(abs(p.x),abs(p.x-uSize.x));
+        float seed=p.x<uSize.x*.5 ? 2. : 17.;
+        float eddy=fbm(vec2(p.y*.046-uTime*.85,seed+uTime*.18));
+        float reach=10.+eddy*35.+7.*sin(p.y*.072+seed-uTime*1.6);
+        // Rounded emission ends dissipate through the texture instead of fading into flat feet.
+        float tip=max(p.y-uSize.y+14.,0.);
+        float distanceToSheet=length(vec2(side,tip*1.5));
+        vec2 sideUV=vec2(.2+eddy*.48, .35+distanceToSheet/(reach*2.)+.1*sin(p.y*.04-uTime));
+        float ragged=1.-smoothstep(reach*.38,reach,distanceToSheet+(noise(p*.13+vec2(0.,uTime*2.))-.5)*9.);
+        vec3 sheet=sampleFire(sideUV,seed)*ragged*.68;
+        float shoulder=smoothstep(-22.,30.+eddy*12.,p.y);
+        color=mix(crown,sheet,shoulder);
+        float glow=exp(-max(sd,0.)*.17)*(.06+.035*noise(p*.045+vec2(0.,-uTime)));
+        color+=vec3(1.,.26,.035)*glow;
+        // Sparse embers drift upward along independent trajectories.
+        for(int i=0;i<20;i++){
+          float id=float(i),life=fract(uTime*(.13+hash(vec2(id,3.))*.1)+hash(vec2(id,9.)));
+          float x=hash(vec2(id,4.))*(uSize.x+40.)-20.;
+          vec2 spark=vec2(x+sin(life*4.+id)*16.,-life*74.);
+          float d=length((p-spark)*vec2(1.,.6));
+          color+=vec3(1.,.53,.17)*exp(-d*d*1.2)*sin(life*3.14159)*.68;
+        }
+        color*=outside*uIntensity;
+        float alpha=clamp(max(color.r,max(color.g,color.b)),0.,.96);
+        gl_FragColor=vec4(min(color,vec3(alpha)),alpha);
+      }`;
+    const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
+    this.vertex=compile(gl.VERTEX_SHADER,vertex);this.fragment=compile(gl.FRAGMENT_SHADER,fragment);
+    this.program=gl.createProgram();gl.attachShader(this.program,this.vertex);gl.attachShader(this.program,this.fragment);gl.linkProgram(this.program);
+    if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));
+    gl.useProgram(this.program);this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
+    const position=gl.getAttribLocation(this.program,'aPosition');gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
+    this.uniforms=Object.fromEntries(['uResolution','uSize','uPadding','uTime','uIntensity','uFire'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
+    this.texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
+    for(const name of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,name,gl.CLAMP_TO_EDGE);
+    for(const name of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,name,gl.LINEAR);
+    this.ready=new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{if(this.destroyed){resolve();return;}gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);resolve();};image.onerror=()=>reject(Error('Fire texture could not be loaded'));image.src=textureUrl;});
+    const ratio=Math.min(devicePixelRatio||1,2);canvas.width=Math.round((width+padding*2)*ratio);canvas.height=Math.round((height+padding*2)*ratio);
+    canvas.style.width=`${width+padding*2}px`;canvas.style.height=`${height+padding*2}px`;
+  }
+  draw(time,intensity=1){
+    if(this.destroyed)return;
+    const gl=this.gl,u=this.uniforms;gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.useProgram(this.program);
+    gl.uniform2f(u.uResolution,this.canvas.width,this.canvas.height);gl.uniform2f(u.uSize,this.width,this.height);gl.uniform1f(u.uPadding,this.padding);gl.uniform1f(u.uTime,time);gl.uniform1f(u.uIntensity,intensity);gl.uniform1i(u.uFire,0);gl.drawArrays(gl.TRIANGLES,0,6);
+  }
+  destroy(){if(this.destroyed)return;this.destroyed=true;const gl=this.gl;gl.deleteTexture(this.texture);gl.deleteBuffer(this.buffer);gl.deleteProgram(this.program);gl.deleteShader(this.vertex);gl.deleteShader(this.fragment);gl.getExtension('WEBGL_lose_context')?.loseContext();}
+}
+
+const TAU$1=Math.PI*2;
+const fract=n=>n-Math.floor(n);
+const wave=(i,t)=>Math.sin(i*7.17+t)*.62+Math.sin(i*2.31-t*1.73)*.38;
+
+/** Material-specific motion. Coordinates are local to the node; the caller protects its text. */
+function drawAmbientVFX(ctx,{width:w,height:h,element,time:t,health=50},glow,stroke,crystal) {
+  if(element==='lightning') {
+    // Discharges jump between independent anchors; they never orbit the card.
+    const epoch=Math.floor(t*2.2),phase=fract(t*2.2);
+    const envelope=.22+.78*Math.exp(-phase*7);
+    for(let k=0;k<4;k++) {
+      const side=k%2 ? w : 0,sign=k%2 ? 1 : -1,y=18+fract(k*.618+epoch*.173)*(h-28);
+      const points=[[side,y]];
+      for(let j=1;j<9;j++)points.push([side+sign*(j*4+wave(j+k*8,epoch)*7),y-j*5+wave(j*3+k,epoch)*12]);
+      stroke(ctx,points,'126,162,255',envelope*.9,1.1);
+      stroke(ctx,points,'231,244,255',envelope*.85,.45);
+      const fork=points[4];stroke(ctx,[fork,[fork[0]+sign*12,fork[1]+8],[fork[0]+sign*18,fork[1]-3]],'156,184,255',envelope*.55,.6);
+      glow(ctx,side,y,18,'103,145,255',envelope*.2);
+    }
+  } else if(element==='cold') {
+    for(let i=0;i<30;i++) {
+      const side=i%3,x=side===0 ? 0 : side===1 ? w : fract(i*.618)*w;
+      const y=side===2 ? 1 : fract(i*.754)*h;
+      const angle=side===0 ? -.6 : side===1 ? .6 : wave(i,0)*.4;
+      crystal(ctx,x,y,8+fract(i*.47)*22,angle,.42+.18*Math.sin(t*.7+i));
+      if(i%4===0)glow(ctx,x,y,21,'126,215,250',.12);
+    }
+    for(let i=0;i<20;i++) {
+      const life=fract(t*.065+i*.618),x=fract(i*.754)*(w+70)-35+Math.sin(t*.4+i)*6,y=-40+life*(h+75);
+      crystal(ctx,x,y,2+i%3,t*.1+i,Math.sin(life*Math.PI)*.4);
+    }
+  } else if(element==='acid') {
+    for(let i=0;i<20;i++) {
+      const life=fract(t*.24+i*.618),x=(i%2 ? w+3 : -3)+wave(i,life*3)*9,y=h-life*(h+20),r=1+life*4;
+      glow(ctx,x,y,12,'180,230,62',Math.sin(life*Math.PI)*.16);
+      ctx.strokeStyle=`rgba(183,228,76,${Math.sin(life*Math.PI)*.7})`;ctx.lineWidth=.8;ctx.beginPath();ctx.arc(x,y,r,0,TAU$1);ctx.stroke();
+      ctx.fillStyle=`rgba(240,255,188,${Math.sin(life*Math.PI)*.7})`;ctx.beginPath();ctx.arc(x-r*.3,y-r*.4,.7,0,TAU$1);ctx.fill();
+      if(life>.8)stroke(ctx,[[x-r*2,y],[x-r*3,y-3]],'210,244,136',(1-life)*2,.7);
+    }
+  } else if(element==='poison'||element==='necrotic') {
+    const rgb=element==='poison' ? '120,185,103' : '135,105,186';
+    for(let i=0;i<28;i++) {
+      const life=fract(t*.09+i*.618),sign=i%2 ? 1 : -1,x=(i%2 ? w : 0)+sign*(5+life*16)+wave(i,t*.6)*7,y=h+7-life*(h+53);
+      const alpha=Math.sin(life*Math.PI)**2;
+      glow(ctx,x,y,10+life*15,rgb,alpha*.11);
+      const points=Array.from({length:12},(_,j)=>[x+Math.sin(j*.35+t*.6+i)*(3+j*.4),y-j*2]);
+      stroke(ctx,points,rgb,alpha*.12,.7);
+      if(element==='necrotic')glow(ctx,x+3,y,4,'208,181,239',alpha*.3);
+    }
+  } else if(element==='radiant') {
+    for(let i=0;i<18;i++) {
+      const x=fract(i*.618)*(w+32)-16,y=fract(i*.754)*(h+44)-22,a=.25+.6*Math.sin(t*.65+i)**6;
+      glow(ctx,x,y,19,'255,210,122',a*.15);
+      const length=3+a*6;
+      stroke(ctx,[[x-length,y],[x+length,y]],'255,230,174',a*.7,.6);
+      stroke(ctx,[[x,y-length*1.6],[x,y+length*1.6]],'255,248,217',a,.7);
+    }
+  } else if(element.startsWith('health-')) {
+    // A threshold cue, not a claim about the actor's current health.
+    const low=element==='health-low',rgb=low ? '239,101,115' : '106,220,164';
+    const rate=low ? 1.05+(1-health/100)*.45 : .7,phase=fract(t*rate);
+    const beat=Math.exp(-(((phase-.12)/.055)**2))+.55*Math.exp(-(((phase-.3)/.075)**2));
+    for(const x of [0,w])glow(ctx,x,h*.46,30,rgb,.08+beat*.2);
+    const y=-9,points=[];
+    for(let i=0;i<=90;i++) {
+      const x=i/90*w,q=fract(x/w-t*.23),pulse=Math.exp(-(((q-.48)/.017)**2))*-14+Math.exp(-(((q-.51)/.018)**2))*7;
+      points.push([x,y+pulse]);
+    }
+    stroke(ctx,points,rgb,.45+beat*.22,.85);
+    const x=w*.5,yHeart=-25;
+    ctx.save();ctx.translate(x,yHeart);ctx.scale(1+beat*.12,1+beat*.12);ctx.fillStyle=`rgba(${rgb},${.5+beat*.35})`;
+    ctx.beginPath();ctx.moveTo(0,5);ctx.bezierCurveTo(-12,-2,-6,-10,0,-4);ctx.bezierCurveTo(6,-10,12,-2,0,5);ctx.fill();ctx.restore();
+  } else if(element==='force'||element==='thunder') {
+    const rgb=element==='force' ? '184,151,255' : '151,191,223';
+    for(let i=0;i<3;i++) {
+      const life=fract(t*.45+i/3),a=Math.sin(life*Math.PI)*.35;
+      ctx.strokeStyle=`rgba(${rgb},${a})`;ctx.lineWidth=1.3-life;
+      for(const side of [-1,1]) {
+        ctx.beginPath();ctx.ellipse(side<0 ? 0 : w,h*.5,9+life*30,18+life*40,0,side<0 ? Math.PI*.6 : -Math.PI*.4,side<0 ? Math.PI*1.4 : Math.PI*.4);ctx.stroke();
+      }
+    }
+  }
+}
+
+const TAU = Math.PI * 2;
+const EFFECT_PADDING = 80;
+const EFFECT_ELEMENTS = new Set(['fire', 'cold', 'lightning', 'acid', 'poison', 'radiant', 'necrotic', 'health-low', 'health-high', 'force', 'thunder']);
+const noise = (i, t) => Math.sin(i * 7.17 + t) * .62 + Math.sin(i * 2.31 - t * 1.73) * .38;
+const fraction = value => value - Math.floor(value);
+
+function glow(ctx, x, y, radius, color, alpha) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  g.addColorStop(0, `rgba(${color},${alpha})`); g.addColorStop(1, `rgba(${color},0)`);
+  ctx.fillStyle = g; ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
+}
+
+function strokeGlow(ctx, points, rgb, alpha, width=1) {
+  for (const [line, opacity] of [[width*7,alpha*.06],[width*3,alpha*.17],[width,alpha]]) {
+    ctx.beginPath();points.forEach(([x,y],i)=>i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
+    ctx.strokeStyle=`rgba(${rgb},${opacity})`;ctx.lineWidth=line;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
+  }
+}
+
+function crystal(ctx,x,y,length,angle,alpha) {
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  const g=ctx.createLinearGradient(-3,0,4,-length);g.addColorStop(0,`rgba(86,163,202,${alpha*.15})`);g.addColorStop(.5,`rgba(178,230,250,${alpha*.55})`);g.addColorStop(1,`rgba(239,253,255,${alpha})`);
+  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(-4,-length*.55);ctx.lineTo(0,-length);ctx.lineTo(4,-length*.4);ctx.lineTo(3,0);ctx.closePath();ctx.fill();
+  strokeGlow(ctx,[[0,0],[0,-length]],'215,246,255',alpha*.6,.5);ctx.restore();
+}
+
+function flame(ctx, x, y, height, width, sway, opacity) {
+  const g = ctx.createLinearGradient(x, y, x+sway, y-height);
+  g.addColorStop(0, `rgba(255,232,157,${opacity})`);
+  g.addColorStop(.22, `rgba(255,167,47,${opacity*.95})`);
+  g.addColorStop(.65, `rgba(243,79,17,${opacity*.7})`);
+  g.addColorStop(1, 'rgba(164,35,8,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(x-width, y);
+  ctx.bezierCurveTo(x-width*1.3, y-height*.36, x+sway-width*.35, y-height*.64, x+sway, y-height);
+  ctx.bezierCurveTo(x+sway+width*.8, y-height*.52, x+width, y-height*.28, x+width, y);
+  ctx.closePath(); ctx.fill();
+}
+
+/** All motion is continuous in time, so frame rate changes never speed up the effect. */
+function drawElementalEffect(ctx, {width, height, element, time = 0, intensity = 1, health = 50}) {
+  const p = EFFECT_PADDING, w = width, h = height;
+  ctx.clearRect(0, 0, w+p*2, h+p*2);
+  if (!EFFECT_ELEMENTS.has(element) || intensity <= 0) return;
+  ctx.save(); ctx.translate(p, p); ctx.globalAlpha = intensity;
+  // Never paint over names, values, or inspector content, even with an opaque flame.
+  ctx.beginPath(); ctx.rect(-p, -p, w+p*2, h+p*2); ctx.roundRect(3, 3, w-6, h-6, 5); ctx.clip('evenodd');
+  if(element!=='fire') {
+    drawAmbientVFX(ctx,{width,height,element,time,health},glow,strokeGlow,crystal);
+    ctx.restore();return;
+  }
+  if (element === 'fire') {
+    ctx.filter='blur(0.55px)';
+    for (let i=0; i<18; i++) {
+      const x=5+fraction(i*.618034)*(w-10)+noise(i+3,time*.7)*2, n=noise(i, time*2.4);
+      const tall = 12 + 18*(.5+.5*n) + 10*(.5+.5*Math.sin(i*4.8));
+      const sway=noise(i+8,time*1.9)*11;
+      glow(ctx,x,2,18,'246,104,23',.08);
+      flame(ctx,x,4,tall,4.5+3*Math.sin(i*2.4)**2,sway,.4);
+      flame(ctx,x,3,tall*.49,2.5,sway*.4,.48);
+    }
+    for (const side of [0,w]) for (let i=0; i<7; i++) {
+      const y=24+i*(h-28)/7, n=noise(i+side,time*3);
+      glow(ctx,side,y,15,'255,105,20',.13);
+      flame(ctx,side,y,15+n*7,4, (side ? 1 : -1)*(3+n*2),.4);
+    }
+    ctx.filter='none';
+    for (let i=0; i<32; i++) {
+      const life=fraction(time*(.19+(i%4)*.035)+i*.618);
+      const side=i%3, x0=side===0 ? -3 : side===1 ? w+3 : fraction(i*.754)*w;
+      const y0=side===2 ? 0 : fraction(i*.421)*h;
+      const x=x0+noise(i,time*.9+life*2)*9, y=y0-life*52;
+      const a=Math.sin(life*Math.PI)**2*.65;
+      glow(ctx,x,y,3,'255,162,53',a*.25);
+      ctx.fillStyle=`rgba(255,208,121,${a})`; ctx.beginPath(); ctx.ellipse(x,y,.6+(i%3)*.18,1.1,noise(i,time)*.3,0,TAU); ctx.fill();
+    }
+    glow(ctx,4,h-4,20,'255,127,28',.16); glow(ctx,w-4,h-4,20,'255,127,28',.16);
+  }
+  ctx.restore();
+}
+
+/** A single scheduler per editor, running only while a visible node is active or fading. */
+class ElementalEffects {
+  constructor(root) {
+    this.root=root; this.abort=new AbortController(); this.surfaces=[];
+    this.motion=matchMedia('(prefers-reduced-motion: reduce)');
+    const options={signal:this.abort.signal};
+    for(const event of ['pointerover','pointerout','focusin','focusout']) root.addEventListener(event,()=>this.wake(),options);
+    this.motion.addEventListener('change',()=>this.wake(),options);
+    document.addEventListener('visibilitychange',()=>this.wake(),options);
+    this.preferences=new MutationObserver(()=>this.wake());
+    this.preferences.observe(document.body,{attributes:true,attributeFilter:['data-bna-effects','data-bna-motion']});
+    this.refresh();
+  }
+  refresh() {
+    this.surfaces=this.surfaces.filter(s=>{if(s.node.isConnected)return true;s.canvas.remove();return false;});
+    for(const node of this.root.querySelectorAll('.bna-node[data-element]')) {
+      if(!EFFECT_ELEMENTS.has(node.dataset.element) || this.surfaces.some(s=>s.node===node))continue;
+      const canvas=document.createElement('canvas'); canvas.className='bna-elemental-canvas';canvas.setAttribute('aria-hidden','true');
+      const width=node.offsetWidth, height=node.offsetHeight, ratio=Math.min(devicePixelRatio || 1,2);
+      canvas.width=Math.ceil((width+EFFECT_PADDING*2)*ratio);canvas.height=Math.ceil((height+EFFECT_PADDING*2)*ratio);
+      canvas.style.width=`${width+EFFECT_PADDING*2}px`;canvas.style.height=`${height+EFFECT_PADDING*2}px`;
+      node.append(canvas);const ctx=canvas.getContext('2d');if(!ctx){canvas.remove();continue;}ctx.scale(ratio,ratio);
+      this.surfaces.push({node,canvas,ctx,width,height,intensity:0,health:Number(node.dataset.health ?? 50)});
+    }
+    this.wake();
+  }
+  prepareFire(width,height) {
+    if(this.fireFailed||this.fire)return;
+    try {
+      const url=globalThis.foundry?.utils?.getRoute?.('modules/build-n-action/assets/vfx/fire-bed-v1.png') ?? 'modules/build-n-action/assets/vfx/fire-bed-v1.png';
+      this.fire=new FireVFX(document.createElement('canvas'),url,{width,height,padding:EFFECT_PADDING});
+      this.fire.ready.then(()=>{if(!this.destroyed){this.fireReady=true;this.wake();}}).catch(()=>{this.fireFailed=true;this.fire?.destroy();this.fire=null;});
+    } catch {this.fireFailed=true;this.fire?.destroy();this.fire=null;}
+  }
+  wake() { if(!this.destroyed&&!this.frame)this.frame=requestAnimationFrame(t=>this.tick(t)); }
+  tick(now) {
+    this.frame=0;
+    const enabled=document.body.dataset.bnaEffects!=='off' && !document.hidden;
+    const animated=document.body.dataset.bnaMotion!=='off' && !this.motion.matches;
+    const dt=Math.min((now-(this.last ?? now-16))/1000,.05);this.last=now;
+    let running=false;
+    for(const s of this.surfaces) {
+      const editingHealth=s.node.dataset.element.startsWith('health-') && this.root.querySelector('[name^="filters.healthPercentages."]:focus-within');
+      const active=enabled && s.node.isConnected && s.node.getClientRects().length>0 && (s.node.matches(':hover,:focus-within')||!!editingHealth);
+      const target=active ? 1 : 0;
+      s.intensity=animated && enabled ? s.intensity+(target-s.intensity)*(1-Math.exp(-dt*(active ? 9 : 5))) : target;
+      if(Math.abs(s.intensity-target)<.005)s.intensity=target;
+      const element=s.node.dataset.element,time=animated ? now/1000 : 0,intensity=s.intensity*(animated ? 1 : .35);
+      if(element==='fire'&&intensity>0)this.prepareFire(s.width,s.height);
+      if(element==='fire'&&this.fireReady&&this.fire) {
+        this.fire.draw(time,intensity);
+        s.ctx.clearRect(0,0,s.width+EFFECT_PADDING*2,s.height+EFFECT_PADDING*2);
+        s.ctx.drawImage(this.fire.canvas,0,0,s.width+EFFECT_PADDING*2,s.height+EFFECT_PADDING*2);
+      } else drawElementalEffect(s.ctx,{...s,element,time,intensity});
+      running ||= enabled && animated && (active || s.intensity>0);
+    }
+    if(running)this.wake();else this.last=null;
+  }
+  destroy() { this.destroyed=true;cancelAnimationFrame(this.frame);this.frame=0;this.abort.abort();this.preferences.disconnect();this.fire?.destroy();this.fire=null;for(const s of this.surfaces)s.canvas.remove();this.surfaces=[]; }
+}
+
+const t = key => game.i18n.localize(`BUILD_N_ACTION.Blueprint.${key}`);
+const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+const icon = type => ({condition: "filter", context: 'crosshairs', branch: 'code-branch', xor: 'not-equal', nand: 'ban', nor: 'ban', and: "code-branch", or: "shuffle", not: "ban", result: "bolt"}[type] ?? "circle-question");
+const configured = bonus => Object.keys(bonus.filters).filter(id => fields[id]?.storage(bonus));
+const json = value => JSON.stringify(value);
+
+/** Detached graph draft: all document writes happen at the explicit Save boundary. */
+class ConditionBlueprint extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    classes: [MODULE.ID, "blueprint"], tag: "form",
+    window: {icon: "fa-solid fa-diagram-project", resizable: true},
+    form: {handler: () => {}, submitOnChange: false, closeOnSubmit: false},
+    position: {width: 1240, height: 820},
+    actions: {keysDialog: this.onKeys, deleteFilter: this.onDeleteFilter}
+  };
+  static PARTS = {editor: {template: `modules/${MODULE.ID}/templates/condition-blueprint.hbs`}};
+
+  constructor({bonus, ...options}) {
+    super({...options, id: `bna-blueprint-${bonus.uuid.replaceAll(".", "-")}`});
+    this.owner = bonus.parent;
+    this.bonusId = bonus.id;
+    this.BonusClass = bonus.constructor;
+    this.baseline = json(bonus.toObject());
+    this.draft = new this.BonusClass(bonus.toObject(), {parent: this.owner});
+    const stored = bonus.conditionGraph;
+    const readable = stored?.version === 1 && Array.isArray(stored.nodes) && stored.nodes.length <= 256 && stored.nodes.every(n => n && typeof n.id === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(n.id) && GRAPH_TYPES.has(n.type)) && Array.isArray(stored.edges) && stored.edges.length <= 1024 && stored.edges.every(e => e && typeof e.from === "string" && typeof e.to === "string");
+    this.graph = structuredClone(readable
+      ? stored : createConditionGraph(configured(bonus)));
+    this.graph.enabled = true;
+    this.graph.nodes.forEach((node, index) => { node.x = Number.isFinite(node.x) ? node.x : 40; node.y = Number.isFinite(node.y) ? node.y : 30 + index * 140; });
+    this.unsupported = !!stored && !readable;
+    this.history = new BlueprintHistory(this.snapshot());
+    this.saved = stored?.enabled ? json(this.snapshot()) : null;
+    this.view = {x: 45, y: 60, scale: 1};
+    this.selected = this.graph.nodes.find(n => n.type === "result")?.id;
+    this.trialContext = {actor: bonus.actor?.id ?? "", item: bonus.item?.id ?? "", activity: "", target: game.user.targets?.first?.()?.id ?? ""};
+  }
+
+  get title() { return `${t("Title")}: ${this.draft.name}`; }
+  get dirty() { return json(this.snapshot()) !== this.saved; }
+  snapshot() { return {graph: this.graph, filters: this.draft.toObject().filters}; }
+  get editable() { return !!this.owner.isOwner && !this.saving; }
+  async _prepareContext() {
+    return {name: this.draft.name, gates: ["and", "or", "not", 'branch', 'xor', 'nand', 'nor'].map(type => ({type, label: t(type), hint: t(`${type}Hint`)}))};
+  }
+
+  _onRender(...args) {
+    super._onRender(...args);
+    this.effects?.destroy();
+    this.effects = null;
+    this.listeners?.abort();
+    this.listeners = new AbortController();
+    const options = {signal: this.listeners.signal};
+    this.element.addEventListener("submit", event => event.preventDefault(), options);
+    this.element.addEventListener("click", event => {
+      const button = event.target.closest("[data-bp-action]");
+      if (button) { event.preventDefault(); this.action(button.dataset.bpAction, button).catch(err => this.showError(err)); }
+    }, options);
+    this.element.addEventListener("change", event => {
+      if (event.target.closest("[data-bp-inspector]")) {
+        event.stopPropagation();
+        this.readParameters();
+      }
+      const context = event.target.dataset.bpContext;
+      if (context) {
+        this.trialContext[context] = event.target.value;
+        if (context === "actor") { this.trialContext.item = ""; this.trialContext.activity = ""; }
+        if (context === "item") this.trialContext.activity = "";
+        this.clearTrial(); this.renderGraph(); this.renderDiagnostics(); this.renderTrialContext();
+      }
+    }, options);
+    this.element.querySelector("[data-bp-search]").addEventListener("input", () => this.renderCatalog(), options);
+    this.element.addEventListener("keydown", event => this.onKey(event), options);
+    const canvas = this.element.querySelector("[data-bp-canvas]");
+    canvas.addEventListener("pointerdown", event => this.onPointerDown(event), options);
+    canvas.addEventListener("wheel", event => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      this.zoom(event.deltaY < 0 ? 1.1 : 1 / 1.1, {x: event.clientX - rect.left, y: event.clientY - rect.top});
+    }, {...options, passive: false});
+    this.renderCatalog(); this.renderGraph(); this.renderInspector(); this.renderDiagnostics(); this.renderTrialContext();
+    this.effects = new ElementalEffects(this.element);
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = new ResizeObserver(() => this.autoFit ? this.fit() : this.applyView());
+    this.resizeObserver.observe(canvas);
+    if (!this.fitted) { this.fit(); this.fitted = true; }
+  }
+
+  readParameters() {
+    if (!this.editable) return;
+    const node = this.graph.nodes.find(n => n.id === this.selected);
+    if (node?.type !== "condition") return;
+    try {
+      const form = new foundry.applications.ux.FormDataExtended(this.element);
+      const changes = foundry.utils.expandObject(form.object).filters;
+      if (!changes || !Object.hasOwn(changes, node.filter)) return;
+      this.draft.updateSource({filters: changes});
+      this.parameterError = null;
+      this.commit();
+      // Rebuild dependent field choices after validation without losing graph viewport.
+      this.renderInspector();
+    } catch (err) {
+      this.parameterError = {nodeId: node.id, message: String(err.message ?? err)};
+      this.renderDiagnostics();
+    }
+  }
+
+  commit() {
+    this.history.push(this.snapshot()); this.clearTrial();
+    this.renderGraph(); this.renderDiagnostics(); this.renderCatalog();
+  }
+
+  restore(snapshot) {
+    this.connecting = null;
+    this.graph = snapshot.graph;
+    this.draft = new this.BonusClass({...this.draft.toObject(), filters: snapshot.filters}, {parent: this.owner});
+    this.parameterError = null; this.clearTrial();
+    this.renderGraph(); this.renderInspector(); this.renderDiagnostics(); this.renderCatalog();
+  }
+
+  label(node) {
+    if (node.type === 'context') return t(node.predicate);
+    if (node.type !== "condition") return t(node.type);
+    return Object.hasOwn(this.draft.filters, node.filter) ? this.draft.schema.getField(`filters.${node.filter}`).label : node.filter;
+  }
+
+  renderCatalog() {
+    const search = this.element.querySelector("[data-bp-search]").value.toLocaleLowerCase();
+    const entries = Object.keys(this.draft.filters).map(id => ({id, label: this.draft.schema.getField(`filters.${id}`).label})).sort((a, b) => a.label.localeCompare(b.label));
+    this.element.querySelector("[data-bp-catalog]").innerHTML = entries.filter(entry => `${entry.label} ${entry.id}`.toLocaleLowerCase().includes(search)).map(entry => {
+      const present = this.graph.nodes.some(node => node.filter === entry.id);
+      return `<button type="button" class="bna-catalog-entry" data-bp-action="add" data-type="condition" data-filter="${escape(entry.id)}" title="${escape(getConditionHelp(entry.id).description)}"><i class="fa-solid fa-${present ? "check" : "plus"}" aria-hidden="true"></i><span>${escape(entry.label)}</span></button>`;
+    }).join("") || `<p class="hint">${escape(t("SearchEmpty"))}</p>`;
+    this.element.querySelector('[data-bp-catalog]').insertAdjacentHTML('afterbegin', CONTEXT_PREDICATES.filter(id => `${t(id)} ${id}`.toLocaleLowerCase().includes(search)).map(id => `<button type="button" class="bna-catalog-entry" data-bp-action="add" data-type="context" data-predicate="${id}" title="${escape(t(`${id}Hint`))}"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>${escape(t(id))}</span></button>`).join(''));
+  }
+
+  renderPorts(node, direction) {
+    const ports = direction === 'in' ? inputPorts(node) : outputPorts(node);
+    return ports.map(port => {
+      const label = ['true','false'].includes(port) ? t(port === 'true' ? 'Yes' : 'No') : ['a','b'].includes(port) ? port.toUpperCase() : t(direction === 'in' ? 'Input' : 'Output');
+      const active = this.connecting?.id === node.id && this.connecting?.port === port;
+      return `<button type="button" class="bna-port bna-port-${direction} ${active ? 'connecting' : ''}" style="top:${portY(node, port) - 9}px" data-bp-action="${direction === 'in' ? 'portIn' : 'portOut'}" data-id="${escape(node.id)}" data-port="${port}" aria-label="${escape(t(direction === 'in' ? 'Input' : 'Output'))}: ${escape(this.label(node))} · ${escape(label)}"><span>${escape(label)}</span></button>`;
+    }).join('');
+  }
+
+  renderGraph() {
+    const element = [...(this.draft.bonuses?.damageType ?? [])][0] ?? "";
+    const traces = new Map((this.trial?.trace ?? []).map(item => [item.nodeId, item]));
+    this.element.querySelector("[data-bp-nodes]").innerHTML = this.graph.nodes.map(node => {
+      const trace = traces.get(node.id);
+      const status = trace?.status ?? "";
+      const health=this.draft.filters.healthPercentages;
+      const effect=node.type==='result' ? element : node.type==='condition' && node.filter==='healthPercentages' && [0,1].includes(health?.type) ? (health.type===0 ? 'health-low' : 'health-high') : '';
+      return `<article class="bna-node ${this.selected === node.id ? "selected" : ""}" data-node-id="${escape(node.id)}" data-type="${escape(node.type)}" data-element="${escape(effect)}" data-health="${Number(health?.value ?? 50)}" data-trace="${escape(status)}" style="transform:translate(${Number(node.x) || 0}px,${Number(node.y) || 0}px)" tabindex="0" aria-label="${escape(this.label(node))}">
+        ${this.renderPorts(node, 'in')}
+        <div class="bna-node-heading"><i class="fa-solid fa-${icon(node.type)}" aria-hidden="true"></i><span>${escape(t(node.type === "condition" ? "Condition" : "Logic"))}</span>${trace ? `<span class="bna-node-trace">${escape(t(status[0]?.toUpperCase() + status.slice(1)))}</span>` : ""}</div>
+        <strong title="${escape(this.label(node))}">${escape(this.label(node))}</strong><small title="${escape(node.type === 'context' ? t(`${node.predicate}Hint`) : '')}">${escape(node.type === "result" ? this.draft.bonuses?.bonus || t("ResultHint") : node.type === "condition" ? this.conditionSummary(node.filter) : t(`${node.type === 'context' ? node.predicate : node.type}Hint`))}</small>
+        ${this.renderPorts(node, 'out')}
+      </article>`;
+    }).join("");
+    this.drawEdges(); this.applyView(); this.effects?.refresh();
+  }
+
+  conditionSummary(id) {
+    if (!configured(this.draft).includes(id)) return t("Parameters");
+    const value = this.draft.toObject().filters[id];
+    return (Array.isArray(value) ? value.map(v => typeof v === "object" ? Object.values(v).join(" ") : v).join(" · ") : typeof value === "object" ? Object.values(value).map(v => Array.isArray(v) ? v.join(", ") : v).join(" · ") : String(value)).slice(0, 90);
+  }
+
+  drawEdges() {
+    const nodes = new Map(this.graph.nodes.map(node => [node.id, node]));
+    this.element.querySelector("[data-bp-edges]").innerHTML = this.graph.edges.map(edge => {
+      if (!nodes.has(edge.from) || !nodes.has(edge.to)) return "";
+      const path = connectionPath(nodes.get(edge.from), nodes.get(edge.to), edge);
+      return `<path class="bna-edge ${this.selected === edge.from || this.selected === edge.to ? "selected" : ""}" d="${path}" />`;
+    }).join("");
+  }
+
+  renderInspector() {
+    const container = this.element.querySelector("[data-bp-inspector]");
+    const node = this.graph.nodes.find(n => n.id === this.selected);
+    if (!node) { container.innerHTML = `<h3>${escape(t("Inspector"))}</h3><p class="hint">${escape(t("SelectNode"))}</p>`; return; }
+    const help = node.type === "condition" && Object.hasOwn(this.draft.filters, node.filter) ? getConditionHelp(node.filter) : {description: t(node.type === "result" ? "ResultHint" : node.type === "condition" ? "FilterError" : `${node.type === 'context' ? node.predicate : node.type}Hint`)};
+    let parameters = "";
+    try { if (node.type === "condition") parameters = fields[node.filter]?.render(this.draft) ?? ""; }
+    catch (err) { parameters = `<p class="bna-error">${escape(t("FilterError"))}: ${escape(err.message)}</p>`; }
+    const links = this.graph.edges.map((edge, index) => ({edge, index})).filter(({edge}) => edge.from === node.id || edge.to === node.id);
+    container.innerHTML = `<div class="bna-inspector-title"><i class="fa-solid fa-${icon(node.type)}" aria-hidden="true"></i><div><span>${escape(t("Inspector"))}</span><h3>${escape(this.label(node))}</h3></div></div>
+      <p>${escape(help.description)}</p>${help.example ? `<div class="bna-help-example"><strong>${escape(t("Example"))}</strong><p>${escape(help.example)}</p></div><p class="bna-help-context"><strong>${escape(t("Context"))}</strong> ${escape(help.context)}</p>` : ""}
+      ${node.type === "condition" ? `<div class="bna-blueprint-parameters">${parameters}</div><p class="hint">${escape(t("SharedFilterHint"))}</p>${fields[node.filter]?.repeatable ? `<button type="button" data-bp-action="repeat">${escape(t("AddRepeat"))}</button>` : ""}` : ""}
+      <h4>${escape(t("Connections"))}</h4><div class="bna-connections">${links.map(({edge, index}) => `<div><span>${escape(this.connectionLabel(edge, node))}</span><button type="button" data-bp-action="disconnect" data-index="${index}" title="${escape(t("Disconnect"))}" aria-label="${escape(t("Disconnect"))}: ${escape(this.connectionLabel(edge, node))}"><i class="fa-solid fa-link-slash" aria-hidden="true"></i></button></div>`).join("") || `<p class="hint">${escape(t("NoConnections"))}</p>`}</div>
+      ${node.type !== "result" ? `<button type="button" class="bna-remove-node" data-bp-action="remove"><i class="fa-solid fa-trash" aria-hidden="true"></i> ${escape(t("Remove"))}</button>` : ""}`;
+    if (!this.editable) container.querySelectorAll("input,select,textarea,button").forEach(input => input.disabled = true);
+  }
+
+  connectionLabel(edge, node) {
+    const other = this.graph.nodes.find(n => n.id === (edge.from === node.id ? edge.to : edge.from));
+    const portLabel = port => ({true:t('Yes'), false:t('No'), in:t('Input'), out:t('Output')}[port] ?? port.toUpperCase());
+    return `${other ? this.label(other) : '?'} · ${portLabel(outputPort(edge))} → ${portLabel(inputPort(edge))}`;
+  }
+
+  validation() {
+    const report = validateConditionGraph(this.graph, {knownFilters: Object.keys(this.draft.filters), configuredFilters: configured(this.draft)});
+    if (this.unsupported) report.issues.push({code: "UnsupportedGraph", severity: "error"});
+    if (this.parameterError) report.issues.push({code: "FilterError", severity: "error", ...this.parameterError});
+    // Repeated comparisons can be structurally present yet contain blank operands.
+    for (const node of this.graph.nodes) {
+      if (node.filter === "arbitraryComparisons" && this.draft.filters.arbitraryComparisons.some(v => !v.one?.trim() || !v.other?.trim())) report.issues.push({nodeId: node.id, code: "FilterError", severity: "error"});
+    }
+    report.valid = !report.issues.some(i => i.severity === "error");
+    return report;
+  }
+
+  renderDiagnostics() {
+    const report = this.validation();
+    this.element.querySelector("[data-bp-diagnostics]").innerHTML = report.issues.map(issue => {
+      const node = this.graph.nodes.find(n => n.id === issue.nodeId);
+      const key = `BUILD_N_ACTION.Blueprint.Issues.${issue.code}`;
+      const message = game.i18n.has?.(key) ? game.i18n.localize(key) : t(issue.code) !== `BUILD_N_ACTION.Blueprint.${issue.code}` ? t(issue.code) : issue.code;
+      return `<button type="button" class="bna-diagnostic ${issue.severity}" data-bp-action="focus" data-id="${escape(issue.nodeId ?? "")}"><i class="fa-solid fa-${issue.severity === "error" ? "circle-exclamation" : "triangle-exclamation"}" aria-hidden="true"></i><span>${node ? `${escape(this.label(node))}: ` : ""}${escape(message)}${issue.message ? ` — ${escape(issue.message)}` : ""}</span></button>`;
+    }).join("") || `<p class="bna-valid"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${escape(t("Valid"))}</p>`;
+    this.element.querySelector("[data-bp-issue-count]").textContent = report.issues.length || "";
+    this.element.querySelector("[data-bp-validity]").textContent = report.valid ? "✓" : report.issues.length;
+    this.element.querySelector('[data-bp-action="save"]').disabled = !report.valid || !this.editable || this.saving;
+    this.element.querySelector('[data-bp-action="undo"]').disabled = !this.history.canUndo;
+    this.element.querySelector('[data-bp-action="redo"]').disabled = !this.history.canRedo;
+    this.element.querySelector(".bna-blueprint-workspace").inert = !!this.saving;
+    this.element.querySelector("[data-bp-status]").textContent = this.dirty ? t("Unsaved") : t("Saved");
+    const invalid = new Set(report.issues.filter(i => i.severity === "error").map(i => i.nodeId));
+    this.element.querySelectorAll("[data-node-id]").forEach(node => node.classList.toggle("invalid", invalid.has(node.dataset.nodeId)));
+  }
+
+  async action(action, button) {
+    const editableActions = new Set(["add", "repeat", "remove", "disconnect", "portIn", "portOut", "undo", "redo", "save"]);
+    if (editableActions.has(action) && !this.editable) throw Error(t("PermissionDenied"));
+    if (action === "save") return this.save();
+    if (action === "fit") return this.fit();
+    if (action === "zoomIn" || action === "zoomOut") return this.zoom(action === "zoomIn" ? 1.2 : 1 / 1.2);
+    if (action === "undo" || action === "redo") return this.restore(this.history[action]());
+    if (action === "validate") { this.renderDiagnostics(); this.element.querySelector(".bna-blueprint-diagnostics").open = true; return; }
+    if (action === "trial") return this.runTrial();
+    if (action === "focus") return this.select(button.dataset.id, true);
+    if (action === "portOut") { this.connecting = this.connecting?.id === button.dataset.id && this.connecting?.port === button.dataset.port ? null : {id:button.dataset.id,port:button.dataset.port}; this.renderGraph(); return; }
+    if (action === "portIn") {
+      if (this.connecting && connectNodes(this.graph, this.connecting.id, button.dataset.id, this.connecting.port, button.dataset.port)) { this.connecting = null; this.commit(); this.renderInspector(); }
+      return;
+    }
+    if (action === "add") {
+      if (button.dataset.type === "condition") {
+        const existing = this.graph.nodes.find(n => n.filter === button.dataset.filter);
+        if (existing) return this.select(existing.id, true);
+      }
+      const canvas = this.element.querySelector("[data-bp-canvas]");
+      const center = graphPoint({x: canvas.clientWidth / 2, y: canvas.clientHeight / 2}, this.view);
+      const point = freeNodePosition(this.graph.nodes, {x: center.x - NODE_WIDTH / 2, y: center.y - NODE_HEIGHT / 2});
+      const node = {id: foundry.utils.randomID(), type: button.dataset.type, x: Math.round(point.x), y: Math.round(point.y)};
+      if (node.type === 'context') node.predicate = button.dataset.predicate;
+      if (node.type === "condition") {
+        node.filter = button.dataset.filter;
+        if (fields[node.filter].repeatable && !this.draft.filters[node.filter].length) this.draft.updateSource({filters: {[node.filter]: [{}]}});
+      }
+      this.graph.nodes.push(node); this.selected = node.id; this.fit();
+    }
+    if (action === "remove") {
+      const node = this.graph.nodes.find(n => n.id === this.selected);
+      if (node && removeNode(this.graph, node.id)) {
+        if (node.filter) {
+          const source = this.draft.toObject(); delete source.filters[node.filter];
+          this.draft = new this.BonusClass(source, {parent: this.owner});
+        }
+        this.selected = null;
+      }
+    }
+    if (action === "disconnect") this.graph.edges.splice(Number(button.dataset.index), 1);
+    if (action === "repeat") {
+      const node = this.graph.nodes.find(n => n.id === this.selected);
+      const values = this.draft.toObject().filters[node.filter]; values.push({});
+      this.draft.updateSource({filters: {[node.filter]: values}});
+    }
+    this.parameterError = null; this.commit(); this.renderInspector();
+  }
+
+  select(id, center = false) {
+    this.selected = id; this.renderGraph(); this.renderInspector(); this.renderDiagnostics();
+    const node = this.graph.nodes.find(n => n.id === id);
+    if (center && node) {
+      const canvas = this.element.querySelector("[data-bp-canvas]");
+      this.view.x = canvas.clientWidth / 2 - (node.x + NODE_WIDTH / 2) * this.view.scale;
+      this.view.y = canvas.clientHeight / 2 - (node.y + NODE_HEIGHT / 2) * this.view.scale;
+      this.applyView();
+    }
+  }
+
+  onPointerDown(event) {
+    if (event.target.closest("button")) return;
+    if (![0, 1].includes(event.button)) return;
+    const canvas = this.element.querySelector("[data-bp-canvas]");
+    const target = event.target.closest("[data-node-id]");
+    const node = event.button === 0 && target ? this.graph.nodes.find(n => n.id === target.dataset.nodeId) : null;
+    if (node) { this.selected = node.id; this.renderInspector(); canvas.querySelectorAll("[data-node-id]").forEach(el => el.classList.toggle("selected", el.dataset.nodeId === node.id)); }
+    if (node && !this.editable) return;
+    event.preventDefault(); canvas.focus();
+    this.autoFit = false;
+    const start = {x: event.clientX, y: event.clientY, nx: node?.x ?? this.view.x, ny: node?.y ?? this.view.y};
+    canvas.setPointerCapture(event.pointerId);
+    let moved = false;
+    const move = current => {
+      const dx = current.clientX - start.x, dy = current.clientY - start.y;
+      moved ||= Math.abs(dx) + Math.abs(dy) > 3;
+      if (node) {
+        node.x = Math.round(start.nx + dx / this.view.scale); node.y = Math.round(start.ny + dy / this.view.scale);
+        target.style.transform = `translate(${node.x}px,${node.y}px)`; this.drawEdges();
+      } else { this.view.x = start.nx + dx; this.view.y = start.ny + dy; this.applyView(); }
+    };
+    const end = () => {
+      canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerup", end); canvas.removeEventListener("pointercancel", end);
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      if (node && moved) this.commit(); else if (node) { this.renderGraph(); this.renderDiagnostics(); }
+    };
+    canvas.addEventListener("pointermove", move, {signal: this.listeners.signal});
+    canvas.addEventListener("pointerup", end, {signal: this.listeners.signal});
+    canvas.addEventListener("pointercancel", end, {signal: this.listeners.signal});
+  }
+
+  onKey(event) {
+    if (event.target.closest("input,select,textarea,[contenteditable=true]")) return;
+    if (event.target.closest('button') && ['Enter',' '].includes(event.key)) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); if (this.editable) this.restore(this.history[event.shiftKey ? "redo" : "undo"]()); }
+    if (event.key === "Escape") { this.connecting = null; this.renderGraph(); }
+    const focused = event.target.closest("[data-node-id]");
+    if (focused && ["Enter", " "].includes(event.key)) { event.preventDefault(); this.select(focused.dataset.nodeId); }
+    if (event.key === "Delete" && this.selected && this.editable) { event.preventDefault(); this.action("remove", {}).catch(err => this.showError(err)); }
+    if (focused && event.key.startsWith("Arrow") && this.editable) {
+      event.preventDefault(); const node = this.graph.nodes.find(n => n.id === focused.dataset.nodeId);
+      const step = event.shiftKey ? 40 : 10;
+      node.x += ({ArrowLeft: -step, ArrowRight: step}[event.key] ?? 0); node.y += ({ArrowUp: -step, ArrowDown: step}[event.key] ?? 0);
+      this.commit(); this.element.querySelector(`[data-node-id="${node.id}"]`)?.focus();
+    }
+  }
+
+  applyView() {
+    const world = this.element.querySelector("[data-bp-world]");
+    if (!world) return;
+    world.style.transform = `translate(${this.view.x}px, ${this.view.y}px) scale(${this.view.scale})`;
+    this.element.querySelector("[data-bp-zoom]").textContent = `${Math.round(this.view.scale * 100)}%`;
+  }
+  fit() { const canvas = this.element.querySelector("[data-bp-canvas]"); this.autoFit = true; this.view = fitGraph(this.graph, canvas.clientWidth, canvas.clientHeight); this.applyView(); }
+  zoom(factor, pivot) {
+    this.autoFit = false;
+    const canvas = this.element.querySelector("[data-bp-canvas]");
+    pivot ??= {x: canvas.clientWidth / 2, y: canvas.clientHeight / 2};
+    const point = graphPoint(pivot, this.view);
+    this.view.scale = Math.max(.15, Math.min(2.5, this.view.scale * factor));
+    this.view.x = pivot.x - point.x * this.view.scale; this.view.y = pivot.y - point.y * this.view.scale; this.applyView();
+  }
+
+  renderTrialContext() {
+    const values = collection => Array.from(collection?.values?.() ?? collection ?? []);
+    const actors = values(game.actors).filter(actor => actor.isOwner || game.user.isGM);
+    const actor = actors.find(entry => entry.id === this.trialContext.actor);
+    const items = values(actor?.items);
+    const item = items.find(entry => entry.id === this.trialContext.item);
+    const activities = values(item?.system?.activities);
+    const targets = (globalThis.canvas?.tokens?.placeables ?? []).filter(token => token.isVisible && token.actor);
+    for (const [key, entries] of Object.entries({actor: actors, item: items, activity: activities, target: targets})) {
+      const select = this.element.querySelector(`[data-bp-context="${key}"]`);
+      if (!entries.some(entry => entry.id === this.trialContext[key])) this.trialContext[key] = "";
+      select.innerHTML = `<option value="">${escape(t("None"))}</option>` + entries.map(entry => `<option value="${escape(entry.id)}" ${entry.id === this.trialContext[key] ? "selected" : ""}>${escape(entry.name)}</option>`).join("");
+    }
+  }
+
+  runTrial() {
+    if (!this.validation().valid) { this.renderDiagnostics(); return; }
+    const actor = game.actors.get(this.trialContext.actor);
+    const item = actor?.items.get(this.trialContext.item);
+    const activity = item?.system.activities.get(this.trialContext.activity);
+    const target = globalThis.canvas?.tokens?.get(this.trialContext.target) ?? null;
+    const registry = game.modules.get(MODULE.ID).api.filters;
+    const reasons = new Map();
+    this.trial = evaluateConditionGraph(this.graph, node => {
+      if (node.type === 'context') return evaluateContextCondition(node, {actor, item, activity, target}, {combatActive: !!game.combat?.started});
+      const evaluation = evaluateTrialCondition(node.filter, this.draft, registry, {actor, item, activity, target});
+      if (evaluation.reason) reasons.set(node.id, evaluation.reason);
+      return evaluation.result;
+    });
+    const result = this.element.querySelector("[data-bp-trial-result]");
+    result.innerHTML = `<strong>${escape(t(this.trial.result === true ? "Pass" : this.trial.result === false ? "Fail" : "Unknown"))}</strong>` + this.trial.trace.map(trace => {
+      const node = this.graph.nodes.find(n => n.id === trace.nodeId);
+      return `<button type="button" class="bna-trial-row" data-bp-action="focus" data-id="${escape(trace.nodeId)}"><span>${escape(node ? this.label(node) : trace.nodeId)}</span><span>${escape(t(trace.status[0].toUpperCase() + trace.status.slice(1)))}${reasons.has(trace.nodeId) ? ` — ${escape(t(reasons.get(trace.nodeId)))}` : ""}</span></button>`;
+    }).join("");
+    this.renderGraph(); this.renderDiagnostics();
+  }
+  clearTrial() { this.trial = null; const result = this.element?.querySelector("[data-bp-trial-result]"); if (result) result.replaceChildren(); }
+
+  async save() {
+    if (this.saving) return;
+    if (!this.editable) throw Error(t("PermissionDenied"));
+    if (!this.validation().valid) { this.renderDiagnostics(); return; }
+    const current = getCollection(this.owner).get(this.bonusId);
+    if (!current || json(current.toObject()) !== this.baseline) throw Error(t("Conflict"));
+    this.saving = true; this.renderDiagnostics();
+    try {
+      const data = this.draft.toObject(); data.conditionGraph = structuredClone(this.graph);
+      await upsertStoredBonus(this.owner, this.bonusId, data);
+      this.draft = new this.BonusClass(data, {parent: this.owner});
+      this.baseline = json(this.draft.toObject()); this.saved = json(this.snapshot());
+      const sheet = foundry.applications.instances.get(`build-n-action-bonus-${current.uuid.replaceAll(".", "-")}`);
+      if (sheet) { sheet._filters = new Set(configured(this.draft)); sheet.render({force: true}); }
+    } finally { this.saving = false; this.renderDiagnostics(); }
+  }
+  showError(err) { ui.notifications.error(`${t("SaveError")}: ${err.message ?? err}`); }
+
+  static async onKeys(event, button) {
+    if (!this.editable) return;
+    const field = fields[button.dataset.id];
+    const property = button.dataset.property;
+    const values = foundry.utils.getProperty(this.draft, property);
+    const list = field.choices().map(entry => ({...entry, include: values.has(entry.value), exclude: values.has(`!${entry.value}`)}));
+    await KeysDialog.prompt({filterId: button.dataset.id, values: list, canExclude: field.canExclude, ok: {
+      label: "BUILD_N_ACTION.KeysDialogApplySelection", icon: "fa-solid fa-check",
+      callback: (_event, submit) => {
+        const selected = Array.from(submit.form.querySelectorAll(".table .select select")).flatMap(select => select.value === "include" ? [select.dataset.value] : select.value === "exclude" ? [`!${select.dataset.value}`] : []);
+        this.draft.updateSource(foundry.utils.expandObject({[property]: selected})); this.commit(); this.renderInspector();
+      }
+    }});
+  }
+  static onDeleteFilter(event, button) {
+    if (!this.editable) return;
+    const node = this.graph.nodes.find(n => n.id === this.selected);
+    if (fields[node?.filter]?.repeatable && button.dataset.idx !== undefined) {
+      const values = this.draft.toObject().filters[node.filter]; values.splice(Number(button.dataset.idx), 1);
+      this.draft.updateSource({filters: {[node.filter]: values}}); this.commit(); this.renderInspector();
+    } else this.action("remove", button).catch(err => this.showError(err));
+  }
+
+  async close(options = {}) {
+    if (this.saving) return this;
+    if (this.dirty && !options.force) {
+      const discard = await foundry.applications.api.DialogV2.confirm({window: {title: t("Title")}, content: `<p>${escape(t("CloseConfirm"))}</p>`});
+      if (!discard) return this;
+    }
+    this.effects?.destroy(); this.listeners?.abort(); this.resizeObserver?.disconnect();
+    return super.close(options);
+  }
+}
+
 class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.DocumentSheetV2
 ) {
@@ -5940,6 +6975,7 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
       deleteFilter: this.#onDeleteFilter,
       editImage: this.#onEditImage,
       keysDialog: this.#onKeysDialog,
+      openBlueprint: this.#onOpenBlueprint,
       viewFilter: this.#onViewFilter
     },
     bonusId: null
@@ -6099,6 +7135,7 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
     return {
       aura: this.#prepareAura(makeField),
       bonus,
+      hasGraph: !!bonus.conditionGraph?.enabled,
       bonuses: this.#prepareBonuses(makeField, source),
       consume: this.#prepareConsumption(makeField, source),
       fields: await this.#prepareRootFields(makeField, rollData),
@@ -6323,6 +7360,7 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
       if (!this._filters.has(key) || fields[key].repeatable) acc.push({
         id: key,
         repeats: fields[key].repeatable ? bonus.filters[key].length : null,
+        example: getConditionHelp(key).example,
         field: bonus.schema.getField(`filters.${key}`)
       });
       return acc;
@@ -6415,6 +7453,13 @@ class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
     const collection = getCollection(this.document).contents.map(k => k.toObject());
     collection.findSplice(k => k.id === bonus.id, data);
     this.document.update({[`flags.${MODULE.ID}.bonuses`]: collection});
+  }
+
+  static #onOpenBlueprint() {
+    const id = `bna-blueprint-${this.bonus.uuid.replaceAll(".", "-")}`;
+    const existing = foundry.applications.instances.get(id);
+    if (existing) { existing.render({force: true}); existing.bringToFront(); }
+    else new ConditionBlueprint({bonus: this.bonus}).render({force: true});
   }
 
   /* -------------------------------------------------- */
@@ -7076,7 +8121,8 @@ var applications = {
   BonusSheet,
   BonusWorkshop,
   KeysDialog,
-  TokenAura
+  TokenAura,
+  ConditionBlueprint
 };
 
 /**
@@ -9277,6 +10323,13 @@ class OptionalSelector {
   }
 }
 
+/** Apply personal visual preferences without a reload or changes to world data. */
+function applyInterfacePreferences({settings = game.settings, body = globalThis.document?.body} = {}) {
+  if (!body) return;
+  body.dataset.bnaEffects = settings.get(MODULE.ID, SETTINGS.EFFECTS) ? "on" : "off";
+  body.dataset.bnaMotion = settings.get(MODULE.ID, SETTINGS.MOTION) ? "on" : "off";
+}
+
 /** Document types whose open sheets expose Build-n-Action header controls. */
 const DOCUMENT_TYPES = new Set(["Actor", "Item", "ActiveEffect", "Region"]);
 
@@ -9341,8 +10394,16 @@ function registerSettings({
   settings = game.settings,
   refreshDocuments = refreshDocumentApplications,
   refreshAuraDisplays = refreshAuras,
-  reload = reloadWorld
+  reload = reloadWorld,
+  refreshInterface = () => applyInterfacePreferences({settings})
 } = {}) {
+  for (const [key, prefix] of [[SETTINGS.EFFECTS, "Effects"], [SETTINGS.MOTION, "Motion"]]) {
+    registerBooleanSetting(settings, key, {
+      scope: "client", default: true,
+      name: `BUILD_N_ACTION.Blueprint.${prefix}Name`, hint: `BUILD_N_ACTION.Blueprint.${prefix}Hint`,
+      onChange: refreshInterface
+    });
+  }
   registerBooleanSetting(settings, SETTINGS.PLAYERS, {
     name: "BUILD_N_ACTION.SettingsShowBuilderForPlayersName",
     hint: "BUILD_N_ACTION.SettingsShowBuilderForPlayersHint",
@@ -9470,6 +10531,7 @@ async function setupTree() {
 
 // General setup.
 Hooks.once("init", registerSettings);
+Hooks.once("ready", () => applyInterfacePreferences());
 Hooks.once("init", enricherSetup);
 Hooks.once("init", () => game.modules.get(MODULE.ID).api = buildNActionApi);
 Hooks.on("hotbarDrop", _onHotbarDrop);

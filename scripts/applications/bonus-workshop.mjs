@@ -169,7 +169,7 @@ export default class BonusWorkshop extends HandlebarsApplicationMixin(Applicatio
   /** Keep the type selector usable at narrow window sizes. */
   #updateResponsiveLayout(width) {
     const selector = this.element?.querySelector(".pages .select-type");
-    selector?.classList.toggle("hidden", Number.parseInt(width) < 680);
+    selector?.classList.toggle("bna-compact", Number.parseInt(width) < 680);
   }
 
   /* -------------------------------------------------- */

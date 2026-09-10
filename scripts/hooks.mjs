@@ -14,6 +14,7 @@ import registry from "./registry.mjs";
 import {configureApplicationFactories} from "./services/application-factories.mjs";
 import {getProficiencyTrees, setProficiencyTrees} from "./services/proficiencies.mjs";
 import {registerSettings} from "./settings.mjs";
+import {applyInterfacePreferences} from "./services/interface-preferences.mjs";
 
 // Build the module-owned public API. The package API is canonical; the global
 // is provided for macros and deliberately has no legacy aliases.
@@ -91,6 +92,7 @@ async function setupTree() {
 
 // General setup.
 Hooks.once("init", registerSettings);
+Hooks.once("ready", () => applyInterfacePreferences());
 Hooks.once("init", enricherSetup);
 Hooks.once("init", () => game.modules.get(MODULE.ID).api = buildNActionApi);
 Hooks.on("hotbarDrop", _onHotbarDrop);
