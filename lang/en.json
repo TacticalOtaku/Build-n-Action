@@ -1,888 +1,1374 @@
 {
-  "BUILD_N_ACTION": {
-    "AvailableFiltersTooltip": "Conditions restrict the bonus. Without a blueprint all must pass; in a blueprint combine them with AND, OR and NOT.",
-    "ContextualBonus": "Bonus",
-    "Bonuses": "Bonuses",
-    "TestBonus": "Ability Check Bonus",
-    "AttackBonus": "Attack Roll Bonus",
-    "DamageBonus": "Damage Roll Bonus",
-    "HitdieContextualBonus": "Hit Die Bonus",
-    "SaveBonus": "Save DC Bonus",
-    "ThrowBonus": "Saving Throw Bonus",
-    "BasicBonuses": "Basic Bonuses",
-    "BonusCopy": "{name} (Copy)",
-    "BonusNotFound": "That bonus could no longer be found.",
-    "BaseContextualBonus": "Contextual Bonus",
-    "OptionalSelector": {
-      "LabelApply": "Apply",
-      "LabelConsume": "Consume"
+  "BNA": {
+    "Kind": {
+      "event": "When",
+      "condition": "If",
+      "result": "Then"
     },
-    "ConfigurationCopyTooltip": "Create a duplicate of this bonus",
-    "ConfigurationEditTooltip": "Edit this bonus",
-    "ConsumptionOption": "({value}) of {max} {label}",
-    "ContextMenu": {
-      "Delete": "Delete",
-      "Disable": "Disable",
-      "Duplicate": "Duplicate",
-      "Edit": "Edit",
-      "Enable": "Enable"
+    "Category": {
+      "Event": {
+        "pre": "Before a roll",
+        "post": "After a roll",
+        "signal": "Signals"
+      },
+      "Check": {
+        "item": "Item",
+        "spell": "Spell",
+        "self": "Me",
+        "target": "Target",
+        "roll": "Roll",
+        "advanced": "Advanced"
+      },
+      "Result": {
+        "roll": "Change the roll",
+        "reaction": "React"
+      }
     },
-    "Create": "Create New Bonus",
-    "CurrentBonuses": "Current Bonuses",
-    "CurrentBonusesTooltip": "The bonuses you have created that are currently stored on this Actor, Item, or ActiveEffect.",
-    "CurrentFiltersTooltip": "The filters currently applied to the bonus, further narrowing down which rolls it should apply to. Each filter must be true for the bonus to apply.",
-    "Example": "Example",
-    "FIELDS": {
-      "aura": {
-        "blockers": {
-          "hint": "The status conditions that block an aura from being transferred, such as a paladin's aura that is only active while the paladin is neither dead nor unconscious.",
-          "label": "Blocking Conditions"
-        },
-        "disposition": {
-          "hint": "Which targets should be affected by this aura, relative to the disposition of the origin token.",
-          "label": "Valid Targets",
-          "optionAlly": "Allied Targets",
-          "optionAny": "Any Targets",
-          "optionEnemy": "Enemy Targets"
-        },
-        "enabled": {
-          "hint": "Configure whether and how the bonus acts as an aura.",
-          "label": "Enable"
-        },
-        "label": "Aura Configuration",
-        "range": {
-          "hint": "The range of the aura, measured in feet (put in '-1' for an unlimited range).",
-          "label": "Range",
-          "labelFt": "Range ({range} ft)",
-          "labelUnlimited": "Range ({range})"
-        },
-        "require": {
-          "light": {
-            "hint": "If checked, the aura will be restricted by anything that blocks light.",
-            "label": "Enforce Light Restrictions"
-          },
-          "move": {
-            "hint": "If checked, the aura will be restricted by anything that blocks movement.",
-            "label": "Enforce Move Restrictions"
-          },
-          "sight": {
-            "hint": "If checked, the aura will be restricted by anything that blocks vision.",
-            "label": "Enforce Sight Restrictions"
-          },
-          "sound": {
-            "hint": "If checked, the aura will be restricted by anything that blocks sound.",
-            "label": "Enforce Sound Restrictions"
-          }
-        },
-        "self": {
-          "hint": "Whether the aura should affect its owner regardless of any other targeting behavior.",
-          "label": "Affect Self"
+    "Pin": {
+      "out": {
+        "Label": "Then",
+        "Hint": "Continues when the event happens."
+      },
+      "yes": {
+        "Label": "Yes",
+        "Hint": "Continues when the checks pass."
+      },
+      "no": {
+        "Label": "Otherwise",
+        "Hint": "Continues when the checks fail."
+      },
+      "hit": {
+        "Label": "Hit",
+        "Hint": "The attack hit at least one target."
+      },
+      "miss": {
+        "Label": "Miss",
+        "Hint": "The attack missed every target."
+      },
+      "crit": {
+        "Label": "Critical",
+        "Hint": "The attack was a critical hit; it also counts as a hit."
+      },
+      "fumble": {
+        "Label": "Fumble",
+        "Hint": "The attack roll was a natural fumble."
+      },
+      "failed": {
+        "Label": "Failed",
+        "Hint": "The target failed its saving throw."
+      },
+      "succeeded": {
+        "Label": "Succeeded",
+        "Hint": "The target succeeded on its saving throw."
+      },
+      "dealt": {
+        "Label": "Damage dealt",
+        "Hint": "Damage was applied to a target."
+      },
+      "dropped": {
+        "Label": "Dropped to 0",
+        "Hint": "The damage reduced a target to 0 hit points."
+      },
+      "success": {
+        "Label": "Success",
+        "Hint": "The check met or beat its DC."
+      },
+      "failure": {
+        "Label": "Failure",
+        "Hint": "The check fell short of its DC."
+      }
+    },
+    "Connect": {
+      "missingNode": "One of these nodes no longer exists.",
+      "selfLoop": "A node cannot connect to itself.",
+      "intoEvent": "Events start a chain; nothing can lead into them.",
+      "fromResult": "Results end a chain; send a signal to continue elsewhere.",
+      "unknownPin": "This output does not exist on the node.",
+      "duplicate": "These pins are already connected.",
+      "cycle": "This wire would create a loop."
+    },
+    "Phrase": {
+      "Sentence": "{event}: {then}.",
+      "SentenceIf": "{event}, if {guards}, then {then}.",
+      "And": "and",
+      "Or": "or",
+      "Not": "not ({text})",
+      "Any": "anything",
+      "NotValues": "anything but {values}",
+      "ButNot": "{values}, but not {excluded}",
+      "Optional": "player's choice",
+      "Cost": "costs {cost}",
+      "Unset": "(not set)",
+      "Limit": {
+        "turn": "once per turn",
+        "round": "once per round",
+        "shortRest": "once per short rest",
+        "longRest": "once per long rest"
+      }
+    },
+    "Reach": {
+      "Who": {
+        "aura": {
+          "any": "a creature in my aura",
+          "ally": "an ally in my aura",
+          "enemy": "an enemy in my aura"
         },
         "template": {
-          "hint": "If the aura affects the area within a Measured Template instead of having a range (for items that are able to place a template).",
-          "label": "Applies to Template"
+          "any": "a creature in my template",
+          "ally": "an ally in my template",
+          "enemy": "an enemy in my template"
+        },
+        "region": {
+          "any": "a creature in this region"
         }
+      }
+    },
+    "Choice": {
+      "reachMode": {
+        "self": "Me",
+        "aura": "My aura",
+        "template": "My template",
+        "region": "This region"
       },
-      "consume": {
-        "enabled": {
-          "hint": "Configure whether and how the bonus consumes a property. A bonus cannot be set to consume unless it is optional.",
-          "label": "Enable"
-        },
-        "formula": {
-          "hint": "The formula by which the bonus scales at each step.",
-          "label": "Scaling Formula"
-        },
-        "label": "Consumption Configuration",
-        "scales": {
-          "hint": "Decide whether this bonus can consume more than the base amount of the consumed property and scale its bonus accordingly.",
-          "label": "Enable Scaling"
-        },
-        "subtype": {
-          "label": "Subtype"
-        },
-        "type": {
-          "label": "Consumption Type",
-          "optionEffect": "Active Effect",
-          "optionSlots": "Spell Slot"
-        },
-        "value": {
-          "label": "Consumed Values",
-          "labelSlot": "Spell Slot Size",
-          "hint": "The amount that will be consumed when opting into this bonus.",
-          "hintScale": "The minimum and maximum amounts that can be consumed when opting into this bonus.",
-          "hintScaleSlot": "The minimum and maximum sizes of a spell slot to opt into this bonus. If a spell slot greater than this maximum is consumed, it grants no additional benefit.",
-          "hintSlot": "The minimum size of a spell slot required to opt into this bonus.",
-          "min": {
-            "label": "Minimum",
-            "labelSlot": "Smallest"
-          },
-          "max": {
-            "label": "Maximum",
-            "labelSlot": "Largest"
-          },
-          "step": {
-            "label": "Step",
-            "hint": "The delta, or step, of the choices when consuming."
-          }
-        }
+      "disposition": {
+        "any": "Everyone",
+        "ally": "Allies",
+        "enemy": "Enemies"
       },
-      "description": {
-        "hint": "The text that accompanies this bonus. While not required, this is shown in tooltips as well as any hints for optional bonuses.",
-        "label": "Description"
+      "conditionMode": {
+        "all": "All checks pass",
+        "any": "Any check passes"
       },
-      "enabled": {
-        "hint": "Toggle this bonus on or off. A bonus that is toggled off will be completely ignored.",
-        "label": "Enabled"
+      "threshold": {
+        "atMost": "At most",
+        "atLeast": "At least"
       },
-      "exclusive": {
-        "hint": "Toggle whether this bonus applies only to the item on which it is created. A bonus cannot be set to apply to one specific item only, unless created on said item, and applying to attack, damage, save DCs, or tool checks.",
-        "label": "Exclusive"
+      "componentMatch": {
+        "any": "Any of them",
+        "all": "All of them"
       },
-      "img": {
-        "hint": "The image of this bonus to display where relevant.",
-        "label": "Image"
+      "modifierMode": {
+        "add": "Add",
+        "multiply": "Multiply"
+      },
+      "who": {
+        "self": "myself",
+        "target": "the target"
+      },
+      "riderScope": {
+        "sameActivation": "This same activation",
+        "nextRoll": "The next roll"
+      },
+      "riderRoll": {
+        "attackRoll": "attack roll",
+        "damageRoll": "damage roll",
+        "savingThrow": "saving throw",
+        "abilityCheck": "ability check"
+      },
+      "durationUnit": {
+        "uses": "Uses",
+        "rounds": "Rounds",
+        "turns": "Turns",
+        "untilRest": "Until a rest"
+      },
+      "effectSource": {
+        "status": "A condition",
+        "itemEffect": "An effect of this item"
+      },
+      "removeMatch": {
+        "status": "A condition",
+        "name": "An effect by name"
+      },
+      "resourceAction": {
+        "spend": "spend",
+        "restore": "restore"
+      },
+      "resourceType": {
+        "uses": "item uses",
+        "slots": "spell slots",
+        "hp": "hit points",
+        "tempHp": "temporary hit points",
+        "hitDice": "hit dice",
+        "currency": "currency"
+      },
+      "signalScope": {
+        "actor": "Everything on my actor",
+        "document": "Only this document"
+      },
+      "costType": {
+        "none": "Nothing",
+        "uses": "Item uses",
+        "quantity": "Item quantity",
+        "slots": "Spell slots",
+        "health": "Hit points",
+        "hitdice": "Hit dice",
+        "currency": "Currency",
+        "inspiration": "Inspiration",
+        "effect": "This effect (removed)"
+      },
+      "hitDieSize": {
+        "smallest": "Smallest",
+        "largest": "Largest",
+        "d6": "d6",
+        "d8": "d8",
+        "d10": "d10",
+        "d12": "d12"
+      },
+      "limit": {
+        "none": "No limit",
+        "turn": "Once per turn",
+        "round": "Once per round",
+        "shortRest": "Once per short rest",
+        "longRest": "Once per long rest"
+      },
+      "comparisonOperator": {
+        "EQ": "=",
+        "LT": "<",
+        "GT": ">",
+        "LE": "≤",
+        "GE": "≥"
+      }
+    },
+    "Field": {
+      "reach": {
+        "label": "Whose roll",
+        "hint": "Who has to make the roll for this event to fire."
+      },
+      "reachMode": {
+        "label": "Source",
+        "hint": "Me only, creatures in my aura, creatures in my template, or creatures in this region."
+      },
+      "reachRange": {
+        "label": "Aura radius (ft)",
+        "hint": "A number or a formula such as @abilities.cha.mod * 5. Use -1 for an unlimited range."
+      },
+      "reachDisposition": {
+        "label": "Affects",
+        "hint": "Which creatures, by token disposition, the aura or template affects."
+      },
+      "reachIncludeSelf": {
+        "label": "Also affects me",
+        "hint": "When off, only other creatures benefit."
+      },
+      "reachBlockers": {
+        "label": "Suppressed by",
+        "hint": "The aura stops while I have any of these conditions."
+      },
+      "reachRequire": {
+        "label": "Blocked by walls that block",
+        "hint": "The aura only reaches creatures not cut off by such walls."
+      },
+      "requireSight": {
+        "label": "Sight"
+      },
+      "requireMove": {
+        "label": "Movement"
+      },
+      "requireSound": {
+        "label": "Sound"
+      },
+      "requireLight": {
+        "label": "Light"
+      },
+      "signalName": {
+        "label": "Signal name",
+        "hint": "Any short name. Senders and receivers must use exactly the same one."
+      },
+      "conditionMode": {
+        "label": "Pass when",
+        "hint": "All checks must pass, or any single one is enough."
+      },
+      "anyOf": {
+        "label": "Matches",
+        "hint": "Pick one or more values; the check passes if any of them matches.",
+        "hintExclusion": "Pick one or more values. Mark a value as excluded to require that it does not match."
+      },
+      "tags": {
+        "label": "Values",
+        "hint": "Type a value and press Enter; letters, digits and dashes."
       },
       "optional": {
-        "hint": "Toggle whether this bonus should be opted into when rolling. Note that this feature is not available for bonuses to save DCs.",
-        "label": "Optional"
+        "label": "Ask the player",
+        "hint": "The player opts in from the roll dialog instead of it applying automatically."
       },
-      "reminder": {
-        "hint": "Toggle whether this bonus simply serves as a reminder. To use this, it must not be granting any bonuses or dice modifications. This feature is also only available for rolls that have a configuration dialog.",
-        "label": "Reminder"
+      "choiceGroup": {
+        "label": "Shared choice",
+        "hint": "Results with the same name are offered as one choice with one cost. Leave empty to keep this result separate."
       },
-      "filters": {
-        "abilities": {
-          "hint": "Filter by the ability score being used for the roll. This filter will respect items that are set to use their Default ability score, such as spells set to use the Spellcasting ability, or weapons that are Finesse.",
-          "label": "Ability Modifier"
-        },
-        "actorCreatureSizes": {
-          "hint": "Filter by the creature size of the actor, requiring that the actor making the roll is one of the chosen creature sizes.",
-          "label": "Creature Sizes"
-        },
-        "actorCreatureTypes": {
-          "hint": "Filter by the type of creature the rolling actor must be one of (or have as a subtype), or the type of creature the rolling actor must not be one of. For example 'undead', 'fey', or 'construct'. To designate a creature type as a subtype, write as many as you like in the actor's Subtype field, separated by a '/'.",
-          "label": "Actor Creature Types"
-        },
-        "actorLanguages": {
-          "hint": "Filter by the languages the actor can or cannot speak, read, or write. This will take into account if an actor can speak an entire group of languages such as Primordial rather than only the specific dialects.",
-          "label": "Spoken Languages"
-        },
-        "arbitraryComparisons": {
-          "hint": "Insert numbers, roll data properties, strings, or a combination of the three, that must be in a specific relationship for the bonus to apply. This comparison can evaluate substrings by using either of the inequalities. You can also use roll data from a targeted token's actor by prepending with '@target'.",
-          "label": "Arbitrary Comparisons",
-          "one": {
-            "placeholder": "Value…"
-          },
-          "other": {
-            "placeholder": "Other value…"
-          }
-        },
-        "attackModes": {
-          "hint": "Filter by the type of attack the item is performing, which decides the damage roll. For example, an unarmed strike, a two-handed weapon attack, or ranged spell attack.",
-          "label": "Attack Modes",
-          "value": {
-            "label": "Range"
-          },
-          "classification": {
-            "label": "Type"
-          },
-          "mode": {
-            "label": "Mode"
-          }
-        },
-        "baseArmors": {
-          "hint": "Filter by the type of armor the actor must be wearing or must not be wearing (including shields). For example if wanting the bonus to apply only when wearing Chain Mail or while unarmored. This filter can take into account armor categories such as 'Light Armor' as well.",
-          "label": "Armor Types"
-        },
-        "baseTools": {
-          "hint": "Filter by the types of tools the item making the roll must be one of or none of. For example if wanting the bonus to apply only when using an Herbalism Kit, Thieves' Tools, or Cobbler's Tools.",
-          "label": "Tool Types"
-        },
-        "baseWeapons": {
-          "hint": "Filter by the types of weapons the item making the roll must be one of or none of. For example if wanting the bonus to apply only when using a Battleaxe, Shortbow, or Longsword. This filter can take categories into account as well.",
-          "label": "Weapon Types"
-        },
-        "creatureTypes": {
-          "hint": "Filter by the type of creature the targeted actor must be one of (or have as a subtype), or the type of creature the targeted actor must not be one of. For example 'undead', 'fey', or 'construct'. To designate a creature type as a subtype, write as many as you like in the actor's Subtype field, separated by a '/'.",
-          "label": "Target Creature Types"
-        },
-        "customScripts": {
-          "hint": "Filter using any custom script you want to write yourself. The script has to be completely synchronous and must explicitly return true or false. As helper variables, the script is supplied with the actor and token of the one performing the roll ('actor' and 'token'), the item being used ('item', if any), and the bonus on which this script is attached ('bonus'). These variables can be accessed directly.",
-          "label": "Custom Script"
-        },
-        "damageTypes": {
-          "hint": "Filter by the type of damage that must be or must not be part of the roll. For example if a spell must be dealing fire or lightning damage.",
-          "label": "Damage Types"
-        },
-        "featureTypes": {
-          "hint": "Filter by the type and subtype a feature-type item must be. For example a class feature, ki feature, or monster feature.",
-          "label": "Feature Types",
-          "subtype": {
-            "label": "Subtype"
-          },
-          "type": {
-            "label": "Type"
-          }
-        },
-        "healthPercentages": {
-          "hint": "Filter by the percentage of health the actor must at least have, or at most have. For example if the actor performing the roll must be at or above 90% health remaining.",
-          "label": "Health Percentage",
-          "type": {
-            "label": "Type",
-            "optionLT": "Less than",
-            "optionGT": "More than"
-          },
-          "value": {
-            "label": "Threshold"
-          }
-        },
-        "identifiers": {
-          "hint": "Filter by the identifiers that an item must have one of for the bonus to apply. You can set an item's identifier in its source config.",
-          "label": "Identifiers",
-          "placeholder": "Enter identifiers"
-        },
-        "itemTypes": {
-          "hint": "Filter by the type of the item being used to perform the roll. For example if the bonus should only apply to spells or only to weapons.",
-          "label": "Item Types"
-        },
-        "markers": {
-          "label": "Markers",
-          "hint": "Filter by markers that must be stored on actor performing the roll for the bonus to apply. The item being used, or its actor, must have at least one of these markers. Any markers stored on applied effects will also be valid. You can additionally compare for markers on your target.",
-          "placeholder": "Enter marker…",
-          "target": {
-            "label": "Target Markers",
-            "hint": "Markers of which one must be present on the target."
-          },
-          "values": {
-            "label": "Markers",
-            "hint": "Markers of which one must be present on the one performing the roll."
-          }
-        },
-        "preparationModes": {
-          "hint": "Filter by the type of preparation mode a spell must be set to for the bonus to apply. For example when using a spell that is prepared as Pact Magic or Ritual Spellcasting.",
-          "label": "Preparation Modes"
-        },
-        "proficiencyLevels": {
-          "hint": "Filter by the level of proficiency of the roll. For example, if the bonus should only apply if the tool being used is rolled with expertise, or if a saving throw is non-proficient.",
-          "label": "Proficiency Levels"
-        },
-        "remainingSpellSlots": {
-          "hint": "Filter by the minimum and maximum total number of spell slots the actor performing the roll must have remaining for the bonus to apply. For example if you want a bonus to apply only if you have 3 spell slots or more remaining, or no spell slots remaining at all. This can be toggled such that each remaining spell slot has a value equal to its size.",
-          "label": "Remaining Spell Slots",
-          "rangeLabel": "Range",
-          "size": {
-            "label": "Size",
-            "hint": "Take the size of the spell slot into account, meaning a spell slot of 5th level counts as a value of five. Otherwise, each spell slots count as one."
-          }
-        },
-        "saveAbilities": {
-          "hint": "Filter by the ability score that must be used to set the saving throw DC of the item for the bonus to apply; for example a Battle Master fighter who determines their Maneuver DC with Dexterity. This can be different from the ability the item otherwise uses. If an item is set to scale with 'Spellcasting', the spellcasting ability of the actor performing the roll is used to compared.",
-          "label": "Save DC Abilities"
-        },
-        "skillIds": {
-          "hint": "Filter by the types of skills the roll being performed must be one of or none of. For example if the bonus should apply only to skill checks made with Athletics, Nature, or Survival.",
-          "label": "Skills"
-        },
-        "sourceClasses": {
-          "hint": "Filter by the identifiers of the classes that a spell should belong to. A source class identifier can be set in the spell on the Details tab.",
-          "label": "Source Classes",
-          "placeholder": "Enter identifiers"
-        },
-        "spellComponents": {
-          "hint": "Filter by the components or tags the spell being cast must have. You can choose whether the spell must have all of the given components or tags, or at least one of them. For example if you want a bonus to apply to all spells that require concentration or all spells with a material component.",
-          "label": "Spell Components",
-          "match": {
-            "label": "Matching",
-            "optionAll": "Match all",
-            "optionAny": "Match any"
-          },
-          "types": {
-            "label": "Types"
-          }
-        },
-        "spellLevels": {
-          "hint": "Filter by the level at which the spell must be cast. For example, you can have a bonus apply only to cantrips, only to leveled spells, or only to spells of 3rd level or below.",
-          "label": "Spell Levels"
-        },
-        "spellSchools": {
-          "hint": "Filter by the school a spell must belong to. If multiple schools are selected, the spell must belong to any one of them. For example, if you want a bonus to apply only to Divination or Evocation spells.",
-          "label": "Spell Schools"
-        },
-        "statusEffects": {
-          "hint": "Filter by the conditions the actor performing the roll must be affected by or must not be affected by. This will take into account any condition immunities the actor has, such as immunity to being paralyzed.",
-          "label": "Actor Conditions"
-        },
-        "targetArmors": {
-          "hint": "Filter by the type of armor the target must be wearing or must not be wearing (including shields). For example if wanting the bonus to apply only when the target is wearing Chain Mail or is unarmored. This filter can take into account armor categories such as 'Light Armor' as well.",
-          "label": "Target Armor"
-        },
-        "targetEffects": {
-          "hint": "Filter by the conditions the targeted actor must be affected by or must not be affected by. This will take into account any condition immunities the actor has, such as immunity to being paralyzed.",
-          "label": "Target Conditions"
-        },
-        "throwTypes": {
-          "hint": "Filter by the type of saving throw the bonus should apply to. For example if the bonus should apply only to Intelligence or Charisma saving throws, or even to Death saving throws or saving throws to maintain concentration on an effect.",
-          "label": "Saving Throw Types"
-        },
-        "tokenSizes": {
-          "hint": "Filter by the size of a targeted token, and whether to compare against the rolling token as well. For example if it should be required that a targeted token is at least 2-by-2 but also larger than the token of the actor performing the roll.",
-          "label": "Token Sizes",
-          "self": {
-            "label": "Compare to self",
-            "hint": "If checked, the target token must be larger/smaller than the rolling actor's token size in addition to the above value."
-          },
-          "size": {
-            "label": "Size",
-            "placeholder": "Size…"
-          },
-          "type": {
-            "optionGT": "Greater than",
-            "optionLT": "Smaller than"
-          }
-        },
-        "weaponProperties": {
-          "hint": "Filter by the weapon properties that the item being used to perform the roll either must have some of or cannot have any of. For example if the bonus should apply only to Two-Handed weapons or Versatile weapons.",
-          "label": "Weapon Properties"
-        }
+      "cost": {
+        "label": "Cost",
+        "hint": "What the player spends to opt in."
+      },
+      "costType": {
+        "label": "Pay with",
+        "hint": "The resource spent when the player opts in."
+      },
+      "costCurrency": {
+        "label": "Currency"
+      },
+      "costHitDie": {
+        "label": "Hit die"
+      },
+      "costMin": {
+        "label": "Minimum",
+        "hint": "The smallest amount to spend. Formulas are allowed."
+      },
+      "costMax": {
+        "label": "Maximum",
+        "hint": "Leave empty to allow as much as is available."
+      },
+      "costStep": {
+        "label": "Step",
+        "hint": "The increment between the minimum and maximum."
+      },
+      "costScales": {
+        "label": "Scales with the amount paid",
+        "hint": "Each step above the minimum adds the formula below."
+      },
+      "costFormula": {
+        "label": "Scaling formula",
+        "hint": "Added once per step above the minimum, e.g. 1d8."
+      },
+      "limit": {
+        "label": "At most",
+        "hint": "The result does not apply again within the period."
       }
     },
-    "MODIFIERS": {
-      "FIELDS": {
-        "amount": {
-          "label": "Dice Quantity",
-          "enabled": {
-            "label": "Quantity Modification"
-          },
-          "mode": {
-            "hint": "Whether to add the additional dice on top or multiply the value by this amount.",
-            "label": "Mode"
-          },
-          "value": {
-            "hint": "The increase to the amount of dice rolled.",
-            "label": "Additional Dice"
-          }
-        },
-        "config": {
-          "label": "Dice Configuration",
-          "enabled": {
-            "label": "Enabled Modifications",
-            "hint": "Toggle which dice modifications should be configurable and applying to the die rolls."
-          },
-          "first": {
-            "hint": "If checked, the die modifiers only apply to the first die in the full expression.",
-            "label": "First Die Only"
-          }
-        },
-        "explode": {
-          "label": "Exploding Dice",
-          "enabled": {
-            "label": "Exploding Dice"
-          },
-          "limit": {
-            "hint": "The maximum amount of explosions allowed. If left blank, there will not be any limit enforced.",
-            "label": "Maximum Explosions"
-          },
-          "once": {
-            "hint": "Limit the dice to explode at most once.",
-            "label": "Explode Once"
-          },
-          "value": {
-            "hint": "The threshold for the explosive behaviour.",
-            "label": "Threshold"
-          }
-        },
-        "maximum": {
-          "label": "Maximum Results",
-          "enabled": {
-            "hint": "Allow this bonus to configure the maximum result rolled on each die.",
-            "label": "Maximum Results"
-          },
-          "value": {
-            "hint": "The maximum result able to be rolled. By using negative values, the ceiling will be calculated from the top rather than the bottom.",
-            "label": "Maximum Value"
-          },
-          "zero": {
-            "hint": "Allow 0 as a final value. Otherwise the minimum result allowed will be 1.",
-            "label": "Allow Zero"
-          }
-        },
-        "minimum": {
-          "label": "Minimum Results",
-          "enabled": {
-            "hint": "Allow this bonus to configure the minimum result rolled on each die.",
-            "label": "Minimum Results"
-          },
-          "value": {
-            "hint": "The minimum result able to be rolled. By using negative values, the floor will be calculated from the top rather than the bottom.",
-            "label": "Minimum Value"
-          },
-          "maximize": {
-            "hint": "Cause all dice to be maximized.",
-            "label": "Maximize"
-          }
-        },
-        "mode": {
-          "optionAdd": "Add",
-          "optionMultiply": "Multiply"
-        },
-        "reroll": {
-          "label": "Rerolling Dice",
-          "enabled": {
-            "hint": "Allow this bonus to cause the dice to reroll.",
-            "label": "Rerolling Behaviour"
-          },
-          "invert": {
-            "hint": "Whether to reroll dice that roll above the threshold instead of below the threshold.",
-            "label": "Inverted"
-          },
-          "limit": {
-            "hint": "The maximum amount of rerolls allowed if recursive. If left blank, there will not be any limit enforced.",
-            "label": "Maximum Rerolls"
-          },
-          "recursive": {
-            "hint": "Whether to reroll the dice recursively.",
-            "label": "Recursive"
-          },
-          "value": {
-            "hint": "The threshold for the reroll behaviour.",
-            "label": "Threshold"
-          }
-        },
-        "size": {
-          "label": "Dice Size",
-          "enabled": {
-            "hint": "Allow this bonus to make changes to the size of dice rolled.",
-            "label": "Size Modification"
-          },
-          "mode": {
-            "hint": "Whether to increase the dice sizes by the amount or multiply the faces.",
-            "label": "Mode"
-          },
-          "value": {
-            "hint": "The increase to the size of the dice rolled.",
-            "label": "Size Increase"
+    "Event": {
+      "attackRoll": {
+        "Label": "Attack roll",
+        "Summary": "Before an attack roll is made.",
+        "Help": "Fires while an attack roll is being prepared, so results can still change it. Example: +1 to hit with a magic weapon.",
+        "Phrase": {
+          "out": {
+            "Self": "when I make an attack roll",
+            "Other": "when {who} makes an attack roll"
           }
         }
-      }
-    },
-    "ID": "ID",
-    "Keys": "Keys",
-    "KeysDialogApplySelection": "Apply Selection",
-    "KeysDialogExclude": "Exclude",
-    "KeysDialogInclude": "Include",
-    "KeysDialogState": "State",
-    "KeysDialogTitle": "Keys: {name}",
-    "KeysDialogValue": "Value",
-    "Labels": {
-      "Consuming": "Consuming",
-      "Disabled": "Disabled",
-      "Exclusive": "Item Exclusive",
-      "Filters": "{n} Filters",
-      "Optional": "Optional",
-      "Reminder": "Reminder",
-      "TemplateAura": "Template Aura",
-      "TokenAura": "Token Aura"
-    },
-    "Largest": "Largest",
-    "ModuleTitle": "Build-n-Action",
-    "NewContextualBonus": "New Bonus",
-    "OriginName": "Origin: {name}",
-    "OverviewActor": "Actor",
-    "OverviewCopied": "The uuid has been copied to clipboard.",
-    "OverviewImmediateParent": "Immediate Parent",
-    "OverviewName": "Name",
-    "OverviewTitle": "Applied Bonuses",
-    "RegionConfigHint": "Open the builder for bonuses on this scene region. These will apply to any token contained within the region.",
-    "Relative": "Relative",
-    "SearchBonuses": "Search Bonuses",
-    "GroupByType": "Group by Type",
-    "SelectType": "Select a Type",
-    "SelectTypeTooltip": "Select a type for your new bonus; the kind of roll to which it should apply.",
-    "SettingsAllowFumbleNegationHint": "Allow for modifiers to the fumble range on attack rolls to go below 1?",
-    "SettingsAllowFumbleNegationName": "Allow Fumble Negation",
-    "SettingsDisableCustomScriptFilterHint": "Disable the 'Custom Script' filters from having their values read. Instead the filter always immediately returns true. Enable this setting if you prefer other users not executing scripts.",
-    "SettingsDisableCustomScriptFilterName": "Disable 'Custom Script' filter.",
-    "SettingsDisplayLabelHint": "If checked, the label is displayed in the header of applicable actors, items, and effects.",
-    "SettingsDisplayLabelName": "Display Label",
-    "SettingsPadAuraRadius": "Pad Aura Radius",
-    "SettingsPadAuraRadiusHint": "On gridless scenes, extend the radius of auras due to token size?",
-    "SettingsShowAuraRangesHint": "Create a visual indicator for the ranges of buildNAction auras. This does not apply to template auras or auras with unlimited ranges. If the roller is within an aura, it is marked green, otherwise red.",
-    "SettingsShowAuraRangesName": "Show Aura Ranges",
-    "SettingsShowBuilderForPlayersHint": "If disabled, the icon to enter the builder will not be available in the header for players.",
-    "SettingsShowBuilderForPlayersName": "Show for Players",
-    "SettingsShowSheetTab": "Character/NPC Sheet Tab",
-    "SettingsShowSheetTabHint": "Add a new tab on the character/npc sheets rather than adding a header button.",
-    "SheetTabs": {
-      "Advanced": "Advanced",
-      "Bonuses": "Bonuses",
-      "Configuration": "Configuration",
-      "Description": "Description",
-      "Filters": "Filters"
-    },
-    "MarkersDialog": {
-      "field": {
-        "label": "Markers",
-        "hint": "Apply markers to this document for the purpose of the 'Markers' filter."
       },
-      "title": "Apply Markers: {name}"
-    },
-    "ToggleBonus": "Toggle Bonus",
-    "Toggles": "Toggles",
-    "ATTACK": {
-      "Label": "Attack Rolls",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "label": "Attack Roll Bonus",
-            "hint": "Additional parts to add on top of the attack roll."
-          },
-          "criticalRange": {
-            "label": "Critical Range Modifier",
-            "hint": "An integer to subtract from the critical range of the attack roll. This field respects roll data, but not dice rolls."
-          },
-          "fumbleRange": {
-            "label": "Fumble Range Modifier",
-            "hint": "An integer to add to the fumble range of the attack roll. This field respects roll data, but not dice rolls."
+      "damageRoll": {
+        "Label": "Damage roll",
+        "Summary": "Before damage is rolled.",
+        "Help": "Fires while a damage roll is being prepared. Example: +1d6 fire damage with a flame tongue.",
+        "Phrase": {
+          "out": {
+            "Self": "when I roll damage",
+            "Other": "when {who} rolls damage"
           }
         }
-      }
-    },
-    "DAMAGE": {
-      "Label": "Damage Rolls",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "label": "Damage Roll Bonus",
-            "hint": "Additional parts to add on top of the damage roll."
-          },
-          "criticalBonusDamage": {
-            "hint": "Additional parts to add on top of the damage roll on critical hits.",
-            "label": "Extra Critical Hit Damage"
-          },
-          "criticalBonusDice": {
-            "hint": "An additional number of dice that should be rolled on a critical hit. This field respects roll data, but not dice rolls.",
-            "label": "Extra Critical Hit Dice"
-          },
-          "damageType": {
-            "hint": "The damage type of the parts added to the damage roll.",
-            "label": "Damage Type"
+      },
+      "saveDC": {
+        "Label": "Save DC",
+        "Summary": "When one of my activities forces a saving throw.",
+        "Help": "Changes the DC creatures must beat when my spell or feature forces a save. Example: +1 to spell save DC from a rod of the pact keeper.",
+        "Phrase": {
+          "out": {
+            "Self": "when I force a saving throw",
+            "Other": "when {who} forces a saving throw"
           }
         }
-      }
-    },
-    "HITDIE": {
-      "Label": "Hit Die Rolls",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "label": "Hit Die Roll Bonus",
-            "hint": "Additional parts to add on top of the hit die roll."
+      },
+      "savingThrow": {
+        "Label": "Saving throw",
+        "Summary": "Before a saving throw is rolled, including death and concentration saves.",
+        "Help": "Example: add the paladin's Charisma modifier to the saves of nearby allies.",
+        "Phrase": {
+          "out": {
+            "Self": "when I make a saving throw",
+            "Other": "when {who} makes a saving throw"
           }
         }
-      }
-    },
-    "SAVE": {
-      "Label": "Save DCs",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "hint": "An integer to add onto the DC of a saving throw. This field respects roll data, but not dice rolls.",
-            "label": "Save DC Bonus"
+      },
+      "abilityCheck": {
+        "Label": "Ability check",
+        "Summary": "Before an ability, skill or tool check.",
+        "Help": "Example: +1d4 to Stealth while wearing a cloak of elvenkind.",
+        "Phrase": {
+          "out": {
+            "Self": "when I make an ability check",
+            "Other": "when {who} makes an ability check"
           }
         }
-      }
-    },
-    "TEST": {
-      "Label": "Ability Checks",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "label": "Ability Check Bonus",
-            "hint": "Additional parts to add on top of the ability check."
+      },
+      "hitDie": {
+        "Label": "Hit die",
+        "Summary": "Before a hit die is rolled during a rest.",
+        "Help": "Example: reroll 1s on hit dice with the Durable feat.",
+        "Phrase": {
+          "out": {
+            "Self": "when I roll a hit die",
+            "Other": "when {who} rolls a hit die"
           }
         }
-      }
-    },
-    "THROW": {
-      "Label": "Saving Throws",
-      "FIELDS": {
-        "bonuses": {
-          "bonus": {
-            "hint": "Additional parts to add on top of the saving throw roll.",
-            "label": "Saving Throw Bonus"
+      },
+      "afterAttack": {
+        "Label": "After an attack",
+        "Summary": "When an attack roll is resolved: hit, miss, critical or fumble.",
+        "Help": "Use the outcome pins to react. With Midi QOL the hits come from its workflow; without it the roll is compared with the targets' AC. Example: on a hit, apply Poisoned.",
+        "Phrase": {
+          "hit": {
+            "Self": "when I hit with an attack",
+            "Other": "when {who} hits with an attack"
           },
-          "deathSaveCritical": {
-            "hint": "An integer to subtract from the threshold that decides when a Death Saving Throw results in restoring consciousness and 1 hit point. This field respects roll data, but not dice rolls.",
-            "label": "Death Save Critical Limit"
+          "miss": {
+            "Self": "when I miss with an attack",
+            "Other": "when {who} misses with an attack"
           },
-          "targetValue": {
-            "hint": "An integer to subtract from the minimum requirement to pass a saving throw. This field respects roll data, but not dice rolls.",
-            "label": "Target Value"
+          "crit": {
+            "Self": "when I score a critical hit",
+            "Other": "when {who} scores a critical hit"
+          },
+          "fumble": {
+            "Self": "when I fumble an attack",
+            "Other": "when {who} fumbles an attack"
           }
         }
+      },
+      "afterTargetSave": {
+        "Label": "After a target's save",
+        "Summary": "When a target resolves a save my activity asked for.",
+        "Help": "Example: when the target fails, knock it prone.",
+        "Phrase": {
+          "failed": {
+            "Self": "when a target fails a save against me",
+            "Other": "when a target fails a save against {who}"
+          },
+          "succeeded": {
+            "Self": "when a target succeeds on a save against me",
+            "Other": "when a target succeeds on a save against {who}"
+          }
+        }
+      },
+      "afterDamage": {
+        "Label": "After damage",
+        "Summary": "When my damage is applied to a target.",
+        "Help": "The \"Dropped to 0\" pin fires when the damage leaves the target at 0 HP. Example: gain temporary hit points when you drop a foe.",
+        "Phrase": {
+          "dealt": {
+            "Self": "when I deal damage",
+            "Other": "when {who} deals damage"
+          },
+          "dropped": {
+            "Self": "when I drop a target to 0 HP",
+            "Other": "when {who} drops a target to 0 HP"
+          }
+        }
+      },
+      "afterCheck": {
+        "Label": "After a check",
+        "Summary": "When my ability check with a known DC is resolved.",
+        "Help": "Only checks with a DC can succeed or fail. Example: on a failed Athletics check, gain a bonus to the next one.",
+        "Phrase": {
+          "success": {
+            "Self": "when I succeed on an ability check",
+            "Other": "when {who} succeeds on an ability check"
+          },
+          "failure": {
+            "Self": "when I fail an ability check",
+            "Other": "when {who} fails an ability check"
+          }
+        }
+      },
+      "signal": {
+        "Label": "Signal received",
+        "Summary": "When another blueprint sends a signal with this name.",
+        "Help": "Signals let one blueprint trigger another. The receiver sees the same roll and targets as the sender. Example: a \"smite\" signal shared by several items.",
+        "Phrase": "when the signal “{name}” arrives"
       }
     },
-    "Warning": {
-      "Consuming": {
-        "CurrencyUnavailable": "You do not have the required amount of that denomination.",
-        "EffectUnavailable": "The associated effect no longer exists.",
-        "HealthUnavailable": "You do not have enough hit points remaining.",
-        "HitdiceUnavailable": "You do not have enough hit dice remaining.",
-        "InspirationUnavailable": "You do not have inspiration.",
-        "QuantityUnavailable": "You do not have the required quantity of the associated item.",
-        "SlotsUnavailable": "You do not have any remaining spell slots of that level.",
-        "UsesUnavailable": "You do not have the required number of charges on the item."
-      }
-    },
-    "Blueprint": {
-      "Title": "Condition blueprints",
-      "Open": "Open blueprint",
-      "Subtitle": "Build, inspect and test your conditions",
-      "Catalog": "Node library",
-      "Search": "Find a condition…",
-      "Logic": "Logic",
-      "Conditions": "Conditions",
-      "Inspector": "Node details",
-      "SelectNode": "Select a node to edit its parameters and see an example.",
-      "ConnectHint": "Connect: output dot → input dot · Drag background to pan · Scroll to zoom",
-      "Condition": "Condition",
-      "and": "AND",
-      "or": "OR",
-      "not": "NOT",
-      "result": "Apply bonus",
-      "andHint": "Every connected condition must pass.",
-      "orHint": "At least one connected condition must pass.",
-      "notHint": "Invert one condition: true becomes false.",
-      "Add": "Add node",
-      "AddRepeat": "Add comparison",
-      "Remove": "Remove node",
-      "Save": "Save blueprint",
-      "Saved": "Saved",
-      "Unsaved": "Draft • unsaved",
-      "Discard": "Discard",
-      "CloseConfirm": "Discard unsaved blueprint changes? The saved bonus will remain unchanged.",
-      "Undo": "Undo",
-      "Redo": "Redo",
-      "Fit": "Fit graph",
-      "ZoomIn": "Zoom in",
-      "ZoomOut": "Zoom out",
-      "Validate": "Check graph",
-      "Valid": "Structure and required parameters are valid.",
-      "Invalid": "Fix the highlighted nodes before saving.",
-      "Diagnostics": "Diagnostics",
-      "Example": "Example",
-      "Context": "Reads",
-      "Empty": "Add conditions from the library.",
-      "Trial": "Trial run",
-      "TrialHint": "Choose the roll context. The trace explains which conditions pass, fail or cannot be evaluated.",
-      "Actor": "Actor",
-      "Item": "Item",
-      "Activity": "Activity",
-      "Target": "Target",
-      "None": "Not selected",
-      "Run": "Run trial",
-      "Pass": "Pass",
-      "Fail": "Fail",
-      "Unknown": "Unknown",
-      "Skipped": "Skipped",
-      "TrialLimit": "Checks conditions only. Does not apply damage, consume resources or verify aura range, bonus suppression or every possible game state. Custom scripts and formula comparisons are skipped.",
-      "ScriptSkipped": "Scripts never execute in a trial.",
-      "FormulaSkipped": "Formula comparisons may roll dice and are not executed in a trial.",
-      "MissingContext": "Required actor, item, activity, target or roll details are missing.",
-      "EvaluationError": "This condition could not be safely evaluated.",
-      "Connections": "Connections",
-      "Disconnect": "Disconnect",
-      "NoConnections": "No connections yet.",
-      "Parameters": "Set condition parameters",
-      "ResultHint": "Applies this bonus when the incoming logic is true.",
-      "SharedFilterHint": "Each condition type has one configuration. Repeated comparisons remain grouped inside that node.",
-      "SaveError": "Blueprint",
-      "PermissionDenied": "You do not have permission to edit this bonus.",
-      "Conflict": "This bonus changed after you opened the editor. Reopen it before saving to avoid overwriting those changes.",
-      "Layout": "Graph tools",
-      "Help": "Help",
-      "Back": "Back",
-      "NodeCount": "Nodes",
-      "Changes": "Changes",
-      "Configured": "Configured",
-      "SearchEmpty": "No matching conditions.",
-      "FilterError": "Fill in valid condition parameters.",
-      "SelectActor": "Choose an actor first.",
-      "UnsupportedGraph": "This saved graph has an unsupported format and cannot be overwritten here.",
-      "Input": "Input",
-      "Output": "Output",
-      "ActiveGraph": "A blueprint controls this bonus. Open it to inspect connections after editing conditions.",
-      "EffectsName": "Elemental interface effects",
-      "EffectsHint": "Show flames, sparks and other decorative node effects on this device. Changes apply immediately.",
-      "MotionName": "Interface animations",
-      "MotionHint": "Animate transitions and interactions on this device. Reduced-motion preferences also disable motion.",
-      "context": "Context",
-      "Yes": "Yes",
-      "No": "No",
-      "branch": "Branch",
-      "xor": "XOR",
-      "nand": "NAND",
-      "nor": "NOR",
-      "branchHint": "One input, two boolean outputs: Yes repeats the input; No inverts it. Unknown stays unknown on both. For example, connect an HP condition to split low/high health rules. Each output can feed several nodes. These are condition signals, not sequential actions.",
-      "xorHint": "Two inputs A/B, one output. Passes when exactly one input passes. For example: fire OR cold, but not both.",
-      "nandHint": "Two inputs A/B, one output. Fails only when both inputs pass. For example: disallow the bonus only when the actor is both blinded and frightened.",
-      "norHint": "Two inputs A/B, one output. Passes only when both inputs fail. For example: the actor is neither poisoned nor frightened.",
-      "inCombat": "Combat has started",
-      "inCombatHint": "Passes while the active combat encounter is started. Example: a bonus available in combat, but not during exploration. Does not test whose turn it is.",
-      "hasTarget": "Target is present",
-      "hasTargetHint": "Passes when this roll has a target with an actor. Example: require a target before evaluating its armor. The trial uses the selected target.",
-      "hasItem": "Item is present",
-      "hasItemHint": "Passes when this roll uses an item. Example: skip a bonus for an ordinary ability check without an item.",
-      "Issues": {
-        "Malformed": "The graph has an invalid or unsupported structure.",
-        "TooLarge": "Maximum: 256 nodes and 1024 connections.",
-        "DuplicateNode": "Duplicate node identifier.",
-        "UnknownFilter": "This condition is not supported for this bonus.",
-        "MissingParameters": "The condition has no configured value.",
-        "DuplicateFilter": "Use one node per condition type.",
-        "OmittedFilter": "A configured condition is missing from the graph. Add it from the library.",
-        "ResultCount": "The graph needs exactly one result node.",
-        "DanglingEdge": "A connection points to a missing node.",
-        "DuplicateEdge": "A connection is duplicated.",
-        "PortDirection": "Connections must run from an output to an input.",
-        "SingleInput": "Connect exactly one input.",
-        "MissingInput": "Connect at least one condition.",
-        "Cycle": "This connection creates a loop. Remove a connection to break it.",
-        "Disconnected": "This node does not reach the result.",
-        "FilterError": "Fill in valid condition parameters.",
-        "UnsupportedGraph": "This saved graph has an unsupported format and cannot be overwritten here.",
-        "BinaryInputs": "Connect exactly one source to each input A and B."
-      }
-    },
-    "ConditionHelp": {
-      "abilities": {
-        "example": "Select Strength: a Strength attack passes; a Dexterity attack does not.",
-        "context": "Ability used by the activity or check."
-      },
-      "actorCreatureSizes": {
-        "example": "Select Small: a Small actor passes; a Medium actor does not.",
-        "context": "Rolling actor's size."
-      },
-      "actorCreatureTypes": {
-        "example": "Select humanoid: a humanoid actor passes; an undead actor does not.",
-        "context": "Rolling actor's creature type."
-      },
-      "actorLanguages": {
-        "example": "Select Common: an actor who knows Common passes.",
-        "context": "Rolling actor's languages."
-      },
-      "arbitraryComparisons": {
-        "example": "Compare @abilities.str.mod >= 3: a modifier of +4 passes. Every comparison in the node must pass.",
-        "context": "Roll data, optionally @target; skipped during trial."
-      },
-      "attackModes": {
-        "example": "Select melee and weapon: a melee weapon attack passes; a ranged spell attack does not.",
-        "context": "Attack activity's type, classification and mode."
-      },
-      "baseArmors": {
-        "example": "Include heavy armor: an actor wearing heavy armor passes.",
-        "context": "Equipped armor and shields of the rolling actor."
-      },
-      "baseTools": {
-        "example": "Select thieves' tools: a check with those tools passes.",
-        "context": "Tool used for the check."
-      },
-      "baseWeapons": {
-        "example": "Select longsword: a longsword passes; a shortbow does not.",
-        "context": "Base weapon of the used item."
-      },
-      "creatureTypes": {
-        "example": "Select undead: an item belonging to an undead creature passes.",
-        "context": "The used item's actor; includes race identifiers where supported."
-      },
-      "customScripts": {
-        "example": "return actor.system.attributes.hp.value > 0; checks whether the actor has HP. Trial never executes the script.",
-        "context": "Actor, item, token, bonus, activity and details provided to the script."
-      },
-      "damageTypes": {
-        "example": "Include fire: an activity with a fire damage part passes. This condition does not add fire damage itself.",
-        "context": "Damage or healing parts of the activity."
-      },
-      "featureTypes": {
-        "example": "Select class feature: class features pass; racial features do not.",
-        "context": "Feature item's type and optional subtype."
-      },
-      "healthPercentages": {
-        "example": "Set 50% or lower: the rolling actor at 12/30 HP passes; at 20/30 HP does not. Exactly 50% passes.",
-        "context": "Rolling actor's HP percentage, excluding temporary HP."
+    "Check": {
+      "itemTypes": {
+        "Label": "Item type",
+        "Summary": "The item being used is of one of these types.",
+        "Help": "Example: only weapons and spells.",
+        "Phrase": "the item is a {values}"
       },
       "identifiers": {
-        "example": "Enter fireball: an item with identifier fireball passes, regardless of its translated name.",
-        "context": "Used item's system identifier."
+        "Label": "Item identifier",
+        "Summary": "The item's identifier is one of these.",
+        "Help": "Identifiers are the short names dnd5e gives items, such as longsword or fire-bolt. Example: fire-bolt.",
+        "Phrase": "the item identifier is {values}"
       },
-      "itemTypes": {
-        "example": "Select spell: spells pass; weapons do not.",
-        "context": "Used item's document type."
-      },
-      "markers": {
-        "example": "Require a target marker called hunted: a target carrying that BnA marker passes.",
-        "context": "BnA markers on actor/item/effects and optional target."
-      },
-      "preparationModes": {
-        "example": "Select prepared: prepared spell mode passes; innate mode does not.",
-        "context": "Spell preparation mode."
-      },
-      "proficiencyLevels": {
-        "example": "Select expertise: checks with double proficiency pass; normal proficiency does not.",
-        "context": "Proficiency multiplier for this specific roll."
-      },
-      "remainingSpellSlots": {
-        "example": "Set minimum 1: at least one remaining slot is required. Enable weighting to count slot levels.",
-        "context": "Remaining spell slots of the rolling actor."
-      },
-      "saveAbilities": {
-        "example": "Select Wisdom: a save DC calculated from Wisdom passes.",
-        "context": "Ability used to calculate the save DC, not the target's saving throw ability."
-      },
-      "skillIds": {
-        "example": "Include Stealth: Stealth checks pass; Perception checks do not.",
-        "context": "Skill identifier in roll details."
-      },
-      "sourceClasses": {
-        "example": "Select wizard: a spell associated with the wizard class passes.",
-        "context": "Class associated with the spell."
-      },
-      "spellComponents": {
-        "example": "Select verbal and somatic with ALL: the spell must have both components. ANY requires just one.",
-        "context": "Components of the used spell."
-      },
-      "spellLevels": {
-        "example": "Select level 1: a first-level spell passes; a cantrip does not.",
-        "context": "Used spell's level."
-      },
-      "spellSchools": {
-        "example": "Include evocation: an evocation spell passes.",
-        "context": "Used spell's school."
-      },
-      "statusEffects": {
-        "example": "Include poisoned: a poisoned rolling actor passes. Exclude poisoned to require its absence.",
-        "context": "Rolling actor's conditions, accounting for condition immunity."
-      },
-      "targetArmors": {
-        "example": "Include heavy armor: a target wearing heavy armor passes.",
-        "context": "Selected target's equipped armor and shields."
-      },
-      "targetEffects": {
-        "example": "Include prone: a prone target passes; a standing target does not.",
-        "context": "Selected target's conditions."
-      },
-      "throwTypes": {
-        "example": "Select concentration: concentration saving throws pass; ordinary saves do not.",
-        "context": "Saving throw ability or special type in roll details."
-      },
-      "tokenSizes": {
-        "example": "Set at least 2: a target token 2 squares wide passes; a 1-square token does not.",
-        "context": "Target token dimensions on the scene; optionally compared to the rolling token."
+      "baseWeapons": {
+        "Label": "Weapon",
+        "Summary": "The weapon's base type matches.",
+        "Help": "Example: longswords and shortswords, but not greatswords.",
+        "Phrase": "the weapon is a {values}"
       },
       "weaponProperties": {
-        "example": "Include finesse: a weapon with the finesse property passes.",
-        "context": "Properties of the used weapon."
+        "Label": "Weapon property",
+        "Summary": "The weapon has one of these properties.",
+        "Help": "Example: finesse or light weapons.",
+        "Phrase": "the weapon is {values}"
+      },
+      "attackModes": {
+        "Label": "Attack mode",
+        "Summary": "Melee or ranged, weapon or spell, and how the weapon was used.",
+        "Help": "Example: ranged weapon attacks made by throwing the weapon.",
+        "Phrase": "the attack is {values}",
+        "Field": {
+          "value": "Range",
+          "valueHint": "Melee or ranged.",
+          "classification": "Classification",
+          "classificationHint": "Weapon, spell or unarmed.",
+          "mode": "Mode",
+          "modeHint": "One-handed, two-handed, off-hand or thrown."
+        }
+      },
+      "featureTypes": {
+        "Label": "Feature type",
+        "Summary": "The feature is of this type and subtype.",
+        "Help": "Example: class features of the Channel Divinity subtype.",
+        "Phrase": "the feature is a {type}",
+        "PhraseSubtype": "the feature is a {type} ({subtype})",
+        "Field": {
+          "type": "Type",
+          "typeHint": "The dnd5e feature type.",
+          "subtype": "Subtype",
+          "subtypeHint": "Optional subtype key, e.g. channelDivinity."
+        }
+      },
+      "damageTypes": {
+        "Label": "Damage type",
+        "Summary": "The damage or healing includes one of these types.",
+        "Help": "Example: fire or cold, but not healing.",
+        "Phrase": "the damage is {values}"
+      },
+      "abilities": {
+        "Label": "Ability",
+        "Summary": "The roll uses one of these abilities.",
+        "Help": "Example: Strength-based attacks only.",
+        "Phrase": "the roll uses {values}"
+      },
+      "thisItem": {
+        "Label": "This item only",
+        "Summary": "The roll is made with the item that carries this blueprint.",
+        "Help": "Use it so a bonus on a sword does not apply to the axe in your other hand.",
+        "Phrase": "the roll uses this very item"
+      },
+      "spellLevels": {
+        "Label": "Spell level",
+        "Summary": "The spell is cast at one of these levels.",
+        "Help": "Example: cantrips only.",
+        "Phrase": "the spell level is {values}"
+      },
+      "spellSchools": {
+        "Label": "Spell school",
+        "Summary": "The spell belongs to one of these schools.",
+        "Help": "Example: evocation, as for the Empowered Evocation feature.",
+        "Phrase": "the spell is {values}"
+      },
+      "spellComponents": {
+        "Label": "Spell components",
+        "Summary": "The spell requires these components.",
+        "Help": "Example: spells with a verbal component.",
+        "Phrase": {
+          "any": "the spell has {values}",
+          "all": "the spell has all of {values}"
+        },
+        "Field": {
+          "types": "Components",
+          "typesHint": "Verbal, somatic, material and other spell properties.",
+          "match": "Require",
+          "matchHint": "Any one of them, or all of them."
+        }
+      },
+      "preparationModes": {
+        "Label": "Spellcasting method",
+        "Summary": "The spell is cast through one of these methods.",
+        "Help": "Example: pact magic only.",
+        "Phrase": "the spellcasting method is {values}"
+      },
+      "sourceClasses": {
+        "Label": "Spell source class",
+        "Summary": "The spell comes from one of these classes.",
+        "Help": "Enter class identifiers such as wizard or cleric.",
+        "Phrase": "the spell comes from {values}"
+      },
+      "actorCreatureTypes": {
+        "Label": "My creature type",
+        "Summary": "I am a creature of one of these types.",
+        "Help": "Example: undead player characters.",
+        "Phrase": "I am {values}"
+      },
+      "actorCreatureSizes": {
+        "Label": "My size",
+        "Summary": "I am one of these sizes.",
+        "Help": "Example: Small or Tiny.",
+        "Phrase": "my size is {values}"
+      },
+      "actorLanguages": {
+        "Label": "My languages",
+        "Summary": "I know one of these languages.",
+        "Help": "Example: creatures that speak Draconic.",
+        "Phrase": "I speak {values}"
+      },
+      "baseArmors": {
+        "Label": "My armor",
+        "Summary": "I wear one of these armors or shields.",
+        "Help": "Example: no heavy armor, for a Monk feature.",
+        "Phrase": "I wear {values}"
+      },
+      "statusEffects": {
+        "Label": "My conditions",
+        "Summary": "I have one of these conditions.",
+        "Help": "Condition immunities are respected. Example: while raging.",
+        "Phrase": "I am affected by {values}"
+      },
+      "healthPercentages": {
+        "Label": "My hit points",
+        "Summary": "My hit points are above or below a percentage.",
+        "Help": "Temporary hit points are not counted. Example: at most 50% for a Bloodied feature.",
+        "Phrase": {
+          "atMost": "I have at most {value}% of my hit points",
+          "atLeast": "I have at least {value}% of my hit points"
+        },
+        "PhraseAny": "my hit points are anything",
+        "Field": {
+          "value": "Percentage",
+          "valueHint": "From 0 to 100.",
+          "type": "Compare"
+        }
+      },
+      "remainingSpellSlots": {
+        "Label": "My spell slots",
+        "Summary": "I have a number of spell slots left within a range.",
+        "Help": "Example: at most 1 slot left, for a desperate-caster feature.",
+        "Phrase": {
+          "range": "I have {min}–{max} spell slots left",
+          "min": "I have at least {min} spell slots left",
+          "max": "I have at most {max} spell slots left"
+        },
+        "PhraseAny": "I have any number of spell slots",
+        "PhraseSize": "(counting slot levels)",
+        "Field": {
+          "min": "At least",
+          "minHint": "Leave empty for no lower limit.",
+          "max": "At most",
+          "maxHint": "Leave empty for no upper limit.",
+          "size": "Count slot levels",
+          "sizeHint": "A 3rd-level slot counts as 3."
+        }
+      },
+      "proficiencyLevels": {
+        "Label": "My proficiency",
+        "Summary": "I have this level of proficiency in the roll.",
+        "Help": "Example: expertise only.",
+        "Phrase": "my proficiency is {values}"
+      },
+      "markers": {
+        "Label": "My markers",
+        "Summary": "I, my item or my effects carry one of these markers.",
+        "Help": "Markers are simple tags that other blueprints and macros can set. Example: hexblade-curse.",
+        "Phrase": "I carry the marker {values}"
+      },
+      "creatureTypes": {
+        "Label": "Target creature type",
+        "Summary": "The target is a creature of one of these types.",
+        "Help": "Example: undead or fiends.",
+        "Phrase": "the target is {values}"
+      },
+      "targetArmors": {
+        "Label": "Target armor",
+        "Summary": "The target wears one of these armors.",
+        "Help": "Example: targets in metal armor.",
+        "Phrase": "the target wears {values}"
+      },
+      "targetEffects": {
+        "Label": "Target conditions",
+        "Summary": "The target has one of these conditions.",
+        "Help": "Example: a bonus against prone targets.",
+        "Phrase": "the target is affected by {values}"
+      },
+      "tokenSizes": {
+        "Label": "Target size",
+        "Summary": "The target's token is at least or at most a size.",
+        "Help": "Example: Large or bigger, for Giant Killer.",
+        "Phrase": {
+          "atMost": "the target is at most {size}×{size} squares",
+          "atLeast": "the target is at least {size}×{size} squares"
+        },
+        "PhraseAny": "the target is any size",
+        "PhraseSelf": "(compared with my size)",
+        "Field": {
+          "size": "Squares",
+          "sizeHint": "Token width in grid squares, e.g. 2 for Large.",
+          "type": "Compare",
+          "self": "Compare with my size",
+          "selfHint": "Use my own token as the bound when it is stricter."
+        }
+      },
+      "targetMarkers": {
+        "Label": "Target markers",
+        "Summary": "The target carries one of these markers.",
+        "Help": "Example: hunters-mark.",
+        "Phrase": "the target carries the marker {values}"
+      },
+      "saveAbilities": {
+        "Label": "Save DC ability",
+        "Summary": "The DC of the save my activity forces is set by one of these abilities.",
+        "Help": "Example: a Battle Master who sets maneuver DCs with Dexterity. For spells, the spellcasting ability counts.",
+        "Phrase": "the save DC uses {values}"
+      },
+      "throwTypes": {
+        "Label": "Saving throw type",
+        "Summary": "The saving throw is of one of these kinds.",
+        "Help": "Includes death saves and concentration. Example: concentration only.",
+        "Phrase": "the saving throw is {values}"
+      },
+      "skillIds": {
+        "Label": "Skill",
+        "Summary": "The check uses one of these skills.",
+        "Help": "Example: Stealth and Sleight of Hand.",
+        "Phrase": "the skill is {values}"
+      },
+      "baseTools": {
+        "Label": "Tool",
+        "Summary": "The check uses one of these tools.",
+        "Help": "Example: thieves' tools.",
+        "Phrase": "the tool is {values}"
+      },
+      "arbitraryComparisons": {
+        "Label": "Compare values",
+        "Summary": "Compare two formulas; every comparison must hold.",
+        "Help": "Formulas can use roll data such as @abilities.str.mod and @target.attributes.ac.value. Example: @target.attributes.hp.value < 10.",
+        "Phrase": "{values}",
+        "PhraseAny": "no comparisons are set",
+        "Field": {
+          "comparisons": "Comparisons",
+          "comparisonsHint": "Left value, operator, right value."
+        }
+      },
+      "customScripts": {
+        "Label": "Custom script",
+        "Summary": "A JavaScript snippet that returns true or false.",
+        "Help": "For advanced users. The GM can disable scripts in the module settings.",
+        "Phrase": "the custom script allows it",
+        "Field": {
+          "script": "Script",
+          "scriptHint": "Available variables: actor, item, activity, target, details."
+        }
       }
+    },
+    "Result": {
+      "rollBonus": {
+        "Label": "Roll bonus",
+        "Summary": "Add a formula to the roll.",
+        "Help": "On damage rolls the bonus can have a damage type. Example: +1d6 fire.",
+        "Phrase": "{formula} to the roll",
+        "PhraseTyped": "{formula} {types} damage",
+        "Field": {
+          "formula": "Bonus",
+          "formulaHint": "A number, dice or roll data, e.g. 1d4 or @abilities.cha.mod.",
+          "damageTypes": "Damage type",
+          "damageTypesHint": "Several types let the player pick one."
+        }
+      },
+      "dcBonus": {
+        "Label": "Save DC bonus",
+        "Summary": "Raise or lower the DC of the save I force.",
+        "Help": "Example: +1 from a rod of the pact keeper.",
+        "Phrase": "{formula} to the save DC",
+        "Field": {
+          "formula": "DC change",
+          "formulaHint": "Positive raises the DC, negative lowers it."
+        }
+      },
+      "diceModifiers": {
+        "Label": "Dice modifiers",
+        "Summary": "Reroll, explode, clamp or resize the dice.",
+        "Help": "Example: Great Weapon Fighting rerolls 1s and 2s once.",
+        "Phrase": "dice: {list}",
+        "PhraseEmpty": "dice unchanged",
+        "Short": {
+          "amount": "{mode}{value} dice",
+          "size": "{mode}{value} faces",
+          "reroll": "reroll {value}",
+          "explode": "explode on {value}",
+          "minimum": "minimum {value}",
+          "maximum": "maximum {value}",
+          "maximize": "maximized"
+        },
+        "Field": {
+          "amount": "Number of dice",
+          "amountHint": "Change how many dice are rolled.",
+          "size": "Die size",
+          "sizeHint": "Change the number of faces.",
+          "reroll": "Reroll",
+          "rerollHint": "Reroll dice at or below the threshold.",
+          "explode": "Explode",
+          "explodeHint": "Roll an extra die when a die reaches the threshold.",
+          "minimum": "Minimum",
+          "minimumHint": "No die rolls lower than this.",
+          "maximum": "Maximum",
+          "maximumHint": "No die rolls higher than this.",
+          "enabled": "Enabled",
+          "mode": "Operation",
+          "value": "Value",
+          "threshold": "Threshold",
+          "invert": "Reroll at or above instead",
+          "recursive": "Keep rerolling",
+          "limit": "Limit",
+          "once": "Explode at most once",
+          "minimumValue": "Lowest result",
+          "maximize": "Maximize dice",
+          "maximumValue": "Highest result",
+          "zero": "Allow zero",
+          "firstOnly": "First dice only",
+          "firstOnlyHint": "Change only the first dice in the formula."
+        }
+      },
+      "critRange": {
+        "Label": "Critical range",
+        "Summary": "Widen or narrow critical hits and fumbles.",
+        "Help": "Example: -1 for Improved Critical (critical hits on 19–20).",
+        "PhraseCritical": "{value} to the critical range",
+        "PhraseFumble": "{value} to the fumble range",
+        "PhraseEmpty": "critical ranges unchanged",
+        "Field": {
+          "critical": "Critical threshold change",
+          "criticalHint": "Negative numbers make critical hits easier.",
+          "fumble": "Fumble threshold change",
+          "fumbleHint": "Positive numbers make fumbles more likely."
+        }
+      },
+      "critDamage": {
+        "Label": "Critical damage",
+        "Summary": "Extra dice or damage on critical hits.",
+        "Help": "Example: +1 extra die for Brutal Critical.",
+        "Phrase": "on a critical hit: {list}",
+        "PhraseDice": "{value} extra dice",
+        "PhraseDamage": "{value} damage",
+        "PhraseEmpty": "critical damage unchanged",
+        "Field": {
+          "dice": "Extra dice",
+          "diceHint": "How many extra weapon dice to roll.",
+          "damage": "Extra damage",
+          "damageHint": "A formula added only on a critical hit."
+        }
+      },
+      "saveThresholds": {
+        "Label": "Save thresholds",
+        "Summary": "Change what counts as a success or a critical death save.",
+        "Help": "Example: death saves succeed on 8 or higher (-2 to the threshold).",
+        "PhraseTarget": "{value} to the success threshold",
+        "PhraseDeath": "{value} to the death save critical threshold",
+        "PhraseEmpty": "thresholds unchanged",
+        "Field": {
+          "targetValue": "Success threshold change",
+          "targetValueHint": "Negative numbers make success easier.",
+          "deathSaveCritical": "Death save critical change",
+          "deathSaveCriticalHint": "Negative numbers make a critical death save easier."
+        }
+      },
+      "reminder": {
+        "Label": "Reminder",
+        "Summary": "Show a note in the roll dialog.",
+        "Help": "Nothing is applied automatically. Example: \"You have advantage against being charmed.\"",
+        "Phrase": "remind: “{text}”",
+        "Field": {
+          "text": "Text",
+          "textHint": "Shown to the player while rolling."
+        }
+      },
+      "rider": {
+        "Label": "Bonus to a later roll",
+        "Summary": "Carry a roll change forward to a later roll.",
+        "Help": "Example: after a hit, +2d6 to this attack's damage roll.",
+        "Phrase": {
+          "sameActivation": "{effect} for the rest of this activation",
+          "nextRoll": "{effect} on the next {roll} ({who})"
+        },
+        "PhraseNoEffect": "an unset change",
+        "Duration": {
+          "uses": "for {value} uses",
+          "rounds": "for {value} round(s)",
+          "turns": "for {value} turn(s)",
+          "untilRest": "until a rest"
+        },
+        "Field": {
+          "effect": "Change",
+          "effectHint": "The roll change to carry forward.",
+          "scope": "Applies to",
+          "scopeHint": "The rest of this activation, or the next roll of a kind.",
+          "roll": "Roll",
+          "who": "Whose roll",
+          "duration": "Lasts",
+          "durationHint": "When the change expires if it is not used.",
+          "unit": "Unit",
+          "value": "Amount"
+        }
+      },
+      "applyEffect": {
+        "Label": "Apply effect",
+        "Summary": "Apply a condition or one of this item's effects.",
+        "Help": "Changes to other creatures are made by the GM's client. Example: on a failed save, apply Frightened.",
+        "Phrase": "apply “{effect}” to {who}",
+        "Field": {
+          "source": "Effect",
+          "sourceHint": "A condition from the list, or an effect stored on this item.",
+          "status": "Condition",
+          "effectId": "Item effect",
+          "effectIdHint": "Effects defined on the item that carries this blueprint.",
+          "who": "Apply to"
+        }
+      },
+      "removeEffect": {
+        "Label": "Remove effect",
+        "Summary": "Remove a condition or a named effect.",
+        "Help": "Example: when you hit, end your own Invisible condition.",
+        "Phrase": "remove “{effect}” from {who}",
+        "Field": {
+          "match": "Remove",
+          "status": "Condition",
+          "name": "Effect name",
+          "nameHint": "The exact name of the effect.",
+          "who": "From"
+        }
+      },
+      "resource": {
+        "Label": "Resources",
+        "Summary": "Spend or restore uses, slots, hit points and more.",
+        "Help": "Example: on a kill, gain 5 temporary hit points.",
+        "Phrase": "{action} {amount} {resource} ({who})",
+        "SlotLevel": "{level} spell slots",
+        "Field": {
+          "action": "Action",
+          "resource": "Resource",
+          "slotLevel": "Slot level",
+          "currency": "Currency",
+          "amount": "Amount",
+          "amountHint": "A number or a formula.",
+          "who": "Whose"
+        }
+      },
+      "signal": {
+        "Label": "Send signal",
+        "Summary": "Trigger blueprints listening for this signal.",
+        "Help": "Receivers run with the same roll and targets. Example: one \"smite\" chain shared by several weapons.",
+        "Phrase": "send the signal “{name}”",
+        "Field": {
+          "name": "Signal name",
+          "nameHint": "Must match the receiver exactly.",
+          "scope": "Reaches",
+          "scopeHint": "Blueprints on my whole actor, or only on this document."
+        }
+      }
+    },
+    "Palette": {
+      "condition": {
+        "Label": "Condition",
+        "Summary": "Check the item, the target, the roll or me before continuing."
+      }
+    },
+    "UI": {
+      "Rail": {
+        "title": "Blueprints",
+        "label": "Blueprints on this document",
+        "create": "New blueprint",
+        "untitled": "Untitled blueprint",
+        "noChain": "Not connected yet",
+        "disabled": "Off",
+        "duplicate": "Duplicate “{name}”",
+        "copyName": "{name} (copy)",
+        "turnOn": "Turn on “{name}”",
+        "turnOff": "Turn off “{name}”",
+        "remove": "Delete “{name}”…",
+        "confirmDelete": "Delete “{name}”? This cannot be undone.",
+        "delete": "Delete",
+        "keep": "Keep",
+        "templates": "From a template",
+        "library": "Library",
+        "search": "Search blueprints",
+        "searchPlaceholder": "Name or effect",
+        "searchEmpty": "No blueprint matches.",
+        "saveToLibrary": "Save “{name}” to the library",
+        "savedToLibrary": "Saved to the library",
+        "moveToEffect": "Move “{name}” to a new effect",
+        "more": "More actions for “{name}”",
+        "menuDuplicate": "Duplicate",
+        "menuSave": "Save to the library",
+        "menuMove": "Move to a new effect"
+      },
+      "Toolbar": {
+        "label": "Canvas tools",
+        "add": "Add node (Space)",
+        "layout": "Tidy layout",
+        "fit": "Fit to view",
+        "undo": "Undo (Ctrl+Z)",
+        "redo": "Redo (Ctrl+Y)",
+        "test": "Show a test run",
+        "testStop": "Hide the test run",
+        "themeDark": "Switch to the dark theme",
+        "themeLight": "Switch to the light theme",
+        "fxFull": "Effects: full",
+        "fxReduced": "Effects: reduced",
+        "fxOff": "Effects: off",
+        "tour": "Show the guide"
+      },
+      "Palette": {
+        "label": "Add a node",
+        "search": "Search nodes",
+        "placeholder": "Damage, target, aura…",
+        "empty": "No node matches “{query}”. Try another word.",
+        "fromHint": "Only nodes that can follow this output are shown."
+      },
+      "Inspector": {
+        "label": "Node settings",
+        "emptyTitle": "Select a node",
+        "emptyBody": "Click a node on the canvas to edit it, or press Space to add one.",
+        "help": "Show help",
+        "hideHelp": "Hide help",
+        "delete": "Delete node",
+        "checks": "Checks",
+        "addCheck": "Add check",
+        "removeCheck": "Remove check",
+        "searchChecks": "Search checks",
+        "noChecks": "Add the first check. Without checks this node always passes.",
+        "irrelevantCheck": "This check never passes after the events wired into this node.",
+        "common": "Player choice and limits",
+        "unknown": "This node type is not available in this version."
+      },
+      "Field": {
+        "none": "Not set",
+        "include": "Matches",
+        "exclude": "Excluded",
+        "addTag": "Add",
+        "tagPlaceholder": "longsword",
+        "removeTag": "Remove {value}",
+        "addComparison": "Add comparison",
+        "removeComparison": "Remove comparison",
+        "one": "Left value",
+        "operator": "Operator",
+        "other": "Right value",
+        "filter": "Filter values",
+        "embeddedNone": "Choose a change",
+        "on": "On",
+        "off": "Off"
+      },
+      "Node": {
+        "feet": "{value} ft",
+        "noChecksTitle": "No checks yet",
+        "noChecks": "Always passes",
+        "moreChecks": "and {count} more",
+        "signal": "Signal “{name}”",
+        "optional": "Player's choice",
+        "passed": "Passed",
+        "failed": "Not passed",
+        "skipped": "Not reached",
+        "unknown": "Unknown node"
+      },
+      "Stamp": {
+        "label": "Blueprint title block",
+        "name": "Blueprint name",
+        "namePlaceholder": "Flame tongue",
+        "carrier": "Carrier",
+        "status": "This blueprint",
+        "on": "On",
+        "off": "Off",
+        "emptyPhrase": "Connect an event to a result to see what this blueprint does.",
+        "saved": "Saved",
+        "saving": "Saving…",
+        "issues": "Issues",
+        "noIssues": "None",
+        "showIssues": "Show issues (errors: {errors}, warnings: {warnings}, notes: {notes})",
+        "effect": "Carried by an effect",
+        "effectActive": "Active: the blueprint works",
+        "effectDisabled": "Off: the blueprint does not work now",
+        "effectSuppressed": "Suppressed: the item is not equipped, or the effect does not apply to its actor",
+        "effectDisableWhen": "Turns off while {condition}",
+        "effectRemoveUnless": "Removed unless {condition}",
+        "effectEndsOn": "Ends on: {list}",
+        "effectConfig": "Effect settings",
+        "effectExpired": "Ended: its duration is over, for example by a DAE special duration; the blueprint does not work",
+        "onWaiting": "On, waiting"
+      },
+      "Canvas": {
+        "label": "Blueprint canvas",
+        "nodeHelp": "Press Enter or Space to select a node, then use the arrow keys to move it. Delete removes it; Ctrl+D duplicates it; Escape cancels.",
+        "edgeHelp": "Press Enter or Space to select a wire. Delete removes it; Escape cancels.",
+        "moved": "Moved the node {direction}. Position: {x}, {y}.",
+        "direction": {
+          "up": "up",
+          "down": "down",
+          "left": "left",
+          "right": "right"
+        },
+        "minimap": "Overview map",
+        "pin": "Pin",
+        "wire": "Wire from “{from}” ({pin}) to “{to}”"
+      },
+      "Stage": {
+        "emptyTitle": "Build your first blueprint",
+        "emptyBody": "A blueprint connects an event to results, with checks in between when you need them."
+      },
+      "Lint": {
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Note"
+      },
+      "Drawer": {
+        "label": "Test and issues",
+        "test": "Test",
+        "issues": "Issues",
+        "issuesCount": "Issues ({count})",
+        "close": "Close the panel"
+      },
+      "Issues": {
+        "empty": "No issues. Wiring, formulas and signals are checked as you edit.",
+        "blueprint": "Whole blueprint"
+      },
+      "Sim": {
+        "setup": "Test setup",
+        "actor": "Who rolls",
+        "item": "Item and activity",
+        "noItem": "No item",
+        "target": "Target",
+        "noTarget": "No target",
+        "event": "Event",
+        "outcome": "Outcome",
+        "ability": "Ability",
+        "skill": "Skill",
+        "noSkill": "No skill (ability check)",
+        "applies": "Would apply: {count}",
+        "nothing": "Nothing would apply",
+        "whyNot": "Why not?",
+        "path": "Path taken",
+        "noActors": "Add an actor to the world to test with.",
+        "noEvents": "Add an event to test this blueprint.",
+        "failed": "The test could not run: {message}",
+        "noteSuppressed": "The carrier is switched off (an unequipped item or an inactive effect), so this blueprint is ignored in play.",
+        "noteNoToken": "The actor has no token on this scene, so auras, templates and regions cannot reach it."
+      },
+      "Formula": {
+        "suggestions": "Roll data",
+        "preview": "= {value}",
+        "invalid": "This formula cannot be read."
+      },
+      "Coach": {
+        "canvasTitle": "Build on the canvas",
+        "canvasBody": "Right-click the canvas or press Space to add a node. Drag from a pin to wire it to the next node; drop a wire on empty space to pick what comes next.",
+        "inspectorTitle": "Set up the selected node",
+        "inspectorBody": "Every field explains itself. The ? button shows an example.",
+        "stampTitle": "Read it back",
+        "stampBody": "The title block says in plain words what this blueprint does and marks anything to fix.",
+        "testTitle": "Test before the session",
+        "testBody": "▶ runs the blueprint on an actor and target you choose and shows why each check passed or failed.",
+        "next": "Next",
+        "done": "Done",
+        "skip": "Skip the guide",
+        "count": "{step} of {total}"
+      },
+      "Picker": {
+        "label": "Start from a template",
+        "presets": "Templates",
+        "library": "Library",
+        "search": "Search templates",
+        "searchPlaceholder": "Smite, aura, hex…",
+        "empty": "Nothing matches “{query}”.",
+        "emptyLibrary": "The library is empty. Save a blueprint to it from the list, or import a JSON file.",
+        "close": "Close",
+        "remove": "Remove “{name}” from the library",
+        "confirmRemove": "Remove for good",
+        "exportOne": "Export “{name}” as JSON",
+        "exportAll": "Export the library",
+        "import": "Import JSON…",
+        "imported": "Imported {count} blueprint(s).",
+        "importFailed": "This file is not JSON. Choose a file exported from Build-n-Action."
+      }
+    },
+    "Reason": {
+      "empty": "Nothing is selected, so this always passes.",
+      "matched": "Matches: {actual}.",
+      "notMatched": "{actual} is not one of: {expected}.",
+      "excluded": "{actual} is excluded.",
+      "noTarget": "There is no target.",
+      "noItem": "The roll has no item.",
+      "noActivity": "The roll has no activity of that kind.",
+      "notSpell": "The item is not a spell.",
+      "notWeapon": "The item is not a weapon.",
+      "notFeature": "The item is a {actual}, not a feature.",
+      "noValue": "This roll does not provide that value.",
+      "threshold": "{actual} does not meet {expected}.",
+      "comparisonFailed": "{left} {operator} {right} is not true.",
+      "scriptFalse": "The script returned false.",
+      "scriptError": "The script stopped with an error.",
+      "scriptDisabled": "Scripts are turned off in the module settings, so this passes.",
+      "otherItem": "The roll uses a different item.",
+      "noChecks": "No checks, so this always passes.",
+      "disabled": "The blueprint is turned off.",
+      "outOfReach": "The roller is out of reach: {actual}.",
+      "limitUsed": "Already used in this period."
+    },
+    "Lint": {
+      "orphan-node": "Nothing leads into this node, so it never runs.",
+      "dead-event": "This event does not lead to any result.",
+      "incompatible-result": "This result cannot follow the “{event}” event.",
+      "irrelevant-check": "This check never passes after the “{event}” event.",
+      "invalid-formula": "The formula “{formula}” is not valid.",
+      "unknown-path": "{path} does not exist in the roll data.",
+      "contradiction": "This check contradicts an earlier check of the same kind, so the condition can never pass.",
+      "signal-unmatched": "No blueprint here both sends and receives the signal “{name}”.",
+      "cost-without-optional": "A cost needs “Ask the player” turned on.",
+      "migrated": "Converted from the previous version. Check that it works as expected."
+    },
+    "Migration": {
+      "Warning": {
+        "invalidId": "The bonus had an invalid id and received a new one.",
+        "unknownFilter": "The filter “{filter}” is not supported and was left out.",
+        "unknownType": "The bonus type “{type}” is not supported and was not converted."
+      },
+      "title": "Migrate the world to blueprints",
+      "intro": "Converts every v1 bonus in this world's actors, items, effects, regions and templates into a blueprint. The originals are kept as backups until you delete them, and running this again converts nothing twice. Start with a scan: it changes nothing.",
+      "packs": "Also include these compendiums",
+      "locked": "locked; unlocked for the run",
+      "scan": "Scan",
+      "scanSummary": "Found {documents} document(s) with v1 bonuses: {converted} will convert, {failed} cannot be read.",
+      "doneSummary": "Migrated {documents} document(s): {converted} bonus(es) converted, {failed} left as they were, {errors} error(s).",
+      "nothing": "No v1 bonuses left to convert.",
+      "entry": "{type}: {converted} converted, {failed} not readable",
+      "entryError": "Not migrated: {error}",
+      "back": "Back",
+      "run": "Migrate now",
+      "running": "Migrating… {done} of {total}",
+      "deleteBackups": "Delete backups",
+      "deleteBackupsConfirm": "Delete the kept v1 originals from every document? Converted blueprints stay. This cannot be undone.",
+      "backupsDeleted": "Deleted the backups of {count} document(s)."
+    },
+    "Storage": {
+      "invalidBlueprint": "A saved blueprint is damaged and was skipped (problem at “{path}”)."
+    },
+    "Setting": {
+      "disableScripts": {
+        "name": "Turn off script checks",
+        "hint": "Script checks in conditions pass without running their code. Turn this on if you do not trust scripts in shared content."
+      },
+      "fumbleBelowOne": {
+        "name": "Allow removing fumbles",
+        "hint": "Blueprints may lower the fumble range below 1, so a natural 1 is no longer a fumble."
+      },
+      "padAuraRadius": {
+        "name": "Measure auras from the token's edge",
+        "hint": "On gridless scenes, add half the source token's size to aura ranges, as gridded scenes always do."
+      },
+      "showAuraRanges": {
+        "name": "Show aura ranges",
+        "hint": "Draw aura shapes on the canvas while a roll checks them."
+      },
+      "allowPlayers": {
+        "name": "Let players edit blueprints",
+        "hint": "Players can open the blueprint editor on documents they own. The GM can always edit."
+      },
+      "headerLabel": {
+        "name": "Show the Blueprints button in the title bar",
+        "hint": "Besides the entry in each sheet's header menu, show a Blueprints button in the window's title bar."
+      },
+      "migration": {
+        "name": "Migrate the world",
+        "label": "Open the migration",
+        "hint": "Convert every v1 bonus in the world (and chosen compendiums) into blueprints, with a dry run first."
+      },
+      "showSheetTab": {
+        "name": "Blueprints tab on character sheets",
+        "hint": "Kept from v1 for a later version; it has no effect yet."
+      }
+    },
+    "Runtime": {
+      "NotFound": "That blueprint no longer exists.",
+      "Enabled": "{name} is on.",
+      "Disabled": "{name} is off.",
+      "NoGM": "No GM is online, so a blueprint could not change a creature you do not own.",
+      "RemoteFailed": "The GM could not make every change a blueprint asked for. See the console for details."
+    },
+    "Panel": {
+      "Apply": "Apply",
+      "Spend": "Spend and apply",
+      "Applied": "Applied",
+      "Amount": "How much to spend",
+      "DamageType": "Damage type",
+      "Option": "{amount} {resource} ({available})",
+      "CannotPay": "This cost can no longer be paid.",
+      "Reminder": "Reminder"
+    },
+    "Reaction": {
+      "Title": "{name}: blueprint choices",
+      "Done": "Done"
+    },
+    "Editor": {
+      "title": "Blueprints: {name}",
+      "loadFailed": "The blueprint editor could not load. The console (F12) has the details.",
+      "saveFailed": "A blueprint could not be saved. Your edit is still in the editor; the console (F12) has the details.",
+      "noPermission": "You cannot edit blueprints on this document."
+    },
+    "Header": {
+      "label": "Blueprints",
+      "labelCount": "Blueprints ({count})"
+    },
+    "Preset": {
+      "bless": {
+        "name": "Bless",
+        "description": "Put it on the blessed creature's effect: +1d4 to attack rolls and saving throws."
+      },
+      "bane": {
+        "name": "Bane",
+        "description": "Put it on the effect of each creature under Bane: −1d4 to attack rolls and saving throws."
+      },
+      "hex": {
+        "name": "Hex",
+        "description": "+1d6 necrotic damage against a target that carries the marker “hex”. Give the cursed creature an effect with that marker."
+      },
+      "huntersMark": {
+        "name": "Hunter's Mark",
+        "description": "+1d6 force damage on weapon attacks against a target with the marker “hunters-mark”."
+      },
+      "sneakAttack": {
+        "name": "Sneak Attack",
+        "description": "Once per turn, add your Sneak Attack dice to a finesse or ranged weapon attack. The player decides in the roll dialog."
+      },
+      "greatWeapon": {
+        "name": "Great Weapon Fighting",
+        "description": "With a two-handed or versatile weapon held in two hands, damage dice that roll 1 or 2 count as 3."
+      },
+      "archery": {
+        "name": "Archery Fighting Style",
+        "description": "+2 to attack rolls with ranged weapons."
+      },
+      "brutalCritical": {
+        "name": "Brutal Critical",
+        "description": "One extra weapon die on a critical hit with a melee weapon."
+      },
+      "lucky": {
+        "name": "Lucky",
+        "description": "Reminds the player of Luck Points on attack rolls, ability checks and saving throws.",
+        "reminder": "Lucky: spend a Luck Point to roll with advantage."
+      },
+      "auraOfProtection": {
+        "name": "Aura of Protection",
+        "description": "Allies within 10 ft add your Charisma modifier (at least +1) to saving throws while you are not incapacitated."
+      },
+      "divineSmite": {
+        "name": "Divine Smite",
+        "description": "On a melee weapon hit, spend a spell slot for 2d8 radiant damage, +1d8 per slot level above 1st. Against fiends and undead, also take the second choice for +1d8."
+      },
+      "colossusSlayer": {
+        "name": "Colossus Slayer",
+        "description": "Once per turn, +1d8 weapon damage against a target that is below its hit point maximum."
+      },
+      "poisonedBlade": {
+        "name": "Poisoned Blade",
+        "description": "On a hit against a living creature, the player may poison the target, once per turn."
+      },
+      "vampiricStrike": {
+        "name": "Vampiric Strike",
+        "description": "When your damage drops a creature to 0 hit points, gain temporary hit points equal to your proficiency bonus."
+      }
+    },
+    "Library": {
+      "imported": "Imported {count} blueprint(s) into the library; {rejected} entry(ies) could not be read.",
+      "importFailed": "This file is not JSON. Choose a file exported from Build-n-Action."
+    },
+    "Effects": {
+      "moved": "“{name}” now lives on a new effect. Set its conditions and durations in the window that opened."
     }
   }
 }

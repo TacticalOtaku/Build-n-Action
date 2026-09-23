@@ -1,70 +1,71 @@
 {
-    "id": "build-n-action",
-    "title": "Build-n-Action",
-    "version": "1.0.7",
-    "authors": [
-        {
-            "name": "TacticalOtaku"
+  "id": "build-n-action",
+  "title": "Build-n-Action",
+  "description": "Blueprints: When → If → Then graphs that change rolls and react to their outcome.",
+  "version": "2.0.0",
+  "authors": [
+    {
+      "name": "TacticalOtaku"
+    }
+  ],
+  "compatibility": {
+    "minimum": "14.367",
+    "verified": "14.367",
+    "maximum": "14"
+  },
+  "esmodules": [
+    "module.mjs"
+  ],
+  "styles": [
+    "module.css"
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "compatibility": {
+          "minimum": "5.3.3",
+          "verified": "5.3.3",
+          "maximum": "5.3.3"
         }
+      }
     ],
-    "compatibility": {
-        "minimum": "14.363",
-        "maximum": "14.367",
-        "verified": "14.367"
-    },
-    "esmodules": [
-        "module.mjs"
-    ],
-    "styles": [
-        "module.css"
-    ],
-    "relationships": {
-        "systems": [
-            {
-                "id": "dnd5e",
-                "type": "system",
-                "compatibility": {
-                    "minimum": "5.3.3",
-                    "maximum": "5.3.3",
-                    "verified": "5.3.3"
-                }
-            }
-        ],
-        "recommends": [
-            {
-                "id": "midi-qol",
-                "type": "module",
-                "compatibility": {
-                    "minimum": "14.0.10",
-                    "verified": "14.0.11"
-                }
-            },
-            {
-                "id": "dae",
-                "type": "module",
-                "compatibility": {
-                    "minimum": "14.0.12",
-                    "verified": "14.0.12"
-                }
-            }
-        ]
-    },
-    "languages": [
-        {
-            "lang": "en",
-            "name": "English",
-            "path": "lang/en.json",
-            "flags": {}
-        },
-        {
-            "lang": "ru",
-            "name": "Русский",
-            "path": "lang/ru.json",
-            "flags": {}
+    "recommends": [
+      {
+        "id": "midi-qol",
+        "type": "module",
+        "compatibility": {
+          "minimum": "14.0.12",
+          "verified": "14.0.12"
         }
-    ],
-    "url": "https://github.com/TacticalOtaku/Build-n-Action",
-    "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
-    "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v1.0.7/build-n-action-v1.0.7.zip",
-    "socket": true
+      },
+      {
+        "id": "dae",
+        "type": "module",
+        "compatibility": {
+          "minimum": "14.0.14",
+          "verified": "14.0.14"
+        }
+      }
+    ]
+  },
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    },
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "lang/ru.json",
+      "flags": {}
+    }
+  ],
+  "url": "https://github.com/TacticalOtaku/Build-n-Action",
+  "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
+  "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.0.0/build-n-action-v2.0.0.zip",
+  "socket": true
 }
