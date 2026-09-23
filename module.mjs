@@ -1,10603 +1,1669 @@
-/**
- * Numeric values of the dice-modifier modes. MODULE.MODIFIER_MODES maps these to
- * localized labels for the schema choices and is mutated into localized strings on
- * i18nInit, so comparisons must use these values and never that label map.
- */
-const MODIFIER_MODE = Object.freeze({
-  ADD: 0,
-  MULTIPLY: 1
-});
-
-/* -------------------------------------------------- */
-
-const MODULE = {
-  ID: "build-n-action",
-  NAME: "Build-n-Action",
-  ICON: "fa-solid fa-wand-magic-sparkles",
-  CONSUMPTION_TYPES: {
-    currency: "DND5E.Currency",
-    effect: "BUILD_N_ACTION.FIELDS.consume.type.optionEffect",
-    health: "DND5E.HitPoints",
-    hitdice: "DND5E.HitDice",
-    inspiration: "DND5E.Inspiration",
-    quantity: "DND5E.Quantity",
-    slots: "BUILD_N_ACTION.FIELDS.consume.type.optionSlots",
-    uses: "DND5E.LimitedUses"
-  },
-  DISPOSITION_TYPES: {
-    2: "BUILD_N_ACTION.FIELDS.aura.disposition.optionAny",
-    1: "BUILD_N_ACTION.FIELDS.aura.disposition.optionAlly",
-    "-1": "BUILD_N_ACTION.FIELDS.aura.disposition.optionEnemy"
-  },
-  HEALTH_PERCENTAGES_CHOICES: {
-    0: "BUILD_N_ACTION.FIELDS.filters.healthPercentages.type.optionLT",
-    1: "BUILD_N_ACTION.FIELDS.filters.healthPercentages.type.optionGT"
-  },
-  ATTACK_MODES_CHOICES: {
-    offhand: "DND5E.ATTACK.Mode.Offhand",
-    oneHanded: "DND5E.ATTACK.Mode.OneHanded",
-    thrown: "DND5E.ATTACK.Mode.Thrown",
-    "thrown-offhand": "DND5E.ATTACK.Mode.ThrownOffhand",
-    twoHanded: "DND5E.ATTACK.Mode.TwoHanded"
-  },
-  SPELL_COMPONENT_CHOICES: {
-    ANY: "BUILD_N_ACTION.FIELDS.filters.spellComponents.match.optionAny",
-    ALL: "BUILD_N_ACTION.FIELDS.filters.spellComponents.match.optionAll"
-  },
-  TOKEN_SIZES_CHOICES: {
-    0: "BUILD_N_ACTION.FIELDS.filters.tokenSizes.type.optionGT",
-    1: "BUILD_N_ACTION.FIELDS.filters.tokenSizes.type.optionLT"
-  },
-  MODIFIER_MODES: {
-    [MODIFIER_MODE.ADD]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionAdd",
-    [MODIFIER_MODE.MULTIPLY]: "BUILD_N_ACTION.MODIFIERS.FIELDS.mode.optionMultiply"
-  }
-};
-
-/* -------------------------------------------------- */
-
-const SETTINGS = {
-  EFFECTS: "visualEffects",
-  MOTION: "interfaceMotion",
-  AURA: "showAuraRanges",
-  LABEL: "headerLabel",
-  PLAYERS: "allowPlayers",
-  SCRIPT: "disableCustomScriptFilter",
-  FUMBLE: "allowFumbleNegation",
-  SHEET_TAB: "showSheetTab",
-  RADIUS: "padAuraRadius"
-};
-
-/**
- * A mixin function for base filter behaviour.
- * @param {Class} Base      The base class.
- * @returns {Class}
- * @mixin
- */
-function FilterMixin(Base) {
-  return class BaseFilter extends Base {
-    /**
-     * The name of the filter.
-     * @type {string}
-     */
-    static name = null;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Whether this filter can be added more than once to a buildNAction.
-     * @type {boolean}
-     */
-    static repeatable = false;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * What handlebars template to use when rendering this filter in the builder.
-     * @type {string}
-     */
-    static template = null;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Whether this filter has 'exclude' as an option in KeysDialog.
-     * @type {boolean}
-     */
-    static canExclude = false;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Should this filter display the trash button?
-     * @type {boolean}
-     */
-    static trash = true;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Get the current data values of this filter.
-     * @param {ContextualBonus} bonus     The instance of the buildNAction on which this field lives.
-     */
-    static value(bonus) {
-      return foundry.utils.getProperty(bonus, `filters.${this.name}`);
-    }
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Render the filter.
-     * @param {ContextualBonus} bonus     The bonus being rendered.
-     * @returns {string}          The rendered template.
-     */
-    static render(bonus) {
-      throw new Error("This must be subclassed!");
-    }
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Determine whether this filter data should be saved on the document.
-     * @param {ContextualBonus} bonus     The bonus being embedded.
-     * @returns {boolean}         Whether to save the filter.
-     */
-    static storage(bonus) {
-      return this.value(bonus).size > 0;
-    }
-
-    /* -------------------------------------------------- */
-
-    /** @override */
-    toFormGroup(formConfig, inputConfig) {
-      const element = super.toFormGroup(formConfig, inputConfig);
-
-      if (this.constructor.trash) {
-        const trash = document.createElement("A");
-        trash.dataset.action = "deleteFilter";
-        trash.dataset.id = this.constructor.name;
-        trash.innerHTML = "<i class='fa-solid fa-trash'></i>";
-        element.querySelector(".form-fields").after(trash);
-      }
-
-      return element;
-    }
-  };
-}
-
-const {SchemaField: SchemaField$d, StringField: StringField$c, ArrayField} = foundry.data.fields;
-
-// ArrayField that filters invalid comparison fields.
-class ArbitraryComparisonField extends FilterMixin(ArrayField) {
-  /** @override */
-  static name = "arbitraryComparisons";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static repeatable = true;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  constructor(options = {}) {
-    super(new SchemaField$d({
-      one: new StringField$c(),
-      other: new StringField$c(),
-      operator: new StringField$c({
-        required: true,
-        initial: "EQ",
-        choices: {EQ: "=", LT: "<", GT: ">", LE: "<=", GE: ">="}
-      })
-    }), options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>{{label}}</legend>
-      <p class="hint">{{hint}}</p>
-      {{#each comparisons as |c idx|}}
-      <div class="form-group">
-        <div class="form-fields">
-          {{formInput c.one.field value=c.one.value placeholder=../placeholder1 name=c.one.name}}
-          {{formInput c.operator.field value=c.operator.value name=c.operator.name}}
-          {{formInput c.other.field value=c.other.value placeholder=../placeholder2 name=c.other.name}}
-        </div>
-        <a data-action="deleteFilter" data-id="${this.name}" data-idx="{{idx}}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </div>
-      {{/each}}
-    </fieldset>`;
-
-    const field = bonus.schema.getField("filters.arbitraryComparisons");
-    const {one, other, operator} = field.element.fields;
-    const data = {
-      label: field.label,
-      hint: field.hint,
-      placeholder1: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.arbitraryComparisons.one.placeholder"),
-      placeholder2: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.arbitraryComparisons.other.placeholder"),
-      comparisons: bonus.filters.arbitraryComparisons.map((c, i) => {
-        return {
-          one: {field: one, value: c.one, name: `filters.${this.name}.${i}.one`},
-          other: {field: other, value: c.other, name: `filters.${this.name}.${i}.other`},
-          operator: {field: operator, value: c.operator, name: `filters.${this.name}.${i}.operator`}
-        };
-      })
-    };
-
-    return data.comparisons.length ? Handlebars.compile(template)(data) : "";
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return this.value(bonus).filter(i => i).length > 0;
-  }
-}
-
-const {SchemaField: SchemaField$c, SetField: SetField$6, StringField: StringField$b} = foundry.data.fields;
-
-/* -------------------------------------------------- */
-
-class AttackModesField extends FilterMixin(SchemaField$c) {
-  /** @override */
-  static name = "attackModes";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      value: new SetField$6(new StringField$b({choices: CONFIG.DND5E.attackTypes})),
-      classification: new SetField$6(new StringField$b({choices: CONFIG.DND5E.attackClassifications})),
-      mode: new SetField$6(new StringField$b({choices: MODULE.ATTACK_MODES_CHOICES}))
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const schema = bonus.schema.getField("filters.attackModes");
-    const {value, mode, classification} = schema.fields;
-
-    const context = {
-      value: {
-        field: value,
-        value: bonus.filters.attackModes.value
-      },
-      mode: {
-        field: mode,
-        value: bonus.filters.attackModes.mode
-      },
-      classification: {
-        field: classification,
-        value: bonus.filters.attackModes.classification
-      },
-      legend: schema.label,
-      hint: schema.hint
-    };
-
-    const template = `
-    <fieldset>
-      <legend>
-        {{legend}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      {{formGroup value.field value=value.value}}
-      {{formGroup classification.field value=classification.value}}
-      {{formGroup mode.field value=mode.value}}
-    </fieldset>`;
-
-    return Handlebars.compile(template)(context);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    const value = this.value(bonus);
-    return Object.values(value).some(v => v.size);
-  }
-}
-
-const {SetField: SetField$5, NumberField: NumberField$6, StringField: StringField$a, SchemaField: SchemaField$b} = foundry.data.fields;
-
-let BaseField$1 = class BaseField extends FilterMixin(SetField$5) {
-  /** @override */
-  static render(bonus) {
-    const field = bonus.schema.getField(`filters.${this.name}`);
-    const value = bonus.filters[this.name] ?? new Set();
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      {{formInput field value=value}}
-    </fieldset>`;
-    return Handlebars.compile(template)({
-      field: field, value: value, hint: field.hint, label: field.label
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _cleanType(value, ...args) {
-    const choices = (this.element.choices instanceof Function) ? this.element.choices() : this.element.choices;
-    value = super._cleanType(value, ...args).filter(v => v in choices);
-    return value;
-  }
-};
-
-/* -------------------------------------------------- */
-
-class ProficiencyLevelsField extends BaseField$1 {
-  /** @override */
-  static name = "proficiencyLevels";
-
-  /* -------------------------------------------------- */
-
-  constructor() {
-    super(new NumberField$6({choices: CONFIG.DND5E.proficiencyLevels}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class ItemTypesField extends BaseField$1 {
-  /** @override */
-  static name = "itemTypes";
-
-  /* -------------------------------------------------- */
-
-  constructor() {
-    super(new StringField$a({
-      choices: Object.keys(dnd5e.dataModels.item.config).reduce((acc, type) => {
-        if (!dnd5e.dataModels.item.config[type].schema.getField("activities")) return acc;
-        acc[type] = game.i18n.localize(`TYPES.Item.${type}`);
-        return acc;
-      }, {})
-    }));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class SpellLevelsField extends BaseField$1 {
-  /** @override */
-  static name = "spellLevels";
-
-  /* -------------------------------------------------- */
-
-  constructor() {
-    super(new NumberField$6({choices: CONFIG.DND5E.spellLevels}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class SpellComponentsField extends FilterMixin(SchemaField$b) {
-  /** @override */
-  static name = "spellComponents";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      types: new BaseField$1(new StringField$a({
-        choices: () => CONFIG.DND5E.validProperties.spell.reduce((acc, p) => {
-          const prop = CONFIG.DND5E.itemProperties[p];
-          if (prop) acc[p] = prop;
-          return acc;
-        }, {})
-      })),
-      match: new StringField$a({
-        required: true,
-        initial: "ANY",
-        choices: MODULE.SPELL_COMPONENT_CHOICES
-      }),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{types.parent.label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{types.parent.hint}}</p>
-      <div class="form-group">
-        <label>{{types.label}}</label>
-        <div class="form-fields">
-          {{formInput types value=typesValue}}
-        </div>
-      </div>
-      <div class="form-group">
-        <label>{{match.label}}</label>
-        <div class="form-fields">
-          {{formInput match value=matchValue sort=true}}
-        </div>
-      </div>
-    </fieldset>`;
-
-    return Handlebars.compile(template)({
-      types: bonus.schema.getField("filters.spellComponents.types"),
-      match: bonus.schema.getField("filters.spellComponents.match"),
-      typesValue: bonus.filters.spellComponents.types,
-      matchValue: bonus.filters.spellComponents.match
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return !!this.value(bonus).types?.filter(u => u).size;
-  }
-}
-
-/* -------------------------------------------------- */
-
-class ActorCreatureSizesField extends BaseField$1 {
-  /** @override */
-  static name = "actorCreatureSizes";
-
-  /* -------------------------------------------------- */
-
-  constructor() {
-    super(new StringField$a({choices: CONFIG.DND5E.actorSizes}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class PreparationModesField extends BaseField$1 {
-  /** @override */
-  static name = "preparationModes";
-
-  /* -------------------------------------------------- */
-
-  constructor() {
-    super(new StringField$a({choices: CONFIG.DND5E.spellPreparationModes}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-var checkboxFields = {
-  ActorCreatureSizesField,
-  ItemTypesField,
-  PreparationModesField,
-  ProficiencyLevelsField,
-  SpellComponentsField,
-  SpellLevelsField
-};
-
-const {JavaScriptField, StringField: StringField$9} = foundry.data.fields;
-
-class CustomScriptsField extends FilterMixin(JavaScriptField) {
-  /** @override */
-  static name = "customScripts";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const field = bonus.schema.getField(`filters.${this.name}`);
-    const value = bonus.filters[this.name] ?? "";
-
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      <div class="form-group">
-        <div class="form-fields">
-          {{formInput field value=value}}
-        </div>
-      </div>
-    </fieldset>`;
-
-    return Handlebars.compile(template)({
-      field: field,
-      value: value,
-      label: field.label,
-      hint: field.hint
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _validateType(value, options) {
-    return StringField$9.prototype._validateType.call(this, value, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return !!this.value(bonus)?.length;
-  }
-}
-
-const {SchemaField: SchemaField$a, StringField: StringField$8} = foundry.data.fields;
-
-class FeatureTypesField extends FilterMixin(SchemaField$a) {
-  /** @override */
-  static name = "featureTypes";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      type: new StringField$8({required: false}),
-      subtype: new StringField$8({required: true}),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const schema = bonus.schema.getField("filters.featureTypes");
-    const {type, subtype} = schema.fields;
-
-    const value1 = bonus.filters.featureTypes.type;
-    const value2 = bonus.filters.featureTypes.subtype;
-    const choices1 = CONFIG.DND5E.featureTypes;
-    const choices2 = CONFIG.DND5E.featureTypes[value1]?.subtypes ?? {};
-
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      {{formGroup type value=value1 sort=true choices=choices1}}
-      {{#if choices2}}
-      {{formGroup subtype value=value2 sort=true choices=choices2}}
-      {{/if}}
-    </fieldset>`;
-
-    const data = {
-      type: type,
-      subtype: subtype,
-      value1: value1,
-      value2: value2,
-      choices1: choices1,
-      choices2: foundry.utils.isEmpty(choices2) ? null : choices2,
-      label: schema.label,
-      hint: schema.hint
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    const value = this.value(bonus);
-    return value.type in CONFIG.DND5E.featureTypes;
-  }
-}
-
-const {SchemaField: SchemaField$9, NumberField: NumberField$5} = foundry.data.fields;
-
-class HealthPercentagesField extends FilterMixin(SchemaField$9) {
-  /** @override */
-  static name = "healthPercentages";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      value: new NumberField$5({
-        min: 0,
-        max: 100,
-        step: 1,
-        integer: true,
-        nullable: true, // nullable required to be able to remove it
-        initial: 50
-      }),
-      type: new NumberField$5({
-        initial: null,
-        nullable: true, // nullable required to be able to remove it
-        choices: MODULE.HEALTH_PERCENTAGES_CHOICES
-      }),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      {{formGroup valueField value=value}}
-      {{formGroup typeField value=type}}
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const valueField = bonus.schema.getField(`filters.${this.name}.value`);
-    const typeField = bonus.schema.getField(`filters.${this.name}.type`);
-    const data = {
-      valueField: valueField,
-      typeField: typeField,
-      value: bonus.filters[this.name].value,
-      type: bonus.filters[this.name].type,
-      hint: schema.hint,
-      label: schema.label
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return !Object.values(this.value(bonus)).includes(null);
-  }
-}
-
-const {SchemaField: SchemaField$8, SetField: SetField$4, StringField: StringField$7} = foundry.data.fields;
-
-class IdentifiersField extends FilterMixin(SchemaField$8) {
-  /** @override */
-  static name = "identifiers";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({values: new SetField$4(new StringField$7(), {slug: true}), ...fields}, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      <div class="form-group">
-        <div class="form-fields">
-          {{formInput field value=value slug=true placeholder=placeholder}}
-        </div>
-      </div>
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const field = bonus.schema.getField(`filters.${this.name}.values`);
-    const value = bonus.filters.identifiers.values;
-
-    const data = {
-      label: schema.label,
-      hint: schema.hint,
-      field: field,
-      value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.identifiers.placeholder")
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return !!bonus.filters.identifiers?.values?.size;
-  }
-}
-
-const {SchemaField: SchemaField$7, SetField: SetField$3, StringField: StringField$6} = foundry.data.fields;
-
-class MarkersField extends FilterMixin(SchemaField$7) {
-  /** @override */
-  static name = "markers";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      values: new SetField$3(new StringField$6(), {slug: true}),
-      target: new SetField$3(new StringField$6(), {slug: true}),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      {{formGroup values.field value=values.value slug=true placeholder=placeholder}}
-      {{formGroup target.field value=target.value slug=true placeholder=placeholder}}
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const field = bonus.schema.getField(`filters.${this.name}.values`);
-    const target = bonus.schema.getField(`filters.${this.name}.target`);
-
-    const data = {
-      label: schema.label,
-      hint: schema.hint,
-      values: {field: field, value: bonus.filters[this.name].values},
-      target: {field: target, value: bonus.filters[this.name].target},
-      placeholder: game.i18n.localize(`BUILD_N_ACTION.FIELDS.filters.${this.name}.placeholder`)
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    const {values, target} = bonus.filters[this.name] ?? {};
-    return !!values?.size || !!target?.size;
-  }
-}
-
-const {SchemaField: SchemaField$6, NumberField: NumberField$4, BooleanField: BooleanField$5} = foundry.data.fields;
-
-class RemainingSpellSlotsField extends FilterMixin(SchemaField$6) {
-  /** @override */
-  static name = "remainingSpellSlots";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      min: new NumberField$4({min: 0, step: 1, integer: true}),
-      max: new NumberField$4({min: 0, step: 1, integer: true}),
-      size: new BooleanField$5(),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      <div class="form-group">
-        <label>{{localize "BUILD_N_ACTION.FIELDS.filters.remainingSpellSlots.rangeLabel"}}</label>
-        <div class="form-fields">
-          {{formInput minField value=min placeholder=phmin}}
-          &mdash;
-          {{formInput maxField value=max placeholder=phmax}}
-        </div>
-      </div>
-      {{formGroup sizeField value=size}}
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const {min: minField, max: maxField, size: sizeField} = schema.fields;
-    const {min, max, size} = bonus.filters[this.name];
-
-    const data = {
-      label: schema.label,
-      hint: schema.hint,
-      minField, min,
-      maxField, max,
-      sizeField, size,
-      phmin: game.i18n.localize("Minimum"),
-      phmax: game.i18n.localize("Maximum")
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    const {min, max} = bonus.filters[this.name];
-    return Number.isNumeric(min) || Number.isNumeric(max);
-  }
-}
-
-let proficiencyTrees = {};
-
-/** @param {object} trees */
-function setProficiencyTrees(trees) {
-  proficiencyTrees = trees;
-}
-
-/** @returns {object} */
-function getProficiencyTrees() {
-  return proficiencyTrees;
-}
-
-/**
- * Does this actor speak a given language?
- *
- * @param {Actor5e} actor
- * @param {string} trait
- * @returns {boolean}
- */
-function speaksLanguage(actor, trait) {
-  return hasTrait(actor, trait, "languages");
-}
-
-/**
- * Does this actor have a given weapon proficiency?
- *
- * @param {Actor5e} actor
- * @param {string} trait
- * @returns {boolean}
- */
-function hasWeaponProficiency(actor, trait) {
-  return hasTrait(actor, trait, "weapon");
-}
-
-/**
- * Does this actor have a given armor proficiency?
- *
- * @param {Actor5e} actor
- * @param {string} trait
- * @returns {boolean}
- */
-function hasArmorProficiency(actor, trait) {
-  return hasTrait(actor, trait, "armor");
-}
-
-/**
- * Does this actor have a given tool proficiency?
- *
- * @param {Actor5e} actor
- * @param {string} trait
- * @returns {boolean}
- */
-function hasToolProficiency(actor, trait) {
-  return hasTrait(actor, trait, "tool");
-}
-
-/**
- * Retrieve a path through nested proficiencies.
- *
- * @param {string} key
- * @param {string} category
- * @returns {string[]}
- */
-function proficiencyTree(key, category) {
-  const root = proficiencyTrees[category];
-  if (!root) return [];
-
-  const find = (node) => {
-    for (const [nodeKey, value] of Object.entries(node)) {
-      if (nodeKey === key) return [nodeKey];
-      if (!value.children) continue;
-      const childPath = find(value.children);
-      if (childPath.length) return [nodeKey, ...childPath];
-    }
-    return [];
-  };
-
-  return find(root);
-}
-
-function hasTrait(actor, trait, category) {
-  const path = CONFIG.DND5E.traits[category].actorKeyPath ?? `system.traits.${category}`;
-  const set = foundry.utils.getProperty(actor, path)?.value ?? new Set();
-  if (set.has(trait)) return true;
-  return set.some(value => {
-    const [key, node] = proficiencyTrees[category]?.find(value) ?? [];
-    return (key === trait) || (node?.children && node.children.find(trait));
-  });
-}
-
-const {SetField: SetField$2, StringField: StringField$5} = foundry.data.fields;
-
-class BaseField extends FilterMixin(SetField$2) {
-  /** @override */
-  static canExclude = true;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static trash = false;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Encapsulate this in a fieldset when using the formGroup hbs helper?
-   * @type {boolean}
-   */
-  static fieldset = true;
-
-  /* -------------------------------------------------- */
-
-  constructor(options = {}) {
-    super(new StringField$5(), options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _cast(value) {
-    // If the given value is a string, split it at each ';' and trim the results to get an array.
-    if (typeof value === "string") value = value.split(";").map(v => v.trim());
-    return super._cast(value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _cleanType(value, ...args) {
-    value = super._cleanType(value, ...args).reduce((acc, v) => {
-      if (v) acc.add(v);
-      return acc;
-    }, new Set());
-    return Array.from(value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _toInput(config) {
-    if ((config.value instanceof Set) || Array.isArray(config.value)) {
-      config.value = Array.from(config.value).join(";");
-    }
-    return foundry.data.fields.StringField.prototype._toInput.call(this, config);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  toFormGroup(formConfig, inputConfig) {
-    const element = super.toFormGroup(formConfig, inputConfig);
-
-    const input = element.querySelector("input");
-    const button = document.createElement("BUTTON");
-    button.dataset.action = "keysDialog";
-    button.dataset.property = input.name;
-    button.dataset.id = this.constructor.name;
-    button.type = "button";
-    button.innerHTML = `<i class="fa-solid fa-key"></i> ${game.i18n.localize("BUILD_N_ACTION.Keys")}`;
-    input.after(button);
-
-    if (this.constructor.fieldset) {
-      const set = document.createElement("FIELDSET");
-      const label = element.querySelector("LABEL");
-      set.innerHTML = `
-      <legend>
-        ${label.textContent}
-        <a data-action="deleteFilter" data-id="${this.constructor.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>`;
-      label.remove();
-
-      const hint = element.querySelector(".hint");
-      hint.remove();
-      set.appendChild(hint);
-
-      set.appendChild(element);
-      return set;
-    }
-
-    return element;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = "{{formGroup field value=value}}";
-    const data = {
-      field: bonus.schema.getField(`filters.${this.name}`),
-      value: bonus.filters[this.name]
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Retrieve the choices for a Keys dialog when configuring this field.
-   * @returns {{value: string, label: string}[]}
-   */
-  static choices() {
-    throw new Error("This must be subclassed!");
-  }
-}
-
-/* -------------------------------------------------- */
-
-class AbilitiesField extends BaseField {
-  /** @override */
-  static name = "abilities";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static canExclude = true;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const abilities = Object.entries(CONFIG.DND5E.abilities);
-    return abilities.map(([value, {label}]) => ({value, label}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class SaveAbilitiesField extends AbilitiesField {
-  /** @override */
-  static name = "saveAbilities";
-}
-
-/* -------------------------------------------------- */
-
-class ThrowTypesField extends AbilitiesField {
-  /** @override */
-  static name = "throwTypes";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static canExclude = false;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const choices = super.choices();
-
-    choices.push({
-      value: "death",
-      label: game.i18n.localize("DND5E.DeathSave")
-    }, {
-      value: "concentration",
-      label: game.i18n.localize("DND5E.Concentration")
-    });
-
-    return choices;
-  }
-}
-
-/* -------------------------------------------------- */
-
-class StatusEffectsField extends BaseField {
-  /** @override */
-  static name = "statusEffects";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    return CONFIG.statusEffects.reduce((acc, {id, img, name}) => {
-      if (id && img && name) acc.push({value: id, label: name, icon: img});
-      return acc;
-    }, []);
-  }
-}
-
-/* -------------------------------------------------- */
-
-class TargetEffectsField extends StatusEffectsField {
-  /** @override */
-  static name = "targetEffects";
-}
-
-/* -------------------------------------------------- */
-
-class AuraBlockersField extends StatusEffectsField {
-  /** @override */
-  static name = "auraBlockers";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static canExclude = false;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static trash = false;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static fieldset = false;
-}
-
-/* -------------------------------------------------- */
-
-class CreatureTypesField extends BaseField {
-  /** @override */
-  static name = "creatureTypes";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const types = Object.entries(CONFIG.DND5E.creatureTypes);
-    return types.map(([k, v]) => {
-      return {value: k, label: v.label};
-    }).sort((a, b) => a.label.localeCompare(b.label));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class ActorCreatureTypesField extends CreatureTypesField {
-  /** @override */
-  static name = "actorCreatureTypes";
-}
-
-/* -------------------------------------------------- */
-
-class BaseArmorsField extends BaseField {
-  /** @override */
-  static name = "baseArmors";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    return Array.from(getProficiencyTrees().armor.asSet()).map(k => {
-      return {
-        value: k,
-        label: dnd5e.documents.Trait.keyLabel(`armor:${k}`)
-      };
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-class TargetArmorsField extends BaseArmorsField {
-  /** @override */
-  static name = "targetArmors";
-}
-
-/* -------------------------------------------------- */
-
-class BaseToolsField extends BaseField {
-  /** @override */
-  static name = "baseTools";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    return Array.from(getProficiencyTrees().tool.asSet()).map(k => {
-      return {
-        value: k,
-        label: dnd5e.documents.Trait.keyLabel(`tool:${k}`)
-      };
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-class BaseWeaponsField extends BaseField {
-  /** @override */
-  static name = "baseWeapons";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    return Array.from(getProficiencyTrees().weapon.asSet()).map(k => {
-      return {
-        value: k,
-        label: dnd5e.documents.Trait.keyLabel(`weapon:${k}`)
-      };
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-class DamageTypesField extends BaseField {
-  /** @override */
-  static name = "damageTypes";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const damages = Object.entries(CONFIG.DND5E.damageTypes);
-    const heals = Object.entries(CONFIG.DND5E.healingTypes);
-    return [...damages, ...heals].map(([k, v]) => ({value: k, label: v.label}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class SkillIdsField extends BaseField {
-  /** @override */
-  static name = "skillIds";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    return Array.from(getProficiencyTrees().skills.asSet()).map(k => {
-      return {
-        value: k,
-        label: dnd5e.documents.Trait.keyLabel(`skills:${k}`)
-      };
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-class SpellSchoolsField extends BaseField {
-  /** @override */
-  static name = "spellSchools";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const schools = Object.entries(CONFIG.DND5E.spellSchools);
-    return schools.map(([k, v]) => ({value: k, label: v.label}));
-  }
-}
-
-/* -------------------------------------------------- */
-
-class WeaponPropertiesField extends BaseField {
-  /** @override */
-  static name = "weaponProperties";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const keys = CONFIG.DND5E.validProperties.weapon;
-    const labels = CONFIG.DND5E.itemProperties;
-    return keys.reduce((acc, k) => {
-      const label = labels[k]?.label;
-      if (label) acc.push({value: k, label: label});
-      return acc;
-    }, []);
-  }
-}
-
-/* -------------------------------------------------- */
-
-class ActorLanguagesField extends BaseField {
-  /** @override */
-  static name = "actorLanguages";
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static choices() {
-    const trait = dnd5e.documents.Trait;
-    const choices = getProficiencyTrees().languages;
-
-    const langs = new Set();
-    const cats = new Set();
-
-    const construct = (c) => {
-      for (const [key, choice] of Object.entries(c)) {
-        if (choice.children) {
-          cats.add(key);
-          construct(choice.children);
-        } else langs.add(key);
-      }
-    };
-
-    construct(choices);
-
-    const toLabel = (k, isCat = true) => ({value: k, label: trait.keyLabel(`languages:${k}`), isCategory: isCat});
-
-    return Array.from(cats.map(k => toLabel(k, true))).concat(Array.from(langs.map(k => toLabel(k, false))));
-  }
-}
-
-/* -------------------------------------------------- */
-
-var semicolonFields = {
-  AbilitiesField,
-  ActorCreatureTypesField,
-  ActorLanguagesField,
-  AuraBlockersField,
-  BaseArmorsField,
-  BaseToolsField,
-  BaseWeaponsField,
-  CreatureTypesField,
-  DamageTypesField,
-  SaveAbilitiesField,
-  SkillIdsField,
-  SpellSchoolsField,
-  StatusEffectsField,
-  TargetArmorsField,
-  TargetEffectsField,
-  ThrowTypesField,
-  WeaponPropertiesField
-};
-
-const {SchemaField: SchemaField$5, SetField: SetField$1, StringField: StringField$4} = foundry.data.fields;
-
-class SourceClassesField extends FilterMixin(SchemaField$5) {
-  /** @override */
-  static name = "sourceClasses";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({values: new SetField$1(new StringField$4(), {slug: true}), ...fields}, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      <div class="form-group">
-        <div class="form-fields">
-          {{formInput field value=value slug=true placeholder=placeholder}}
-        </div>
-      </div>
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const field = bonus.schema.getField(`filters.${this.name}.values`);
-    const value = bonus.filters.sourceClasses.values;
-
-    const data = {
-      label: schema.label,
-      hint: schema.hint,
-      field: field,
-      value: value,
-      placeholder: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.sourceClasses.placeholder")
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    return !!bonus.filters.sourceClasses?.values?.size;
-  }
-}
-
-const {SchemaField: SchemaField$4, NumberField: NumberField$3, BooleanField: BooleanField$4} = foundry.data.fields;
-
-class TokenSizesField extends FilterMixin(SchemaField$4) {
-  /** @override */
-  static name = "tokenSizes";
-
-  /* -------------------------------------------------- */
-
-  constructor(fields = {}, options = {}) {
-    super({
-      size: new NumberField$3({min: 0.5, step: 0.5}),
-      type: new NumberField$3({
-        choices: MODULE.TOKEN_SIZES_CHOICES,
-        initial: 0
-      }),
-      self: new BooleanField$4(),
-      ...fields
-    }, options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static render(bonus) {
-    const template = `
-    <fieldset>
-      <legend>
-        {{label}}
-        <a data-action="deleteFilter" data-id="${this.name}">
-          <i class="fa-solid fa-trash"></i>
-        </a>
-      </legend>
-      <p class="hint">{{hint}}</p>
-      <div class="form-group">
-        <label>{{sizeField.label}}</label>
-        <div class="form-fields">
-          {{formInput typeField value=type}}
-          {{formInput sizeField value=size placeholder=phSize}}
-        </div>
-      </div>
-      {{formGroup selfField value=self}}
-    </fieldset>`;
-
-    const schema = bonus.schema.getField(`filters.${this.name}`);
-    const {type: typeField, size: sizeField, self: selfField} = schema.fields;
-    const {type, size, self} = bonus.filters[this.name];
-
-    const data = {
-      label: schema.label,
-      hint: schema.hint,
-      typeField, type,
-      sizeField, size,
-      selfField, self,
-      phSize: game.i18n.localize("BUILD_N_ACTION.FIELDS.filters.tokenSizes.size.placeholder")
-    };
-
-    return Handlebars.compile(template)(data);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static storage(bonus) {
-    const {size, type, self} = this.value(bonus) ?? {};
-    return Number.isNumeric(size) && Number.isNumeric(type);
-  }
-}
-
-var fields = Object.values({
-  ...checkboxFields,
-  ...semicolonFields,
-  ArbitraryComparisonField,
-  AttackModesField,
-  CustomScriptsField,
-  FeatureTypesField,
-  HealthPercentagesField,
-  IdentifiersField,
-  MarkersField,
-  RemainingSpellSlotsField,
-  SourceClassesField,
-  TokenSizesField
-}).reduce((acc, field) => {
-  acc[field.name] = field;
-  return acc;
-}, {});
-
-let BonusSheetClass;
-let TokenAuraClass;
-
-/**
- * Configure UI classes at the composition root without making data models
- * depend on the public global API.
- *
- * @param {object} applications
- * @param {typeof ApplicationV2} applications.BonusSheet
- * @param {typeof TokenAura} applications.TokenAura
- */
-function configureApplicationFactories({BonusSheet, TokenAura}) {
-  BonusSheetClass = BonusSheet;
-  TokenAuraClass = TokenAura;
-}
-
-/**
- * Return the existing sheet for a bonus or construct a new one.
- *
- * @param {ContextualBonus} bonus
- * @returns {BonusSheet}
- */
-function getBonusSheet(bonus) {
-  if (!BonusSheetClass) throw new Error("Build-n-Action application factories are not configured.");
-  const sheet = foundry.applications.instances.get(BonusSheetClass.applicationId(bonus));
-  return sheet ?? new BonusSheetClass({bonus});
-}
-
-/** Apply current display settings to tracked token auras. */
-function refreshTokenAuras() {
-  TokenAuraClass?.refreshAll();
-}
-
-/**
- * Construct the configured aura visualization.
- *
- * @param {TokenDocument5e} token
- * @param {ContextualBonus} bonus
- * @returns {TokenAura}
- */
-function createTokenAura(token, bonus) {
-  if (!TokenAuraClass) throw new Error("Build-n-Action application factories are not configured.");
-  return new TokenAuraClass(token, bonus);
-}
-
-/**
- * Read raw contextual-bonus data from a document flag.
- *
- * @param {Document|object} document
- * @returns {object[]}
- */
-function getStoredBonusData(document) {
-  let stored = foundry.utils.getProperty(document, `flags.${MODULE.ID}.bonuses`) ?? [];
-  if (stored instanceof Map) stored = stored.values();
-  else if (foundry.utils.getType(stored) === "Object") stored = Object.values(stored);
-  return Array.isArray(stored) ? stored.filter(Boolean) : Array.from(stored ?? []);
-}
-
-/**
- * Replace one stored bonus or append it when it is new.
- *
- * @param {Document} document
- * @param {string} id
- * @param {object} data
- * @returns {Promise<void>}
- */
-async function upsertStoredBonus(document, id, data) {
-  const stored = getStoredBonusData(document).filter(entry => entry.id !== id);
-  stored.push(data);
-  await document.setFlag(MODULE.ID, "bonuses", stored);
-}
-
-/**
- * Remove one stored bonus.
- *
- * @param {Document} document
- * @param {string} id
- * @returns {Promise<void>}
- */
-async function removeStoredBonus(document, id) {
-  const stored = getStoredBonusData(document).filter(entry => entry.id !== id);
-  await document.setFlag(MODULE.ID, "bonuses", stored);
-}
-
-const {BooleanField: BooleanField$3, StringField: StringField$3, NumberField: NumberField$2, SchemaField: SchemaField$3} = foundry.data.fields;
-
-class AuraModel extends foundry.abstract.DataModel {
-  /** @override */
-  static defineSchema() {
-    return {
-      enabled: new BooleanField$3(),
-      template: new BooleanField$3(),
-      range: new StringField$3({required: true}),
-      self: new BooleanField$3({initial: true}),
-      disposition: new NumberField$2({
-        initial: 2,
-        choices: MODULE.DISPOSITION_TYPES
-      }),
-      blockers: new fields.auraBlockers(),
-      require: new SchemaField$3(CONST.WALL_RESTRICTION_TYPES.reduce((acc, k) => {
-        acc[k] = new BooleanField$3();
-        return acc;
-      }, {}))
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _initialize(...args) {
-    super._initialize(...args);
-    this.prepareDerivedData();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static migrateData(source) {
-    if (source.isTemplate) source.template = source.isTemplate;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  prepareDerivedData() {
-    if (!this.bonus) return;
-
-    // Prepare aura range.
-    if (this.range) {
-      const range = dnd5e.utils.simplifyBonus(this.range, this.getRollData());
-      this.range = range;
-    }
-
-    // Scene regions cannot be auras.
-    if (this.bonus.region) this.enabled = false;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get applicable roll data from the origin.
-   * @returns {object}      The roll data.
-   */
-  getRollData() {
-    return this.bonus?.getRollData?.({deterministic: true}) ?? {};
-  }
-
-  /* -------------------------------------------------- */
-  /*   Properties                                       */
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction this lives on.
-   * @type {ContextualBonus}
-   */
-  get bonus() {
-    return this.parent;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get whether this has a range that matters.
-   * @type {boolean}
-   */
-  get _validRange() {
-    return (this.range === -1) || (this.range > 0);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the buildNAction is an enabled and valid aura centered on a token. This is true if the property is enabled, the
-   * template aura property is not enabled, and the range of the aura is valid.
-   * @type {boolean}
-   */
-  get isToken() {
-    return this.enabled && !this.template && this._validRange && !this.bonus.isExclusive;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the buildNAction is a template aura. This is true if the aura property is enabled, along with the 'template' aura
-   * property, and the item on which the buildNAction is embedded can create a measured template.
-   * @type {boolean}
-   */
-  get isTemplate() {
-    const item = this.bonus.parent;
-    if (!(item instanceof Item)) return false;
-    return this.enabled && this.template && !this.bonus.isExclusive && !!item.system.activities?.some(a => {
-      return a.target.template?.type;
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the buildNAction aura is suppressed due to its originating actor having at least one of the blocker conditions.
-   * @type {boolean}
-   */
-  get isBlocked() {
-    const actor = this.bonus.actor;
-    const blockers = new Set(this.blockers);
-    const ci = actor.system.traits?.ci?.value ?? new Set();
-    for (const c of ci) blockers.delete(c);
-    return blockers.intersects(actor.statuses);
-  }
-
-  /* -------------------------------------------------- */
-  /*   Bonus collection                                 */
-  /* -------------------------------------------------- */
-
-  /**
-   * Return whether this should be filtered out of token auras due to being blocked from affecting its owner.
-   * @type {boolean}
-   */
-  get isAffectingSelf() {
-    if (!this.isToken) return true;
-    return !this.isBlocked && this.self;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Is this a token aura that is not blocked?
-   * @type {boolean}
-   */
-  get isActiveTokenAura() {
-    return this.enabled && !this.template && this._validRange && !this.isBlocked;
-  }
-}
-
-const {BooleanField: BooleanField$2, StringField: StringField$2, SchemaField: SchemaField$2, NumberField: NumberField$1} = foundry.data.fields;
-
-class ConsumptionModel extends foundry.abstract.DataModel {
-  /** @override */
-  static defineSchema() {
-    return {
-      enabled: new BooleanField$2(),
-      type: new StringField$2({
-        required: true,
-        initial: "",
-        blank: true,
-        choices: MODULE.CONSUMPTION_TYPES
-      }),
-      subtype: new StringField$2({
-        required: true,
-        blank: true,
-        initial: ""
-      }),
-      scales: new BooleanField$2(),
-      formula: new StringField$2({required: true}),
-      value: new SchemaField$2({
-        min: new StringField$2({required: true}),
-        max: new StringField$2({required: true}),
-        step: new NumberField$1({integer: true, min: 1, step: 1})
-      })
-    };
-  }
-
-  /* -------------------------------------------------- */
-  /*   Data preparation                                 */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _initialize(...args) {
-    super._initialize(...args);
-    this.prepareDerivedData();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  prepareDerivedData() {
-    if (!this.bonus) return;
-    const rollData = this.getRollData();
-    this.value.min = this.value.min ? dnd5e.utils.simplifyBonus(this.value.min, rollData) : 1;
-    this.value.max = this.value.max ? dnd5e.utils.simplifyBonus(this.value.max, rollData) : null;
-    if ((this.value.min > this.value.max) && (this.value.max !== null)) {
-      const m = this.value.min;
-      this.value.min = this.value.max;
-      this.value.max = m;
-    }
-  }
-
-  /* -------------------------------------------------- */
-  /*   Migrations                                       */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static migrateData(source) {
-    // Resource as a consumption type is deprecated fully and without replacement.
-    if (source.type === "resource") source.type = "";
-  }
-
-  /* -------------------------------------------------- */
-  /*   Properties                                       */
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction this lives on.
-   * @type {ContextualBonus}
-   */
-  get bonus() {
-    return this.parent;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the set up in consumption can be used to create something that consumes.
-   * This looks only at the consumption data and not at anything else about the buildNAction.
-   * @type {boolean}
-   */
-  get isValidConsumption() {
-    const {type, value} = this;
-    if (!(type in MODULE.CONSUMPTION_TYPES) || ["save", "hitdie"].includes(this.parent.type)) return false;
-    const invalidScale = this.scales && ((this.value.max ?? Infinity) < this.value.min);
-
-    switch (type) {
-      case "uses":
-        if (!(this.bonus.parent instanceof Item) || invalidScale) return false;
-        return this.bonus.parent.hasLimitedUses && (value.min > 0);
-      case "quantity":
-        if (!(this.bonus.parent instanceof Item) || invalidScale) return false;
-        return this.bonus.parent.system.schema.has("quantity") && (value.min > 0);
-      case "effect":
-        return this.bonus.parent instanceof ActiveEffect;
-      case "health":
-      case "slots":
-        if (invalidScale) return false;
-        return value.min > 0;
-      case "currency":
-        if (invalidScale) return false;
-        return Object.keys(CONFIG.DND5E.currencies).includes(this.subtype) && (value.min > 0);
-      case "inspiration":
-        return true;
-      case "hitdice":
-        if (invalidScale) return false;
-        return ["smallest", "largest"].concat(CONFIG.DND5E.hitDieTypes).includes(this.subtype) && (value.min > 0);
-      default:
-        return false;
-    }
-  }
-
-  /* -------------------------------------------------- */
-  /*   Instance methods                                 */
-  /* -------------------------------------------------- */
-
-  /**
-   * Is the actor or user able to make the change when performing the consumption?
-   * This checks for permission issues only as well as properties being existing on the actor.
-   * It does not check for correct setup of the consumption data on the bonus.
-   * This can be used to determine whether a bonus should appear in the Optional Selector, but
-   * NOT due to lack of resources.
-   * @param {Actor5e} actor     The actor performing the roll.
-   * @returns {boolean}
-   */
-  canActorConsume(actor) {
-    if (!this.isValidConsumption) return false;
-
-    switch (this.type) {
-      case "uses":
-      case "quantity":
-      case "effect":
-        return this.bonus.parent.isOwner;
-      case "slots":
-        return !!actor.system.spells && actor.isOwner;
-      case "health":
-        return !!actor.system.attributes?.hp && actor.isOwner;
-      case "currency":
-        return !!actor.system.currency && actor.isOwner;
-      case "inspiration":
-      case "hitdice":
-        return (actor.type === "character") && actor.isOwner;
-      default:
-        return false;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether there are enough remaining of the target to be consumed.
-   * @param {Actor5e|Item5e|ActiveEffect5e} document      The target of consumption.
-   * @param {number} [min]                                A different minimum value to test against.
-   * @returns {boolean}
-   */
-  canBeConsumed(document, min) {
-    if (!this.isValidConsumption) return false;
-
-    min ??= this.value.min;
-    const {hd, hp} = document.system?.attributes ?? {};
-
-    switch (this.type) {
-      case "uses":
-        return document.system.uses.value >= min;
-      case "quantity":
-        return document.system.quantity >= min;
-      case "effect":
-        return document.parent.effects.has(document.id);
-      case "slots":
-        return Object.values(document.system.spells).some(s => s.value && s.max && s.level && (s.level >= min));
-      case "health":
-        return (hp.value + hp.temp) >= min;
-      case "currency":
-        return document.system.currency[this.subtype] >= min;
-      case "inspiration":
-        return document.system.attributes.inspiration;
-      case "hitdice":
-        return (["smallest", "largest"].includes(this.subtype) ? hd.value : hd.bySize[this.subtype] ?? 0) >= min;
-      default:
-        return false;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get applicable roll data from the origin.
-   * @returns {object}      The roll data.
-   */
-  getRollData() {
-    return this.bonus?.getRollData?.({deterministic: true}) ?? {};
-  }
-}
-
-const {SchemaField: SchemaField$1, BooleanField: BooleanField$1, NumberField, StringField: StringField$1} = foundry.data.fields;
-
-/* Child of ContextualBonus#bonuses that holds all die modifiers. */
-class ModifiersModel extends foundry.abstract.DataModel {
-  /** @override */
-  static defineSchema() {
-    return {
-      amount: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
-        value: new StringField$1({required: true})
-      }),
-      size: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        mode: new NumberField({initial: MODIFIER_MODE.ADD, choices: MODULE.MODIFIER_MODES}),
-        value: new StringField$1({required: true})
-      }),
-      reroll: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        value: new StringField$1({required: true}),
-        invert: new BooleanField$1(),
-        recursive: new BooleanField$1(),
-        limit: new StringField$1({required: true})
-      }),
-      explode: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        value: new StringField$1({required: true}),
-        once: new BooleanField$1(),
-        limit: new StringField$1({required: true})
-      }),
-      minimum: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        value: new StringField$1({required: true}),
-        maximize: new BooleanField$1()
-      }),
-      maximum: new SchemaField$1({
-        enabled: new BooleanField$1(),
-        value: new StringField$1({required: true}),
-        zero: new BooleanField$1()
-      }),
-      config: new SchemaField$1({
-        first: new BooleanField$1()
-      })
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = ["BUILD_N_ACTION.MODIFIERS"];
-
-  /* -------------------------------------------------- */
-  /*   Data preparation                                 */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _initialize(...args) {
-    super._initialize(...args);
-    this.prepareDerivedData();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  prepareDerivedData() {
-    const rollData = this.bonus?.getRollData?.({deterministic: true}) ?? {};
-    for (const m of ["amount", "size", "reroll", "explode", "minimum", "maximum"]) {
-      const value = this[m].value;
-      if (!value) this[m].value = null;
-      else {
-        const bonus = dnd5e.utils.simplifyBonus(value, rollData);
-        this[m].value = Number.isNumeric(bonus) ? Math.round(bonus) : null;
-      }
-
-      if (!("limit" in this[m])) continue;
-
-      const limit = this[m].limit;
-      if (!limit) this[m].limit = null;
-      else {
-        const bonus = Math.round(dnd5e.utils.simplifyBonus(limit, rollData));
-        this[m].limit = (Number.isNumeric(bonus) && (bonus > 0)) ? bonus : null;
-      }
-    }
-  }
-
-  /* -------------------------------------------------- */
-  /*   Dice modifications                               */
-  /* -------------------------------------------------- */
-
-  /**
-   * Regex to determine whether a die already has a modifier.
-   */
-  static REGEX = Object.freeze({
-    reroll: /rr?([0-9]+)?([<>=]+)?([0-9]+)?/i,
-    explode: /xo?([0-9]+)?([<>=]+)?([0-9]+)?/i,
-    minimum: /(?:min)([0-9]+)/i,
-    maximum: /(?:max)([0-9]+)/i
-  });
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable modifiers to a die.
-   * @param {DieTerm} die           The die term that will be mutated.
-   * @param {object} [options]      Options object meant to specifically bypass certain modifications.
-   */
-  modifyDie(die, options = {}) {
-    if (options.amount !== false) this._modifyAmount(die);
-    if (options.size !== false) this._modifySize(die);
-    if (options.reroll !== false) this._modifyReroll(die);
-    if (options.explode !== false) this._modifyExplode(die);
-    if (options.minimum !== false) this._modifyMin(die);
-    if (options.maximum !== false) this._modifyMax(die);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable amount modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifyAmount(die) {
-    if (!this.hasAmount) return;
-    const isMult = this.amount.mode === MODIFIER_MODE.MULTIPLY;
-
-    if ((die._number instanceof Roll) && die._number.isDeterministic) {
-      const total = die._number.evaluateSync().total;
-      die._number = total;
-    }
-
-    if (Number.isInteger(die._number)) {
-      if (isMult) die._number = Math.max(0, die._number * this.amount.value);
-      else die._number = Math.max(0, die._number + this.amount.value);
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable size modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifySize(die) {
-    if (!this.hasSize) return;
-    const isMult = this.size.mode === MODIFIER_MODE.MULTIPLY;
-
-    if ((die._faces instanceof Roll) && die._faces.isDeterministic) {
-      const total = die._faces.evaluateSync().total;
-      die._faces = total;
-    }
-
-    if (Number.isInteger(die._faces)) {
-      if (isMult) die._faces = Math.max(0, die._faces * this.size.value);
-      else die._faces = Math.max(0, die._faces + this.size.value);
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable reroll modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifyReroll(die) {
-    if (!this.hasReroll || die.modifiers.some(m => m.match(this.constructor.REGEX.reroll))) return;
-    const l = this.reroll.limit;
-    const prefix = this.reroll.recursive ? (l ? `rr${l}` : "rr") : "r";
-    const v = this.reroll.value ?? 1;
-    let mod;
-    if (this.reroll.invert) {
-      if (v > 0) {
-        // reroll if strictly greater than x.
-        mod = (v >= die.faces) ? `${prefix}=${die.faces}` : `${prefix}>${v}`;
-      } else if (v === 0) {
-        // reroll if max.
-        mod = `${prefix}=${die.faces}`;
-      } else {
-        // reroll if strictly greater than (size-x).
-        mod = (die.faces + v <= 1) ? `${prefix}=1` : `${prefix}>${die.faces + v}`;
-      }
-    } else {
-      if (v > 0) {
-        // reroll if strictly less than x.
-        mod = (v === 1) ? `${prefix}=1` : `${prefix}<${Math.min(die.faces, v)}`;
-      } else if (v === 0) {
-        // reroll 1s.
-        mod = `${prefix}=1`;
-      } else {
-        // reroll if strictly less than (size-x).
-        mod = (die.faces + v <= 1) ? `${prefix}=1` : `${prefix}<${die.faces + v}`;
-      }
-    }
-    if (die.faces > 1) die.modifiers.push(mod);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable explode modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifyExplode(die) {
-    if (!this.hasExplode || die.modifiers.some(m => m.match(this.constructor.REGEX.explode))) return;
-    const v = this.explode.value ?? 0;
-    const l = this.explode.limit;
-    const prefix = (this.explode.once || (l === 1)) ? "xo" : (l ? `x${l}` : "x");
-    const _prefix = () => /x\d+/.test(prefix) ? `${prefix}=${die.faces}` : prefix;
-    let valid;
-    let mod;
-    if (v === 0) {
-      mod = _prefix();
-      valid = (die.faces > 1) || (prefix === "xo");
-    } else if (v > 0) {
-      mod = (v >= die.faces) ? _prefix() : `${prefix}>=${v}`;
-      valid = (v <= die.faces) && (((v === 1) && (prefix === "xo")) || (v > 1));
-    } else if (v < 0) {
-      const m = Math.max(1, die.faces + v);
-      mod = `${prefix}>=${m}`;
-      valid = (m > 1) || (prefix == "xo");
-    }
-    if (valid || l) die.modifiers.push(mod);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable minimum modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifyMin(die) {
-    if (!this.hasMin || die.modifiers.some(m => m.match(this.constructor.REGEX.minimum))) return;
-    const f = die.faces;
-    let mod;
-    const min = this.minimum.value;
-    if (this.minimum.maximize) mod = `min${f}`;
-    else mod = `min${(min > 0) ? Math.min(min, f) : Math.max(1, f + min)}`;
-    if (mod !== "min1") die.modifiers.push(mod);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable maximum modifiers to a die.
-   * @param {DieTerm} die     The die term that will be mutated.
-   */
-  _modifyMax(die) {
-    if (!this.hasMax || die.modifiers.some(m => m.match(this.constructor.REGEX.maximum))) return;
-    const zero = this.maximum.zero;
-    const v = this.maximum.value;
-    const max = (v === 0) ? (zero ? 0 : 1) : (v > 0) ? v : Math.max(zero ? 0 : 1, die.faces + v);
-    if (max < die.faces) die.modifiers.push(`max${max}`);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Append applicable modifiers to a roll part.
-   * @param {string[]|number[]} parts           The roll part. **will be mutated**
-   * @param {object} [rollData]                 Roll data for roll construction.
-   * @param {object} [options]
-   * @param {boolean} [options.ignoreFirst]     Whether to ignore the 'first' property'.
-   * @returns {boolean}                         Whether all but the first die were skipped.
-   */
-  modifyParts(parts, rollData = {}, options = {}) {
-    if (!this.hasModifiers) return;
-    const first = !options.ignoreFirst && this.config.first;
-    for (let i = 0; i < parts.length; i++) {
-      const part = String(parts[i]);
-      const roll = new CONFIG.Dice.DamageRoll(part, rollData);
-      if (!roll.dice.length) continue;
-
-      for (const die of roll.dice) {
-        this.modifyDie(die);
-        if (first) break;
-      }
-      parts[i] = this.constructor._rebuildFormula(roll.terms);
-      if (first) return true;
-    }
-    return false;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Rebuild a formula from roll terms whose dice have just been mutated.
-   *
-   * Roll#dice reaches dice nested inside function and parenthetical terms, but those
-   * terms serialize from a cached string copy of their arguments, so a modifier pushed
-   * onto a nested die is dropped when the formula is regenerated. dnd5e wraps hit die
-   * rolls in max(1, ...), which silently discarded every dice modifier on those rolls.
-   *
-   * @param {RollTerm[]} terms      Roll terms to serialize.
-   * @returns {string}              The regenerated formula.
-   */
-  static _rebuildFormula(terms) {
-    const {FunctionTerm, ParentheticalTerm} = foundry.dice.terms;
-    for (const term of terms) {
-      if (term instanceof FunctionTerm) {
-        for (let i = 0; i < term.rolls.length; i++) {
-          term.terms[i] = this._rebuildFormula(term.rolls[i].terms);
-        }
-      } else if (term instanceof ParentheticalTerm) {
-        term.term = this._rebuildFormula(term.roll.terms);
-      }
-    }
-    return Roll.fromTerms(terms).formula;
-  }
-
-  /* -------------------------------------------------- */
-  /*   Properties                                       */
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction this lives on.
-   * @type {ContextualBonus}
-   */
-  get bonus() {
-    return this.parent ?? null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect the dice amount?
-   * @type {boolean}
-   */
-  get hasAmount() {
-    if (!this.amount.enabled) return false;
-    return Number.isInteger(this.amount.value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect explosive dice?
-   * @type {boolean}
-   */
-  get hasExplode() {
-    if (!this.explode.enabled) return false;
-    return (this.explode.value === null) || Number.isInteger(this.explode.value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect the maximum cap?
-   * @type {boolean}
-   */
-  get hasMax() {
-    if (!this.maximum.enabled) return false;
-    return Number.isInteger(this.maximum.value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect the minimum cap?
-   * @type {boolean}
-   */
-  get hasMin() {
-    if (!this.minimum.enabled) return false;
-    if (this.minimum.maximize) return true;
-    return Number.isInteger(this.minimum.value) && (this.minimum.value !== 0);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus have applicable modifiers for dice?
-   * @type {boolean}
-   */
-  get hasModifiers() {
-    return this.hasAmount || this.hasSize || this.hasReroll || this.hasExplode || this.hasMin || this.hasMax;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect rerolling?
-   * @type {boolean}
-   */
-  get hasReroll() {
-    if (!this.reroll.enabled) return false;
-    return (this.reroll.value === null) || Number.isInteger(this.reroll.value);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus affect the die size?
-   * @type {boolean}
-   */
-  get hasSize() {
-    if (!this.size.enabled) return false;
-    return Number.isInteger(this.size.value);
-  }
-}
-
-const {
-  BooleanField, DocumentIdField, EmbeddedDataField,
-  FilePathField, HTMLField, IntegerSortField,
-  ObjectField, SchemaField, SetField, StringField
-} = foundry.data.fields;
-
-/**
- * Configuration for how a bonus consumes a property.
- *
- * @typedef {object} ConsumptionModel
- * @property {boolean} enabled        Whether the bonus consumes a property.
- * @property {boolean} scales         Whether the bonus scales with its consumed property.
- * @property {string} type            The type of the consumed property.
- * @property {object} value
- * @property {string} value.min       The minimum amount the bonus consumes.
- * @property {string} value.max       The maximum amount the bonus consumes.
- * @property {number} value.step      The interval size between the min and max.
- * @property {string} formula         The formula used to scale up the bonus.
- */
-
-/**
- * Configuration for the aura properties of a bonus.
- *
- * @typedef {object} AuraModel
- * @property {boolean} enabled            Whether the bonus is an aura.
- * @property {boolean} template           Whether the bonus is an aura on a template.
- * @property {string} range               The range of the aura.
- * @property {boolean} self               Whether the aura can also affect its owner.
- * @property {number} disposition         The type of actors, by token disposition, to affect with the aura.
- * @property {Set<string>} blockers       Statuses that disable this aura when its owner is affected.
- * @property {object} require
- * @property {boolean} require.move       Whether the aura requires a direct, unobstructed path of movement.
- * @property {boolean} require.sight      Whether the aura requires a direct line of sight.
- */
-
-/**
- * Configuration for the changes a bonus provides.
- *
- * @typedef {object} BonusConfiguration
- * @property {string} bonus                     Bonus to the roll that is added on top.
- * @property {string} criticalBonusDice         Amount of dice to increase the damage by on critical hits.
- * @property {string} criticalBonusDamage       Bonus to a damage roll that is added on top only on critical hits.
- * @property {string} targetValue               Modification to the target value a saving throw must meet to be
- *                                              considered a success.
- * @property {string} deathSaveCritical         Modification to the threshold at which a death saving throw is
- *                                              considered a critical success.
- * @property {string} criticalRange             Modification to the threshold at which an attack roll is considered
- *                                              a critical hit.
- * @property {string} fumbleRange               Modification to the threshold at which an attack roll is considered
- *                                              an automatic failure.
- * @property {ModifiersModel} modifiers
- */
-
-/**
- * Configuration for dice modifier bonuses.
- *
- * @typedef {object} ModifiersModel
- * @property {object} config                Additional configurations.
- * @property {boolean} config.first         Whether modifiers affect only the first die encountered.
- * @property {object} amount
- * @property {boolean} amount.enabled       Whether this modifier is enabled.
- * @property {string} amount.value          The amount to upscale a die's number by.
- * @property {object} size
- * @property {boolean} size.enabled         Whether this modifier is enabled.
- * @property {string} size.value            The amount to upscale a die's faces by.
- * @property {object} reroll
- * @property {boolean} reroll.enabled       Whether this modifier is enabled.
- * @property {string} reroll.value          The threshold for rerolling a die.
- * @property {boolean} reroll.invert        Whether the threshold is inverted.
- * @property {boolean} reroll.recursive     Whether to reroll recursively.
- * @property {string} reroll.limit          The maximum number of times a die can reroll.
- * @property {object} explode
- * @property {boolean} explode.enabled      Whether this modifier is enabled.
- * @property {string} explode.value         The threshold for exploding a die.
- * @property {boolean} explode.once         Whether a die can explode at most once.
- * @property {string} explode.limit         The maximum number of times a die can explode.
- * @property {object} minimum
- * @property {boolean} minimum.enabled      Whether this modifier is enabled.
- * @property {string} minimum.value         The minimum value a die can roll.
- * @property {boolean} minimum.maximize     Whether to simply maximize dice.
- * @property {object} maximum
- * @property {boolean} maximum.enabled      Whether this modifier is enabled.
- * @property {string} maximum.value         The maximum value a die can roll.
- * @property {boolean} maximum.zero         Whether the maximum can be zero, else at least 1.
- */
-
-/**
- * Data model of a generic ContextualBonus. This includes all properties; depending on the type, some will not exist.
- *
- * @property {string} name                    The name of the bonus.
- * @property {string} id                      The id of the bonus.
- * @property {string} type                    The type of the bonus.
- * @property {boolean} enabled                Whether the bonus is currently active.
- * @property {string} description             The description of the bonus.
- * @property {boolean} optional               Whether the additive bonus is opted into in the roll config.
- * @property {boolean} reminder               Is this optional bonus just a reminder?
- * @property {boolean} exclusive              Whether the bonus is applying only to its parent item,
- *                                            or its parent effect's parent item.
- * @property {object} filters                 Schema of valid filter types.
- * @property {ConsumptionModel} consume
- * @property {AuraModel} aura
- * @property {BonusConfiguration} bonuses
- *
- */
-class ContextualBonus extends foundry.abstract.DataModel {
-  constructor(data, options = {}) {
-    data = foundry.utils.mergeObject({
-      name: options.parent?.name ?? game.i18n.localize("BUILD_N_ACTION.NewContextualBonus"),
-      img: options.parent?.img ?? "icons/svg/dice-target.svg"
-    }, data);
-    super(data, options);
-  }
-
-  /* -------------------------------------------------- */
-  /*   Properties                                       */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static metadata = Object.freeze({
-    label: "BUILD_N_ACTION.BaseContextualBonus",
-    documentName: "BuildNActionBonus",
-    icon: null,
-    defaultImg: null
-  });
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Available buildNAction types.
-   * @type {string[]}
-   */
-  static TYPES = Object.freeze([
-    "attack",
-    "damage",
-    "hitdie",
-    "save",
-    "test",
-    "throw"
-  ]);
-
-  /* -------------------------------------------------- */
-
-  // These two helpers are reached from getRollData during DataModel#_initialize, before
-  // this class's own constructor body has run, so they cannot be private methods: the
-  // brand check for a # method would not yet be installed on the instance.
-
-  /**
-   * The item that created the measured template this bonus lives on, if any.
-   * The dnd5e origin flag holds an activity uuid, whose last two parts address the
-   * activity within its item.
-   * @returns {Item5e|null}
-   */
-  _templateOriginItem() {
-    const uuid = this.template?.flags.dnd5e?.origin ?? "";
-    if (!uuid) return null;
-    const parts = uuid.split(".");
-    parts.pop(); parts.pop();
-    const item = fromUuidSync(parts.join("."));
-    return (item instanceof Item) ? item : null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The document that an effect-embedded bonus draws its roll data from.
-   *
-   * An effect records in its origin the document that applied it, which is what a bonus
-   * on an effect applied to someone else has to scale from. That flag is empty for an
-   * effect authored directly on an item or actor, and points outside the world when the
-   * effect came from a compendium item, so the document the effect is embedded in is the
-   * fallback. Without it every formula on such a bonus silently evaluated to zero.
-   *
-   * @returns {Actor5e|Item5e|null}
-   */
-  _effectSource() {
-    const effect = this.effect;
-    if (!effect) return null;
-
-    let origin;
-    try {
-      origin = fromUuidSync(effect.origin ?? "");
-    } catch (err) {
-      console.warn(err);
-      origin = null;
-    }
-    if (origin instanceof ActiveEffect) origin = origin.parent;
-    if ((origin instanceof Item) || (origin instanceof Actor)) return origin;
-
-    const embedded = effect.parent;
-    if ((embedded instanceof Item) || (embedded instanceof Actor)) return embedded;
-    return null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The actor that this bonus is currently directly or indirectly embedded on, if any.
-   * @type {Actor5e|null}
-   */
-  get actor() {
-    if (this.parent instanceof Actor) return this.parent;
-
-    if (this.parent instanceof Item) return this.parent.parent ?? null;
-
-    if (this.parent instanceof ActiveEffect) {
-      if (this.parent.parent instanceof Actor) return this.parent.parent;
-      if (this.parent.parent instanceof Item) return this.parent.parent.parent ?? null;
-    }
-
-    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem()?.parent ?? null;
-
-    return null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Variable to track whether this bonus has modified dice and was halted at the first die.
-   * @type {boolean}
-   */
-  _halted = false;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether a buildNAction is valid for being 'item only' in the builder. It must be embedded in an item (or an
-   * effect on an item which targets the item's actor), must not be an aura or template aura, and the item
-   * must be able to use activities.
-   * @type {boolean}
-   */
-  get canExclude() {
-    let item;
-    if (this.parent instanceof Item) item = this.parent;
-    else if (this.parent instanceof ActiveEffect) {
-      if (!(this.parent.target instanceof Actor) || !(this.parent.parent instanceof Item)) return false;
-      item = this.parent.parent;
-    }
-    if (!item) return false;
-    return item.system.schema.has("activities");
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Can this bonus act as a reminder?
-   * @type {boolean}
-   */
-  get canRemind() {
-    return ["attack", "damage", "hitdie", "throw", "test"].includes(this.type) && !this.hasBonuses && this.optional;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The effect that this bonus is currently directly embedded on, if any.
-   * @type {ActiveEffect5e|null}
-   */
-  get effect() {
-    return (this.parent instanceof ActiveEffect) ? this.parent : null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this buildNAction have an additive bonus?
-   * @type {boolean}
-   */
-  get hasAdditiveBonus() {
-    return !!this.bonuses.bonus && Roll.validate(this.bonuses.bonus);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus modify a property that isn't an additive bonus or dice modifier?
-   * Such as critical thresholds or bonus critical damage.
-   * @type {boolean}
-   */
-  get hasPropertyBonuses() {
-    return false;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus add dice modifiers?
-   * @type {boolean}
-   */
-  get hasDiceModifiers() {
-    return !!this.bonuses.modifiers?.hasModifiers;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Is this providing a bonus to parts, any properties, or dice modifiers?
-   * @type {boolean}
-   */
-  get hasBonuses() {
-    return this.hasAdditiveBonus || this.hasPropertyBonuses || this.hasDiceModifiers;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this bonus have a damage or healing type?
-   * @type {boolean}
-   */
-  get hasDamageType() {
-    return false;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Getter for the metadata icon for this buildNAction type.
-   * @type {string}
-   */
-  get icon() {
-    return this.constructor.metadata.icon;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the bonus applies only to its parent item. This is true if it has the property enabled and is valid to do so.
-   * @type {boolean}
-   */
-  get isExclusive() {
-    return this.exclusive && this.canExclude;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the bonus can toggle the 'Optional' icon in the builder. This requires that it
-   * applies to attack rolls, damage rolls, saving throws, or ability checks; any of the rolls
-   * that have a roll configuration dialog.
-   * @type {boolean}
-   */
-  get isOptionable() {
-    switch (this.type) {
-      case "damage":
-      case "hitdie":
-        return this.hasBonuses;
-      case "attack":
-      case "throw":
-      case "test":
-        // These roll types currently require an additive formula; dice-only optional bonuses are unsupported.
-        return !!this.bonuses.bonus;
-      default:
-        return false;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether a buildNAction is currently optional, which is only true if it is both able to be optional, and toggled as such.
-   * @type {boolean}
-   */
-  get isOptional() {
-    return this.optional && this.isOptionable;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Is this bonus a reminder, and not an actual 'bonus'?
-   * @type {boolean}
-   */
-  get isReminder() {
-    return this.reminder && this.canRemind;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Whether the buildNAction is unavailable due to its parent item being unequipped,
-   * unattuned (if required), uncrewed, or its parent effect being inactive or suppressed.
-   * @type {boolean}
-   */
-  get isSuppressed() {
-    // If this bonus lives on an effect, template, or region, defer to those.
-    const effect = this.effect;
-    if (effect) {
-      if (!effect.active) return true;
-      if (effect.isAppliedEnchantment) return false;
-      return !effect.modifiesActor;
-    }
-    const template = this.template;
-    if (template) return template.hidden;
-    if (this.region) return false; // a region cannot be disabled.
-
-    const item = this.item;
-    if (!item) return false;
-
-    const actor = item.actor;
-    if (!actor) return false;
-
-    // Special case for vehicle equipment since the system does not suppress 'effects' from these.
-    if (actor.type === "vehicle") {
-      return ("crewed" in item.system) && !item.system.crewed;
-    }
-
-    return item.areEffectsSuppressed;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The item that this bonus is currently directly or indirectly embedded on, if any.
-   * @type {Item5e|null}
-   */
-  get item() {
-    if (this.parent instanceof Actor) return null;
-
-    if (this.parent instanceof Item) return this.parent;
-
-    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
-
-    if (this.parent instanceof ActiveEffect) {
-      const source = this._effectSource();
-      return (source instanceof Item) ? source : null;
-    }
-
-    return null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The true source of the buildNAction intended for the retrieval of roll data.
-   * - If the buildNAction is embedded on a template, this returns the item that created it.
-   * - If the buildNAction is embedded on an item or actor, this simply returns that item or actor.
-   * - If the buildNAction is embedded on an effect, this returns the actor or item from which the effect originates.
-   * @type {Actor5e|Item5e|null}
-   */
-  get origin() {
-    if (this.parent instanceof MeasuredTemplateDocument) return this._templateOriginItem();
-
-    if (this.parent instanceof Item) return this.parent;
-
-    if (this.parent instanceof Actor) return this.parent;
-
-    if (this.parent instanceof ActiveEffect) return this._effectSource();
-
-    return null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The scene region that this bonus is currently embedded on, if any.
-   * @type {SceneRegion|null}
-   */
-  get region() {
-    return (this.parent instanceof RegionDocument) ? this.parent : null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The sheet of the bonus.
-   * @type {BonusSheet}
-   */
-  get sheet() {
-    return getBonusSheet(this);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The template that this bonus is currently directly embedded on, if any.
-   * @type {MeasuredTemplateDocument|null}
-   */
-  get template() {
-    return (this.parent instanceof MeasuredTemplateDocument) ? this.parent : null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get the corresponding token of the actor that has the bonus, no matter what type of document it is embedded in.
-   * Note that this is different from the 'origin' and is dependant on where the bonus currently lives.
-   * @type {Token5e|null}
-   */
-  get token() {
-    const actor = this.actor;
-    if (!actor) return null;
-    const token = actor.isToken ? actor.token?.object : actor.getActiveTokens()[0];
-    return token ? token : null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A formatted uuid of a buildNAction, an extension of its parent's uuid.
-   * @type {string}
-   */
-  get uuid() {
-    return `${this.parent.uuid}.ContextualBonus.${this.id}`;
-  }
-
-  /* -------------------------------------------------- */
-  /*   Data preparation                                 */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static defineSchema() {
-    const base = this._defineBaseSchema();
-    base.bonuses = new SchemaField(this._defineBonusSchema());
-    base.filters = new SchemaField(this._defineFilterSchema());
-    return base;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Define the basics of the schema, properties that are not type specific.
-   * @returns {object}      An object of properties.
-   */
-  static _defineBaseSchema() {
-    return {
-      id: new DocumentIdField({initial: () => foundry.utils.randomID()}),
-      sort: new IntegerSortField(),
-      name: new StringField({required: true, blank: false}),
-      img: new FilePathField({categories: ["IMAGE"]}),
-      type: new StringField({required: true, initial: "base", readonly: true}),
-      enabled: new BooleanField({initial: true}),
-      exclusive: new BooleanField(),
-      optional: new BooleanField(),
-      reminder: new BooleanField(),
-      description: new HTMLField(),
-      conditionGraph: new ObjectField({nullable: true, initial: null}),
-      consume: new EmbeddedDataField(ConsumptionModel),
-      aura: new EmbeddedDataField(AuraModel),
-      flags: new ObjectField()
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = ["BUILD_N_ACTION"];
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Define the bonuses data of the schema.
-   * @returns {object}      An object of properties.
-   */
-  static _defineBonusSchema() {
-    return {};
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Define the filter data of the schema.
-   * @returns {object}      An object of properties.
-   */
-  static _defineFilterSchema() {
-    return {
-      actorCreatureSizes: new fields.actorCreatureSizes(),
-      actorCreatureTypes: new fields.actorCreatureTypes(),
-      actorLanguages: new fields.actorLanguages(),
-      arbitraryComparisons: new fields.arbitraryComparisons(),
-      baseArmors: new fields.baseArmors(),
-      customScripts: new fields.customScripts(),
-      healthPercentages: new fields.healthPercentages(),
-      markers: new fields.markers(),
-      remainingSpellSlots: new fields.remainingSpellSlots(),
-      statusEffects: new fields.statusEffects()
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _initialize(...args) {
-    super._initialize(...args);
-    this.prepareDerivedData();
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Prepare any derived values.
-   */
-  prepareDerivedData() {}
-
-  /* -------------------------------------------------- */
-  /*   Migration                                        */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static migrateData(source) {
-    this.migrateMinimum(source);
-    this.migrateDeathSaveTargetValue(source);
-    this.migrateArbitraryComparisonPlural(source);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Migrate the old version of maximizing dice.
-   * @param {object} source     Candidate source data.
-   */
-  static migrateMinimum(source) {
-    const minimum = source?.bonuses?.modifiers?.minimum;
-    if (!minimum) return;
-    if (!("maximize" in minimum) && (minimum.value === "-1")) {
-      minimum.value = "";
-      minimum.maximize = true;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Migrate 'deathSaveTargetValue' to 'targetValue'.
-   * @param {object} source     Candidate source data.
-   */
-  static migrateDeathSaveTargetValue(source) {
-    const tv = source?.bonuses?.deathSaveTargetValue;
-    if (tv) foundry.utils.setProperty(source, "bonuses.targetValue", tv);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Rename the 'arbitraryComparison' property to 'arbitraryComparisons'.
-   * @param {object} source     Candidate source data.
-   */
-  static migrateArbitraryComparisonPlural(source) {
-    const v = source?.filters?.arbitraryComparison;
-    if (v?.length && !source.filters.arbitraryComparisons) {
-      source.filters.arbitraryComparisons = v;
-    }
-  }
-
-  /* -------------------------------------------------- */
-  /*   Instance methods                                 */
-  /* -------------------------------------------------- */
-
-  /** @override */
-  testUserPermission() {
-    // Since babs are always local, all users have permission to render them.
-    // Proper permissions are handled elsewhere.
-    return true;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  toDragData() {
-    return {type: "ContextualBonus", uuid: this.uuid};
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get applicable roll data from the origin.
-   * @param {boolean} deterministic     Whether to force flat values for properties that could be a die term or flat term.
-   * @returns {object}                  The roll data.
-   */
-  getRollData({deterministic = false} = {}) {
-    const rollData = this.origin?.getRollData({deterministic}) ?? {};
-    const level = this.template ? this.template.getFlag("dnd5e", "spellLevel") : null;
-    if (level) foundry.utils.setProperty(rollData, "item.level", level);
-    return rollData;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get the value of a flag on this buildNAction.
-   * @param {string} scope
-   * @param {string} key
-   * @returns {*}
-   */
-  getFlag(scope, key) {
-    const scopes = this.parent.constructor.database.getFlagScopes();
-    if (!scopes.includes(scope)) throw new Error(`Flag scope "${scope}" is not valid or not currently active.`);
-    return foundry.utils.getProperty(this.flags?.[scope], key);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set a flag on this buildNAction.
-   * @param {string} scope
-   * @param {string} key
-   * @param {*} value
-   * @returns {Promise<ContextualBonus>}
-   */
-  async setFlag(scope, key, value) {
-    const scopes = this.parent.constructor.database.getFlagScopes();
-    if (!scopes.includes(scope)) throw new Error(`Flag scope "${scope}" is not valid or not currently active.`);
-    await this.update({[`flags.${scope}.${key}`]: value});
-    return this;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Remove a flag on this buildNAction.
-   * @param {string} scope
-   * @param {string} key
-   * @return {Promise<ContextualBonus>}
-   */
-  async unsetFlag(scope, key) {
-    const scopes = this.parent.constructor.database.getFlagScopes();
-    if (!scopes.includes(scope)) throw new Error(`Flag scope "${scope}" is not valid or not currently active.`);
-    const head = key.split(".");
-    const tail = `-=${head.pop()}`;
-    key = ["flags", scope, ...head, tail].join(".");
-    await this.update({[key]: null});
-    return this;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Toggle this bonus.
-   * @param {boolean} [state]     A specific state to set the bonus to.
-   * @returns {Promise<ContextualBonus>}
-   */
-  async toggle(state = null) {
-    await this.update({enabled: [true, false].includes(state) ? state : !this.enabled});
-    return this;
-  }
-
-  /* -------------------------------------------------- */
-  /*   Life-cycle methods                               */
-  /* -------------------------------------------------- */
-
-  /**
-   * Update this bonus, propagating the data to its parent.
-   * @param {object} changes        The update object.
-   * @param {object} [options]      The update options.
-   * @returns {Promise<ContextualBonus>}
-   */
-  async update(changes, options = {}) {
-    changes = foundry.utils.expandObject(changes);
-
-    this.updateSource(changes, options);
-    await upsertStoredBonus(this.parent, this.id, this.toObject());
-    this.#updateContentLinks();
-    return this;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Refresh the state of all content links.
-   */
-  #updateContentLinks() {
-    for (const link of document.querySelectorAll(`a[data-link][data-uuid="${this.uuid}"]`)) {
-      link.classList.toggle("enabled", this.enabled);
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Delete this bonus.
-   * @returns {Promise<ContextualBonus>}
-   */
-  async delete() {
-    await removeStoredBonus(this.parent, this.id);
-    return this;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Present a Dialog form to confirm deletion of this bonus.
-   * @param {object} [options]      Options to configure the deletetion.
-   * @returns {Promise}             A Promise which resolves to the deleted bonus.
-   */
-  async deleteDialog(options = {}) {
-    const type = game.i18n.localize(this.constructor.metadata.label);
-    return foundry.applications.api.DialogV2.confirm({
-      window: {
-        title: `Build-n-Action: ${this.name}`,
-        icon: MODULE.ICON
-      },
-      position: {
-        width: 400
-      },
-      content: `<p>${game.i18n.localize("AreYouSure")} ${game.i18n.format("SIDEBAR.DeleteWarning", {type})}</p>`,
-      yes: {
-        callback: () => this.delete(),
-        default: true
-      },
-      no: {
-        default: false
-      },
-      rejectClose: false,
-      modal: true,
-      ...options
-    });
-  }
-}
-
-// a bonus attached to an item; attack rolls, damage rolls, save dc.
-class ItemBonus extends ContextualBonus {
-  /** @override */
-  static _defineFilterSchema() {
-    return {
-      ...super._defineFilterSchema(),
-      abilities: new fields.abilities(),
-      baseWeapons: new fields.baseWeapons(),
-      creatureTypes: new fields.creatureTypes(),
-      damageTypes: new fields.damageTypes(),
-      featureTypes: new fields.featureTypes(),
-      identifiers: new fields.identifiers(),
-      itemTypes: new fields.itemTypes(),
-      preparationModes: new fields.preparationModes(),
-      sourceClasses: new fields.sourceClasses(),
-      spellComponents: new fields.spellComponents(),
-      spellLevels: new fields.spellLevels(),
-      spellSchools: new fields.spellSchools(),
-      targetArmors: new fields.targetArmors(),
-      targetEffects: new fields.targetEffects(),
-      tokenSizes: new fields.tokenSizes(),
-      weaponProperties: new fields.weaponProperties()
-    };
-  }
-}
-
-class AttackBonus extends ItemBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.AttackBonus",
-    icon: "fa-solid fa-location-crosshairs",
-    defaultImg: "systems/dnd5e/icons/svg/trait-weapon-proficiencies.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "attack"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.ATTACK"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true}),
-      criticalRange: new StringField({required: true}),
-      fumbleRange: new StringField({required: true})
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineFilterSchema() {
-    return {
-      ...super._defineFilterSchema(),
-      proficiencyLevels: new fields.proficiencyLevels()
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get hasPropertyBonuses() {
-    return !!this.bonuses.criticalRange || !!this.bonuses.fumbleRange;
-  }
-}
-
-class DamageBonus extends ItemBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.DamageBonus",
-    icon: "fa-solid fa-burst",
-    defaultImg: "systems/dnd5e/icons/svg/properties/magical.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "damage"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.DAMAGE"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true}),
-      damageType: new SetField(new StringField()),
-      criticalBonusDice: new StringField({required: true}),
-      criticalBonusDamage: new StringField({required: true}),
-      modifiers: new EmbeddedDataField(ModifiersModel)
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineFilterSchema() {
-    const schema = super._defineFilterSchema();
-    schema.attackModes = new fields.attackModes();
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static migrateData(source) {
-    super.migrateData(source);
-    if (!source.damageType) return;
-    if (foundry.utils.getType(source.damageType) === "string") {
-      source.damageType = [source.damageType];
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get hasDamageType() {
-    const types = this.bonuses.damageType;
-    return types.some(type => (type in CONFIG.DND5E.damageTypes) || (type in CONFIG.DND5E.healingTypes));
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get hasPropertyBonuses() {
-    return !!this.bonuses.criticalBonusDice || !!this.bonuses.criticalBonusDamage;
-  }
-}
-
-class SaveBonus extends ItemBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.SaveBonus",
-    icon: "fa-solid fa-hand-sparkles",
-    defaultImg: "systems/dnd5e/icons/svg/trait-damage-resistances.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "save"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.SAVE"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true})
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineFilterSchema() {
-    return {
-      ...super._defineFilterSchema(),
-      saveAbilities: new fields.saveAbilities()
-    };
-  }
-}
-
-class ThrowBonus extends ContextualBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.ThrowBonus",
-    icon: "fa-solid fa-person-falling-burst",
-    defaultImg: "systems/dnd5e/icons/svg/trait-saves.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "throw"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.THROW"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true}),
-      targetValue: new StringField({required: true}),
-      deathSaveCritical: new StringField({required: true})
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineFilterSchema() {
-    return {
-      ...super._defineFilterSchema(),
-      creatureTypes: new fields.creatureTypes(),
-      proficiencyLevels: new fields.proficiencyLevels(),
-      targetEffects: new fields.targetEffects(),
-      throwTypes: new fields.throwTypes()
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get hasPropertyBonuses() {
-    return !!this.bonuses.targetValue || !!this.bonuses.deathSaveCritical;
-  }
-}
-
-class TestBonus extends ContextualBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.TestBonus",
-    icon: "fa-solid fa-bolt",
-    defaultImg: "systems/dnd5e/icons/svg/trait-skills.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "test"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.TEST"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true})
-    };
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineFilterSchema() {
-    return {
-      ...super._defineFilterSchema(),
-      abilities: new fields.abilities(),
-      baseTools: new fields.baseTools(),
-      proficiencyLevels: new fields.proficiencyLevels(),
-      skillIds: new fields.skillIds()
-    };
-  }
-}
-
-class HitDieBonus extends ContextualBonus {
-  /** @override */
-  static metadata = Object.freeze(foundry.utils.mergeObject(super.metadata, {
-    label: "BUILD_N_ACTION.HitdieContextualBonus",
-    icon: "fa-solid fa-heart-pulse",
-    defaultImg: "systems/dnd5e/icons/svg/hit-points.svg"
-  }, {inplace: false}));
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBaseSchema() {
-    const schema = super._defineBaseSchema();
-    schema.type = new StringField({
-      required: true,
-      readonly: true,
-      initial: "hitdie"
-    });
-    return schema;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static LOCALIZATION_PREFIXES = [
-    ...super.LOCALIZATION_PREFIXES,
-    "BUILD_N_ACTION.HITDIE"
-  ];
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static _defineBonusSchema() {
-    return {
-      ...super._defineBonusSchema(),
-      bonus: new StringField({required: true}),
-      modifiers: new EmbeddedDataField(ModifiersModel)
-    };
-  }
-}
-
-var contextualBonuses = {
-  attack: AttackBonus,
-  damage: DamageBonus,
-  hitdie: HitDieBonus,
-  save: SaveBonus,
-  test: TestBonus,
-  throw: ThrowBonus
-};
-
-const {Collection} = foundry.utils;
-
-/**
- * Simple class for holding onto bonuses in a structured manner depending on their type and effect.
- * @param {Iterable<ContextualBonus>} bonuses     The bonuses to structure.
- */
-class BonusCollection {
-  constructor(bonuses) {
-    this.#bonuses = bonuses;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The bonuses to structure.
-   * @type {Iterable<ContextualBonus>}
-   */
-  #bonuses = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Reference to the size of the collection, regardless of type of iterator.
-   * @type {number}
-   */
-  get size() {
-    return this.all.size;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses regardless of bonus, type, or modifiers.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  get all() {
-    if (!this.#all) {
-      const collection = new Collection();
-      for (const bonus of this.#bonuses) {
-        collection.set(bonus.uuid, bonus);
-      }
-      this.#all = collection;
-    }
-    return this.#all;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses regardless of bonus, type, or modifiers.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  #all = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that are just reminders.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  get reminders() {
-    if (!this.#reminders) {
-      const collection = new Collection();
-      for (const bonus of this.#bonuses) {
-        if (bonus.isReminder) collection.set(bonus.uuid, bonus);
-      }
-      this.#reminders = collection;
-    }
-    return this.#reminders;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that are just reminders.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  #reminders = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that have dice modifiers.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  get modifiers() {
-    if (!this.#modifiers) {
-      const collection = new Collection();
-      for (const bonus of this.#bonuses) {
-        if (bonus.hasDiceModifiers) collection.set(bonus.uuid, bonus);
-      }
-      this.#modifiers = collection;
-    }
-    return this.#modifiers;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that have dice modifiers.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  #modifiers = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that are optional.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  get optionals() {
-    if (!this.#optionals) {
-      const collection = new Collection();
-      for (const bonus of this.#bonuses) {
-        if (bonus.isOptional) collection.set(bonus.uuid, bonus);
-      }
-      this.#optionals = collection;
-    }
-    return this.#optionals;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that are optional.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  #optionals = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that apply immediately with no configuration.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  get nonoptional() {
-    if (!this.#nonoptional) {
-      const collection = new Collection();
-      for (const bonus of this.#bonuses) {
-        if (bonus.isOptional || bonus.isReminder) continue;
-        if (bonus.hasBonuses) collection.set(bonus.uuid, bonus);
-      }
-      this.#nonoptional = collection;
-    }
-    return this.#nonoptional;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * All the bonuses that apply immediately with no configuration.
-   * @type {Collection<string, ContextualBonus>}
-   */
-  #nonoptional = null;
-}
-
-/**
- * Canvas geometry helpers.
- *
- * Foundry v14 assigns `Token#shape` and `MeasuredTemplate#shape` only while the
- * placeable is being refreshed, so those properties are undefined until the object
- * has been drawn. Reading them directly threw inside the bonus collector, and because
- * that runs before every roll, a single undrawn placeable silently removed every
- * bonus from the roll. These helpers use the public v14 APIs and never throw.
- */
-
-/**
- * The geometry of a token placeable, in the token's local coordinate space.
- * @param {Token5e} token           A token placeable.
- * @returns {PIXI.Polygon|PIXI.Rectangle|PIXI.Circle|PIXI.Ellipse|null}
- */
-function getTokenShape(token) {
-  if (!token) return null;
-  // Token#getShape computes the same geometry that Token#shape caches once drawn.
-  if (typeof token.getShape === "function") return token.getShape() ?? null;
-  return token.shape ?? null;
-}
-
-/**
- * The center point of every grid space that a token placeable occupies.
- * @param {Token5e} token     A token placeable.
- * @returns {object[]}        An array of xy coordinates, empty if the token has no geometry.
- */
-function collectTokenCenters(token) {
-  const points = [];
-  const shape = getTokenShape(token);
-  if (!shape) return points;
-
-  const [i, j, i1, j1] = canvas.grid.getOffsetRange(token.bounds);
-  const gridless = canvas.grid.type === CONST.GRID_TYPES.GRIDLESS;
-  const delta = gridless ? canvas.dimensions.size : 1;
-  const offset = gridless ? canvas.dimensions.size / 2 : 0;
-  for (let x = i; x < i1; x += delta) {
-    for (let y = j; y < j1; y += delta) {
-      const point = canvas.grid.getCenterPoint({i: x + offset, j: y + offset});
-      const p = {
-        x: point.x - token.document.x,
-        y: point.y - token.document.y
-      };
-      if (shape.contains(p.x, p.y)) points.push(point);
-    }
-  }
-  return points;
-}
-
-/**
- * Whether a point on the canvas falls inside a measured template.
- * @param {MeasuredTemplate} template     A measured template placeable.
- * @param {object} point                  An xy coordinate in canvas space.
- * @returns {boolean}                     False when the template has no computed geometry.
- */
-function templateContainsPoint(template, point) {
-  // Both branches read the cached shape, so an undrawn template simply contains nothing.
-  if (!template?.shape) return false;
-  if (typeof template.testPoint === "function") return template.testPoint(point);
-  return template.shape.contains(point.x - template.document.x, point.y - template.document.y);
-}
-
-const EMBEDDABLE_DOCUMENT_TYPES = new Set(["Actor", "Item", "ActiveEffect", "Region"]);
-
-/** @param {Document|object|null} document */
-function isEmbeddableDocument(document) {
-  return EMBEDDABLE_DOCUMENT_TYPES.has(document?.documentName);
-}
-
-/**
- * Create a contextual bonus in memory.
- *
- * @param {object} data
- * @param {Document|null} [parent]
- * @returns {ContextualBonus}
- */
-function createBonus(data, parent = null) {
-  if (!data || !(data.type in contextualBonuses)) throw new Error("INVALID BUILD_N_ACTION TYPE.");
-  const source = {...data, id: foundry.utils.randomID()};
-  return new contextualBonuses[source.type](source, {parent});
-}
-
-/**
- * Construct the collection of bonuses stored on a document.
- *
- * @param {Document} document
- * @returns {Collection<ContextualBonus>}
- */
-function getCollection(document) {
-  const contents = [];
-  for (const bonusData of getStoredBonusData(document)) {
-    try {
-      if (!foundry.data.validators.isValidId(bonusData.id)) continue;
-      const BonusModel = contextualBonuses[bonusData.type];
-      if (!BonusModel) continue;
-      const bonus = new BonusModel(bonusData, {parent: document});
-      contents.push([bonus.id, bonus]);
-    } catch (error) {
-      console.warn(error);
-    }
-  }
-  return new foundry.utils.Collection(contents);
-}
-
-/**
- * Return embedded documents that contain contextual bonuses.
- *
- * @param {Document} document
- * @returns {object}
- */
-function findEmbeddedDocumentsWithBonuses(document) {
-  const documents = {};
-  for (const [, embedded] of document.traverseEmbeddedDocuments()) {
-    const collection = embedded.constructor.metadata.collection;
-    documents[collection] ??= [];
-    if (getCollection(embedded).size) documents[collection].push(embedded);
-  }
-  return documents;
-}
-
-/**
- * Persist a contextual bonus on a document.
- *
- * @param {Document} document
- * @param {ContextualBonus} bonus
- * @param {object} [options]
- * @param {boolean} [options.renderSheet]
- * @returns {Promise<Document|string|null>}
- */
-async function embedBonus(document, bonus, {renderSheet = true, ...options} = {}) {
-  if (!isEmbeddableDocument(document)) {
-    throw new Error("The document provided is not a valid document type for Build-n-Action!");
-  }
-  if (!Object.values(contextualBonuses).some(Model => bonus instanceof Model)) return null;
-
-  const id = await persistBonus(document, bonus);
-  if (renderSheet) await getCollection(document).get(id).sheet.render({force: true});
-  return options.bonusId ? id : document;
-}
-
-/**
- * Duplicate an embedded contextual bonus.
- *
- * @param {ContextualBonus} bonus
- * @returns {Promise<ContextualBonus>}
- */
-async function duplicateBonus(bonus) {
-  const data = bonus.toObject();
-  data.name = game.i18n.format("BUILD_N_ACTION.BonusCopy", {name: data.name});
-  const duplicate = new bonus.constructor(data, {parent: bonus.parent});
-  const id = await embedBonus(bonus.parent, duplicate, {bonusId: true});
-  return getCollection(bonus.parent).get(id);
-}
-
-/** @param {string} uuid */
-async function fromUuid(uuid) {
-  try {
-    const {parentUuid, id} = splitUuid(uuid);
-    const parent = await globalThis.fromUuid(parentUuid);
-    return getCollection(parent).get(id) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** @param {string} uuid */
-function fromUuidSync$1(uuid) {
-  try {
-    const {parentUuid, id} = splitUuid(uuid);
-    const parent = globalThis.fromUuidSync(parentUuid);
-    return getCollection(parent).get(id) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function persistBonus(document, bonus) {
-  const data = bonus.toObject();
-  for (const id of Object.keys(data.filters)) {
-    if (!fields[id].storage(bonus)) delete data.filters[id];
-  }
-  // Embedding always appends a new entry: the same bonus can be dropped onto a
-  // second document, and duplicateBonus re-embeds a copy of an existing one, so a
-  // fresh id is required to avoid overwriting the source.
-  data.id = foundry.utils.randomID();
-
-  const stored = getCollection(document).map(entry => entry.toObject());
-  stored.push(data);
-  await document.setFlag(MODULE.ID, "bonuses", stored);
-  return data.id;
-}
-
-function splitUuid(uuid) {
-  const parts = uuid.split(".");
-  const id = parts.pop();
-  parts.pop();
-  return {parentUuid: parts.join("."), id};
-}
-
-/**
- * A helper class that collects and then hangs onto the bonuses for one particular
- * roll. The bonuses are filtered here only with regards to:
- * - aura blockers, aura range, aura disposition
- * - the hidden state of tokens
- * - the hidden state of measured templates
- * - item exclusivity (buildNAction being item-only)
- * - item attunement/equipped state (isSuppressed)
- * - effects being unavailable
- */
-class BonusCollector {
-  constructor({activity, item, actor, type}) {
-    this.activity = activity;
-    this.item = item;
-    this.actor = actor;
-    this.type = type;
-
-    // Set up canvas elements.
-    this.token = this.actor.token?.object ?? this.actor.getActiveTokens()[0];
-    if (this.token) this.tokenCenters = collectTokenCenters(this.token);
-
-    this.bonuses = this._collectBonuses();
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The type of bonuses being collected.
-   * @type {string}
-   */
-  type = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Collected bonuses.
-   * @type {ContextualBonus[]}
-   */
-  bonuses = [];
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The activity being used.
-   * @type {Activity|null}
-   */
-  activity = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The item performing the roll, if any.
-   * @type {Item5e|null}
-   */
-  item = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The actor performing the roll or owning the item performing the roll.
-   * @type {Actor5e}
-   */
-  actor = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The token object of the actor performing the roll, if any.
-   * @type {Token5e|null}
-   */
-  token = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Center points of all occupied grid spaces of the token placeable.
-   * @type {object[]}
-   */
-  tokenCenters = [];
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Token documents on the same scene which are valid, not a group, and not the same token.
-   * @type {TokenDocument5e[]}
-   */
-  tokens = [];
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Reference to auras that are to be drawn later.
-   * @type {Set<TokenAura>}
-   */
-  auras = new Set();
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A method that can be called at any point to retrieve the bonuses hung on to.
-   * This returns a collection of uuids mapping to bonuses due to ids not necessarily changing.
-   * @returns {Collection<ContextualBonus>}     The collection of bonuses.
-   */
-  returnBonuses() {
-    return new foundry.utils.Collection(this.bonuses.map(b => [b.uuid, b]));
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Main collection method that calls the below collectors for self, all tokens, and all templates.
-   * This method also ensures that overlapping templates from one item do not apply twice.
-   * @returns {ContextualBonus[]}
-   */
-  _collectBonuses() {
-    const bonuses = {
-      actor: this._collectFromSelf(),
-      token: [],
-      template: [],
-      regions: []
-    };
-
-    // Token and template auras.
-    if (this.token) {
-
-      // Collect token auras.
-      const _uuids = new Set();
-      for (const token of this.token.scene.tokens) {
-        if (token.actor && (token.actor.type !== "group") && (token !== this.token.document) && !token.hidden) {
-          if (_uuids.has(token.actor.uuid)) continue;
-          bonuses.token.push(...this._collectFromToken(token));
-          _uuids.add(token.actor.uuid);
-        }
-      }
-
-      // Special consideration for templates; allow overlapping without stacking the same bonus.
-      const map = new Map();
-      for (const template of this.token.scene.templates) {
-        const boni = this._collectFromTemplate(template);
-        for (const b of boni) map.set(`${b.item.uuid}.ContextualBonus.${b.id}`, b);
-      }
-      bonuses.template.push(...map.values());
-
-      // Collection from scene regions.
-      for (const region of this.token.document.regions) {
-        const collected = this._collectFromRegion(region);
-        bonuses.regions.push(...collected);
-      }
-    }
-
-    return bonuses.actor.concat(bonuses.token).concat(bonuses.template).concat(bonuses.regions);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Destroy all auras that were created and drawn during this collection.
-   */
-  destroyAuras() {
-    for (const aura of this.auras) aura.destroy({fadeOut: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get all bonuses that originate from yourself.
-   * @returns {ContextualBonus[]}     The array of bonuses.
-   */
-  _collectFromSelf() {
-
-    // A filter for discarding blocked or suppressed auras, template auras, and auras that do not affect self.
-    const validSelfAura = (bab) => {
-      return !bab.aura.isTemplate && bab.aura.isAffectingSelf;
-    };
-
-    const enchantments = [];
-    if (this.item) {
-      for (const effect of this.item.allApplicableEffects()) {
-        if (effect.active) enchantments.push(...this._collectFromDocument(effect, [validSelfAura]));
-      }
-    }
-
-    const actor = this._collectFromDocument(this.actor, [validSelfAura]);
-    const items = this.actor.items.reduce((acc, item) => acc.concat(this._collectFromDocument(item, [validSelfAura])), []);
-    const effects = this.actor.appliedEffects.reduce((acc, effect) => acc.concat(this._collectFromDocument(effect, [validSelfAura])), []);
-    return [...enchantments, ...actor, ...items, ...effects];
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get all bonuses that originate from another token on the scene.
-   * @param {TokenDocument5e} token     The token.
-   * @returns {ContextualBonus[]}               The array of aura bonuses that apply.
-   */
-  _collectFromToken(token) {
-    const bonuses = [];
-
-    const checker = (object) => {
-      const collection = getCollection(object);
-      for (const bonus of collection) {
-        if (this.type !== bonus.type) continue; // discard bonuses of the wrong type.
-        if (!bonus.aura.isActiveTokenAura) continue; // discard blocked and suppressed auras.
-        if (bonus.aura.isTemplate) continue; // discard template auras.
-        if (!this._matchTokenDisposition(token, bonus)) continue; // discard invalid targeting bonuses.
-        if (!this._generalFilter(bonus)) continue;
-
-        // Skip creating pixi auras for infinite-range auras.
-        if (bonus.aura.range === -1) {
-          bonuses.push(bonus);
-        } else {
-          const aura = createTokenAura(token, bonus);
-          aura.initialize(this.token);
-          if (aura.isApplying) bonuses.push(bonus);
-          this.auras.add(aura);
-        }
-      }
-    };
-
-    checker(token.actor);
-    for (const item of token.actor.items) checker(item);
-    for (const effect of token.actor.appliedEffects) checker(effect);
-
-    return bonuses;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get all bonuses that originate from templates the rolling token is standing on.
-   * @param {MeasuredTemplateDocument} template     The template.
-   * @returns {ContextualBonus[]}                           The array of bonuses.
-   */
-  _collectFromTemplate(template) {
-    if (template.hidden) return [];
-    if (!this._tokenWithinTemplate(template.object)) return [];
-
-    // A filter for discarding template auras that are blocked or do not affect self (if they are your own).
-    const templateAuraChecker = (bab) => {
-      if (bab.aura.isBlocked) return false;
-      const isOwn = this.token.actor === bab.actor;
-      if (isOwn) return bab.aura.self;
-      return this._matchTemplateDisposition(template, bab);
-    };
-
-    const templates = this._collectFromDocument(template, [templateAuraChecker]);
-    return templates;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Collect bonuses from a scene region the token is standing in.
-   * @param {RegionDocument} region     The region.
-   * @returns {ContextualBonus[]}               The array of bonuses.
-   */
-  _collectFromRegion(region) {
-    return this._collectFromDocument(region, []);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * General collection method that all other collection methods call in some fashion.
-   * Gets an array of Build-n-Action bonuses from that document.
-   * @param {Document5e} document          The token, actor, item, effect, or template.
-   * @param {function[]} [filterings]      An array of additional functions used to filter.
-   * @returns {ContextualBonus[]}                  An array of Build-n-Action bonuses of the right type.
-   */
-  _collectFromDocument(document, filterings = []) {
-    const bonuses = getCollection(document).reduce((acc, bonus) => {
-      if (this.type !== bonus.type) return acc;
-      if (!this._generalFilter(bonus)) return acc;
-      for (const fn of filterings) if (!fn(bonus)) return acc;
-      acc.push(bonus);
-      return acc;
-    }, []);
-    return bonuses;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Some general filters that apply no matter where the buildNAction is located.
-   * @param {ContextualBonus} bonus     A buildNAction to evaluate.
-   * @returns {boolean}         Whether the bonus should be retained.
-   */
-  _generalFilter(bonus) {
-    if (!bonus.enabled) return false;
-    if (bonus.isSuppressed) return false;
-
-    // Filter for exclusivity.
-    if (!bonus.isExclusive) return true;
-    const item = bonus.item;
-    return item ? (this.item?.uuid === item.uuid) : true;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get whether the rolling token has any grid center within a given template.
-   * @param {MeasuredTemplate} template     A measured template placeable.
-   * @returns {boolean}                     Whether the rolling token is contained.
-   */
-  _tokenWithinTemplate(template) {
-    return this.tokenCenters.some(point => templateContainsPoint(template, point));
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get whether an aura can target the rolling actor's token depending on its targeting.
-   * @param {TokenDocument5e} token     The token on whom the aura was found.
-   * @param {ContextualBonus} bonus             The buildNAction with the aura.
-   * @returns {boolean}                 Whether the bonus can apply.
-   */
-  _matchTokenDisposition(token, bonus) {
-    const tisp = token.disposition;
-    const bisp = bonus.aura.disposition;
-    return this._matchDisposition(tisp, bisp);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get whether a template aura can target the contained token depending on its targeting.
-   * @param {MeasuredTemplateDocument} template   The containing template.
-   * @param {ContextualBonus} bonus                       The buildNAction with the aura.
-   * @returns {boolean}                           Whether the bonus can apply.
-   */
-  _matchTemplateDisposition(template, bonus) {
-    const tisp = template.flags[MODULE.ID]?.templateDisposition;
-    const bisp = bonus.aura.disposition;
-    return this._matchDisposition(tisp, bisp);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Given a disposition of a template/token and the targeting of of an aura, get whether the aura should apply.
-   * @param {number} tisp   Token or template disposition.
-   * @param {number} bisp   The targeting disposition of a buildNAction.
-   * @returns {boolean}     Whether the targeting applies.
-   */
-  _matchDisposition(tisp, bisp) {
-    if (bisp === 2) { // any
-      // If the bonus targets everyone, immediately return true.
-      return true;
-    } else if (bisp === 1) { // allies
-      // If the bonus targets allies, the roller and the source must match.
-      return tisp === this.token.document.disposition;
-    } else if (bisp === -1) { // enemies
-      // If the bonus targets enemies, the roller and the source must have opposite dispositions.
-      const modes = CONST.TOKEN_DISPOSITIONS;
-      const set = new Set([tisp, this.token.document.disposition]);
-      return set.has(modes.FRIENDLY) && set.has(modes.HOSTILE);
-    }
-  }
-}
-
-/* -------------------------------------------------- */
-
-const GRAPH_TYPES = new Set(['condition', 'context', 'and', 'or', 'not', 'result', 'branch', 'xor', 'nand', 'nor']);
-const BINARY_TYPES = new Set(['xor', 'nand', 'nor']);
-const CONTEXT_PREDICATES = ['inCombat', 'hasTarget', 'hasItem'];
-const outputPort = edge => edge.fromPort ?? 'out';
-const inputPort = edge => edge.toPort ?? 'in';
-function inputPorts(node) {
-  if (['condition', 'context'].includes(node.type)) return [];
-  return BINARY_TYPES.has(node.type) ? ['a', 'b'] : ['in'];
-}
-function outputPorts(node) { return node.type === 'result' ? [] : node.type === 'branch' ? ['true', 'false'] : ['out']; }
-function portY(node, port) { return ['a','true'].includes(port) ? 100 : ['b','false'].includes(port) ? 128 : 114; }
-
-/** Presence checks use the supplied roll context, never stale global user targets. */
-function evaluateContextCondition(node, subjects = {}, {combatActive} = {}) {
-  if (node.predicate === 'hasTarget') return !!subjects.target?.actor;
-  if (node.predicate === 'hasItem') return !!subjects.item;
-  if (node.predicate === 'inCombat') return typeof combatActive === 'boolean' ? combatActive : null;
-  return null;
-}
-
-const MAX_NODES = 256, MAX_EDGES = 1024;
-
-/** Convert existing conjunctive filters without changing their meaning. */
-function createConditionGraph(filterIds) {
-  const filters = [...new Set(filterIds)];
-  const nodes = filters.map((filter, i) => ({id: `condition-${i + 1}`, type: "condition", filter, x: 40, y: i * 150 + 30}));
-  const edges = [];
-  if (filters.length) {
-    nodes.push({id: "all", type: "and", x: 350, y: Math.max(30, (filters.length - 1) * 75 + 30)});
-    edges.push(...nodes.filter(n => n.type === "condition").map(n => ({from: n.id, to: "all"})), {from: "all", to: "result"});
-  }
-  nodes.push({id: "result", type: "result", x: filters.length ? 660 : 300, y: Math.max(30, (filters.length - 1) * 75 + 30)});
-  return {version: 1, enabled: true, nodes, edges};
-}
-
-/** Pure structural validation, including an explicit configured-field contract. */
-function validateConditionGraph(graph, {knownFilters, configuredFilters} = {}) {
-  const issues = [];
-  const error = (code, nodeId) => issues.push({code, nodeId, severity: "error"});
-  const done = () => ({valid: !issues.some(i => i.severity === "error"), issues});
-  if (!graph || graph.version !== 1 || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) { error("Malformed"); return done(); }
-  if (graph.nodes.length > MAX_NODES || graph.edges.length > MAX_EDGES) { error("TooLarge"); return done(); }
-  const nodes = new Map(), conditionIds = new Set();
-  const known = knownFilters === undefined ? null : new Set(knownFilters);
-  const configured = configuredFilters === undefined ? null : new Set(configuredFilters);
-  for (const node of graph.nodes) {
-    if (!node || typeof node.id !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(node.id) || !GRAPH_TYPES.has(node.type)) { error("Malformed"); continue; }
-    if (nodes.has(node.id)) error("DuplicateNode", node.id);
-    nodes.set(node.id, node);
-    if (node.type === "context" && !CONTEXT_PREDICATES.includes(node.predicate)) error("UnknownFilter", node.id);
-    if (node.type === "condition") {
-      if (typeof node.filter !== "string" || !node.filter || (known && !known.has(node.filter))) error("UnknownFilter", node.id);
-      if (configured && !configured.has(node.filter)) error("MissingParameters", node.id);
-      if (conditionIds.has(node.filter)) error("DuplicateFilter", node.id);
-      conditionIds.add(node.filter);
-    }
-  }
-  if (configured) for (const id of configured) if (!conditionIds.has(id)) error("OmittedFilter");
-  const results = [...nodes.values()].filter(n => n.type === "result");
-  if (results.length !== 1) error("ResultCount");
-  const inputs = new Map([...nodes.keys()].map(id => [id, []]));
-  const outputs = new Map([...nodes.keys()].map(id => [id, []]));
-  const edgeIds = new Set();
-  for (const edge of graph.edges) {
-    if (!edge || typeof edge.from !== "string" || typeof edge.to !== "string" || !nodes.has(edge.from) || !nodes.has(edge.to)) { error("DanglingEdge"); continue; }
-    const key = `${edge.from}/${outputPort(edge)}/${edge.to}/${inputPort(edge)}`;
-    if (edgeIds.has(key)) error("DuplicateEdge", edge.to);
-    edgeIds.add(key);
-    inputs.get(edge.to).push(edge.from); outputs.get(edge.from).push(edge.to);
-    if (!inputPorts(nodes.get(edge.to)).includes(inputPort(edge)) || !outputPorts(nodes.get(edge.from)).includes(outputPort(edge))) error("PortDirection", edge.to);
-  }
-  for (const node of nodes.values()) {
-    const count = inputs.get(node.id).length;
-    if (["not", "branch"].includes(node.type) && count !== 1) error("SingleInput", node.id);
-    if (BINARY_TYPES.has(node.type) && (count !== 2 || ['a','b'].some(port => graph.edges.filter(e => e?.to === node.id && inputPort(e) === port).length !== 1))) error('BinaryInputs', node.id);
-    if (["and", "or"].includes(node.type) && count < 1) error("MissingInput", node.id);
-    if (node.type === "result" && count !== 1 && !(nodes.size === 1 && count === 0)) error("SingleInput", node.id);
-  }
-  // Kahn's algorithm handles imported cycles without recursive stack overflow.
-  const degrees = new Map([...inputs].map(([id, incoming]) => [id, incoming.length]));
-  const queue = [...degrees].filter(([, degree]) => degree === 0).map(([id]) => id);
-  let count = 0;
-  while (queue.length) {
-    const id = queue.pop(); count++;
-    for (const next of outputs.get(id)) { degrees.set(next, degrees.get(next) - 1); if (!degrees.get(next)) queue.push(next); }
-  }
-  if (count !== nodes.size) for (const [id, degree] of degrees) if (degree > 0) error("Cycle", id);
-  if (results.length === 1) {
-    const reached = new Set(), stack = [results[0].id];
-    while (stack.length) { const id = stack.pop(); if (reached.has(id)) continue; reached.add(id); stack.push(...inputs.get(id)); }
-    for (const id of nodes.keys()) if (!reached.has(id)) error("Disconnected", id);
-  }
-  return done();
-}
-
-/** Tri-state evaluation; only strict booleans are accepted from condition callbacks. */
-function evaluateConditionGraph(graph, evaluateCondition, options = {}) {
-  const report = validateConditionGraph(graph, options);
-  if (!report.valid) return {result: null, trace: [], issues: report.issues};
-  const nodes = new Map(graph.nodes.map(n => [n.id, n]));
-  const inputs = new Map(graph.nodes.map(n => [n.id, []]));
-  for (const edge of graph.edges) inputs.get(edge.to).push(edge);
-  const values = new Map(), trace = [];
-  const read = edge => { const value = visit(edge.from); return outputPort(edge) === 'false' && value !== null ? !value : value; };
-  const visit = id => {
-    if (values.has(id)) return values.get(id);
-    const node = nodes.get(id), incoming = inputs.get(id);
-    let value = null, reason;
-    if (["condition", "context"].includes(node.type)) {
-      try {
-        const evaluated = evaluateCondition(node);
-        if (evaluated === true || evaluated === false) value = evaluated;
-        else if (evaluated?.then) { evaluated.catch?.(() => {}); reason = "AsyncUnsupported"; }
-      } catch { reason = "EvaluationError"; }
-    } else if (node.type === "result") value = incoming.length ? read(incoming[0]) : true;
-    else if (node.type === "branch") value = read(incoming[0]);
-    else if (node.type === "not") { const child = read(incoming[0]); value = child === null ? null : !child; }
-    else if (node.type === 'xor') { const a = read(incoming[0]), b = read(incoming[1]); value = a === null || b === null ? null : a !== b; }
-    else {
-      const isAnd = ['and','nand'].includes(node.type); value = isAnd;
-      let unknown = false;
-      for (const child of incoming) {
-        const next = read(child);
-        if (next === null) unknown = true;
-        else if (next !== isAnd) { value = next; unknown = false; break; }
-      }
-      if (unknown) value = null;
-      if (['nand','nor'].includes(node.type) && value !== null) value = !value;
-    }
-    values.set(id, value);
-    trace.push({nodeId: id, result: value, status: value === null ? "unknown" : value ? "pass" : "fail", ...(reason ? {reason} : {})});
-    return value;
-  };
-  const result = visit(graph.nodes.find(n => n.type === "result").id);
-  for (const node of graph.nodes) if (!values.has(node.id)) trace.push({nodeId: node.id, result: null, status: "skipped"});
-  return {result, trace, issues: report.issues};
-}
-
-/**
- * Remove bonuses that fail any configured filter.
- *
- * Evaluation short-circuits on the first failed filter so custom scripts and
- * expensive target checks never run for an already rejected bonus.
- *
- * @param {Map<string, ContextualBonus>} bonuses
- * @param {Record<string, Function>} filterRegistry
- * @param {object} subjects
- * @param {object} details
- * @returns {Map<string, ContextualBonus>}
- */
-function evaluateBonusFilters(bonuses, filterRegistry, subjects, details) {
-  for (const [key, bonus] of bonuses.entries()) {
-    if (bonus.conditionGraph?.enabled) {
-      const configuredFilters = Object.keys(bonus.filters).filter(id => {
-        const field = bonus.schema?.getField?.(`filters.${id}`);
-        return field?.constructor?.storage ? field.constructor.storage(bonus) : true;
-      });
-      const evaluated = evaluateConditionGraph(bonus.conditionGraph, node => node.type === 'context'
-        ? evaluateContextCondition(node, subjects, {combatActive: !!globalThis.game?.combat?.started})
-        : filterRegistry[node.filter].call(bonus, subjects, bonus.filters[node.filter], details), {
-        knownFilters: Object.keys(bonus.filters).filter(id => typeof filterRegistry[id] === "function"), configuredFilters
-      });
-      if (evaluated.result !== true) bonuses.delete(key);
-      continue;
-    }
-    for (const [filterId, value] of Object.entries(bonus.filters)) {
-      const filter = filterRegistry[filterId];
-      if (!filter) {
-        bonuses.delete(key);
-        break;
-      }
-      if (filter.call(bonus, subjects, value, details)) continue;
-      bonuses.delete(key);
-      break;
-    }
-  }
-  return bonuses;
-}
-
-function firstTarget(targets) {
-  if (!targets) return null;
-  if (typeof targets.first === "function") return targets.first() ?? null;
-  return targets[Symbol.iterator]?.().next().value ?? null;
-}
-
-/**
- * Resolve the target used while evaluating a roll.
- * @param {object} rollConfig       Current dnd5e roll configuration.
- * @param {object} [options]
- * @param {boolean} [options.preferHitTargets]  Prefer confirmed Midi hits for damage rolls.
- * @param {Iterable} [options.userTargets]      Current Foundry user targets.
- * @returns {Token|null}
- */
-function resolveRollTarget(rollConfig = {}, {
-  preferHitTargets = false,
-  userTargets = globalThis.game?.user?.targets
-} = {}) {
-  const workflow = rollConfig.workflow ?? rollConfig.midiOptions?.workflow;
-  const hasWorkflowTargets = workflow && (("targets" in Object(workflow)) || ("hitTargets" in Object(workflow)));
-  if (hasWorkflowTargets) {
-    if (preferHitTargets) {
-      const hitTarget = firstTarget(workflow.hitTargets);
-      if (hitTarget) return hitTarget;
-    }
-    return firstTarget(workflow.targets);
-  }
-  return firstTarget(userTargets);
-}
-
-/**
- * Resolve the target already attached to a filtering subject, falling back to
- * native Foundry targeting only for callers which have no explicit roll context.
- * @param {object} subjects          Filtering subjects.
- * @param {Iterable} userTargets    Current Foundry user targets.
- * @returns {Token|null}
- */
-function resolveSubjectTarget(subjects = {}, userTargets = globalThis.game?.user?.targets) {
-  if (Object.hasOwn(subjects, "target")) return subjects.target ?? null;
-  return firstTarget(userTargets);
-}
-
-const AURA_CLEANUP_DELAY_MS = 2000;
-
-/**
- * @typedef {object} SubjectConfig
- * @property {Activity} [activity]      The activity that was used.
- * @property {Item5e} [item]            The item whose activity was used.
- * @property {Actor5e} actor            The actor performing a roll or using an item.
- * @property {Token5e|null} [target]     The authoritative target for this roll.
- */
-
-/* -------------------------------------------------- */
-
-/**
- * @typedef {object} DetailsConfig
- * @property {string} [ability]               If a saving throw, the ability used.
- * @property {boolean} [isConcentration]      If a saving throw, whether this is for concentration.
- * @property {boolean} [isDeath]              If a saving throw, whether this is a death save.
- *
- * @property {string} [abilityId]             If an ability check, the ability used.
- * @property {string} [skillId]               If a skill check, the id of the skill.
- * @property {string} [toolId]                If a tool check, the id of the tool type.
- *
- * @property {number} [spellLevel]            The level of the spell, when available.
- * @property {string} [attackMode]            If a damage roll, the attack mode.
- */
-
-/* -------------------------------------------------- */
-
-/**
- * @param {SubjectConfig} subjects      Subject config.
- * @param {string} type                 The type of roll.
- * @param {DetailsConfig} details       Details config.
- * @returns {BonusCollection}           The filtered Collection.
- */
-function _check(subjects, type, details) {
-  const collector = new BonusCollector({...subjects, type: type});
-  const bonuses = collector.returnBonuses();
-  const filtered = _finalFilterBonuses(type, bonuses, subjects, details);
-  setTimeout(() => collector.destroyAuras(), AURA_CLEANUP_DELAY_MS);
-  return new BonusCollection(filtered);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Initiate the collection and filtering of bonuses applying to hit die rolls.
- * @param {SubjectConfig} subjects      Subject config.
- * @returns {BonusCollection}           The filtered Collection.
- */
-function hitDieCheck(subjects) {
-  return _check(subjects, "hitdie", {});
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Initiate the collection and filtering of bonuses applying to saving throws.
- * @param {SubjectConfig} subjects      Subject config.
- * @param {DetailsConfig} details       Details config.
- * @returns {BonusCollection}           The filtered Collection.
- */
-function throwCheck(subjects, details) {
-  return _check(subjects, "throw", details);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Initiate the collection and filtering of bonuses applying to ability checks.
- * @param {SubjectConfig} subjects      Subject config.
- * @param {DetailsConfig} details       Details config.
- * @returns {BonusCollection}           The filtered Collection.
- */
-function testCheck(subjects, details) {
-  return _check(subjects, "test", details);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Initiate the collection and filtering of bonuses applying to attack rolls, damage rolls, and save DCs.
- * @param {SubjectConfig} subjects      Subject config.
- * @param {string} hookType             The type of hook ('attack', 'damage', or 'save').
- * @param {DetailsConfig} details       Details config.
- * @returns {BonusCollection}           The filtered Collection.
- */
-function itemCheck(subjects, hookType, details) {
-  return _check(subjects, hookType, details);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Filters the Collection of bonuses using the filters of ContextualBonus.
- * @param {string} hookType                 The type of hook being executed ('attack', 'damage',
- *                                          'save', 'throw', 'test', 'hitdie').
- * @param {Collection<ContextualBonus>} bonuses     The Build-n-Action bonuses to filter. **will be mutated**
- * @param {SubjectConfig} subjects          Subject config.
- * @param {DetailsConfig} details           Details config.
- * @returns {Collection<ContextualBonus>}           The filtered Collection.
- */
-function _finalFilterBonuses(hookType, bonuses, subjects, details) {
-  /**
-   * A hook that is called before the collection of bonuses has been filtered.
-   * @param {Collection<ContextualBonus>} bonuses     The collection of bonuses, before filtering.
-   * @param {SubjectConfig} subjects          Subject config.
-   * @param {DetailsConfig} details           Details config.
-   * @param {string} hookType                 The type of hook being executed ('attack', 'damage',
-   *                                          'save', 'throw', 'test', 'hitdie').
-   */
-  Hooks.callAll(`${MODULE.ID}.preFilterBonuses`, bonuses, subjects, details, hookType);
-
-  evaluateBonusFilters(bonuses, filters, subjects, details);
-
-  _replaceRollDataOfBonuses(bonuses, subjects);
-
-  /**
-   * A hook that is called after the collection of bonuses has been filtered.
-   * @param {Collection<ContextualBonus>} bonuses     The array of bonuses, after filtering.
-   * @param {SubjectConfig} subjects          Subject config.
-   * @param {DetailsConfig} details           Details config.
-   * @param {string} hookType                 The type of hook being executed ('attack', 'damage',
-   *                                          'save', 'throw', 'test', 'hitdie').
-   */
-  Hooks.callAll(`${MODULE.ID}.filterBonuses`, bonuses, subjects, details, hookType);
-
-  return bonuses;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Replace roll data of bonuses that originate from foreign sources, including transferred effects.
- * @param {Collection<ContextualBonus>} bonuses     A collection of Build-n-Action bonuses whose data to replace.
- * @param {SubjectConfig} subjects          Subject config.
- */
-function _replaceRollDataOfBonuses(bonuses, {activity, item, actor}) {
-  for (const bonus of bonuses) {
-    // Do not replace roll data of optional bonuses as this is done later.
-    if (bonus.isOptional) continue;
-
-    const src = bonus.origin;
-
-    // Don't bother if the origin could not be found.
-    if (!src) continue;
-
-    // Don't bother with different roll data if the origin is the current actor rolling.
-    if (src.uuid === actor.uuid) continue;
-
-    // Don't bother with different roll data if the origin is the item being rolled.
-    if (src.uuid === item?.uuid) continue;
-
-    // Foreign-source bonuses must resolve formulas against their origin's roll data.
-    const data = src.getRollData();
-
-    const update = Object.entries(bonus.bonuses).reduce((acc, [key, val]) => {
-      if (!val || (typeof val !== "string")) return acc;
-      acc[key] = Roll.replaceFormulaData(val, data, {missing: 0});
-      return acc;
-    }, {});
-    try {
-      bonus.updateSource({bonuses: update});
-    } catch (err) {
-      console.warn("ContextualBonus | Issue updating bonus data:", err);
-    }
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Split a set into 'included' and 'excluded'.
- * @param {Set<string>} filter      The set of strings, some with '!' prefixed.
- * @returns {object}                An object with two sets of strings.
- */
-function _splitExclusion(filter) {
-  const rgx = /([!]+)?(.+)/;
-  const data = filter.reduce((acc, str) => {
-    const [, bangs, string] = str.match(rgx) ?? [];
-    if (!string) return acc;
-    if (bangs) acc.excluded.add(string);
-    else acc.included.add(string);
-    return acc;
-  }, {included: new Set(), excluded: new Set()});
-  return data;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Utility function to split a string by '/'.
- * @param {string} str        The string to split.
- * @returns {Set<string>}     The set of strings.
- */
-function _split(str) {
-  str ||= "";
-  return str.split("/").reduce((acc, e) => {
-    const trim = e.trim().toLowerCase();
-    if (trim.length) acc.add(trim);
-    return acc;
-  }, new Set());
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Utility function to split racial values.
- * @param {Actor5e} actor     The actor.
- * @returns {Set<string>}     The different 'races' to compare against.
- */
-function _splitRaces(actor) {
-  let races = new Set();
-
-  /**
-   * Find the type object on the actor to read from. We prefer the actor data,
-   * since that is subject to effects and later changes, while the race item is not.
-   */
-  const type = actor.system.details?.type;
-
-  if (type) {
-    races = _split(type.subtype);
-    if (type.value === "custom") _split(type.custom).forEach(k => races.add(k));
-    else races.add(type.value);
-  }
-  return races;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Return whether a set of values overlaps a non-empty set of required values,
- * while also not overlapping a non-empty set of excluded values.
- * @param {Set<*>} values       The current values.
- * @param {Set<*>} included     Required values.
- * @param {Set<*>} excluded     Excluded values.
- * @returns {boolean}           Result of the test.
- */
-function _testInclusion(values, included, excluded) {
-  if (included.size && !included.intersects(values)) return false;
-  if (excluded.size && excluded.intersects(values)) return false;
-  return true;
-}
-
-/* -------------------------------------------------- */
-/*   Filtering functions                              */
-/* -------------------------------------------------- */
-
-const filters = {
-  abilities,
-  actorCreatureSizes,
-  actorCreatureTypes,
-  actorLanguages,
-  arbitraryComparisons,
-  attackModes,
-  baseArmors,
-  baseTools,
-  baseWeapons,
-  creatureTypes,
-  customScripts,
-  damageTypes,
-  featureTypes,
-  healthPercentages,
-  identifiers,
-  itemTypes,
-  markers,
-  preparationModes,
-  proficiencyLevels,
-  remainingSpellSlots,
-  saveAbilities,
-  skillIds,
-  sourceClasses,
-  spellComponents,
-  spellLevels,
-  spellSchools,
-  statusEffects,
-  targetArmors,
-  targetEffects,
-  throwTypes,
-  tokenSizes,
-  weaponProperties
-};
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item is using one of the abilities in the filter. Consideration is made
- * by the system itself for items set to 'Default' to look for finesse weapons and spellcasting
- * abilities. Note that this is the ability set at the top level of the item's action, and
- * is NOT the ability used to determine the dc of the saving throw.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of abilities.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the actor or item is using one of the abilities.
- */
-function abilities(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  let abi;
-
-  // Case 1: Tool Checks.
-  if (details.toolId) abi = details.abilityId;
-
-  // Case 2: Attack/Damage rolls.
-  else if (subjects.activity) abi = subjects.activity.ability;
-
-  // Case 3: AbilityTest or Skill.
-  else if (subjects.actor) abi = details.abilityId;
-
-  if (!abi) return false;
-
-  // Test the filters.
-  return _testInclusion(new Set([abi]), included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor is one of the correct creature sizes.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of valid creature sizes.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the actor is a correct creature size.
- */
-function actorCreatureSizes(subjects, filter, details) {
-  if (!filter.size) return true;
-  const size = subjects.actor.system.traits?.size;
-  return !!size && filter.has(size);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the rolling actor is one of the included creature etypes and none of the excluded types.
- * In the case of no values, refer to whether any specific creature type was included.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of creature types the rolling actor must or must not be.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the rolling actor is of a valid creature type.
- */
-function actorCreatureTypes(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  const ad = subjects.actor.system.details;
-  if (!ad) return !included.size;
-
-  // All the races the rolling actor is a member of.
-  const races = _splitRaces(subjects.actor);
-
-  return _testInclusion(races, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor speaks one of the included languages while not any of the excluded languages.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of languages the actor must speak or not speak.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}
- */
-function actorLanguages(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-
-  const values = subjects.actor.system.traits?.languages?.value;
-  if (!values) return false;
-
-  const speaksAny = included.some(lang => speaksLanguage(subjects.actor, lang));
-  if (included.size && !speaksAny) return false;
-
-  if (!excluded.size) return true;
-
-  // If e.g. "standard" is excluded, the actor must not be able to speak "dwarvish".
-  for (const k of values) {
-    const nodes = new Set(proficiencyTree(k, "languages"));
-    if (nodes.intersects(excluded)) return false;
-  }
-  return true;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if 'one' and 'other have the correct relationship for each of the comparisons.
- * If 'one' and 'other' do not both evaluate to numbers, string comparison is instead used.
- * For string comparison, inequality operators are taken to mean substrings. The comparisons
- * are done after replacing any roll data.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects        Subject config.
- * @param {object[]} filter               An array of objects with 'one', 'other', and 'operator'.
- * @param {string} filter[].one           One value to compare against another.
- * @param {string} filter[].other         One value to compare against another.
- * @param {string} filter[].operator      The kind of comparison to make between the two values.
- * @param {DetailsConfig} details         Details config.
- * @returns {boolean}                     Whether every comparison were in the correct relationship.
- */
-function arbitraryComparisons(subjects, filter, details) {
-  if (!filter.length) return true;
-
-  const rollData = (subjects.activity ?? subjects.item ?? subjects.actor).getRollData();
-  const target = resolveSubjectTarget(subjects);
-  if (target?.actor) rollData.target = target.actor.getRollData();
-
-  for (const {one, other, operator} of filter) {
-    // This method immediately returns false if invalid data somehow.
-    if (!one || !other) return false;
-
-    const left = Roll.replaceFormulaData(one, rollData);
-    const right = Roll.replaceFormulaData(other, rollData);
-
-    try {
-      // try comparing numbers.
-      const nLeft = Roll.create(left).evaluateSync().total;
-      const nRight = Roll.create(right).evaluateSync().total;
-      if ((operator === "EQ") && !(nLeft === nRight)) return false;
-      else if ((operator === "LT") && !(nLeft < nRight)) return false;
-      else if ((operator === "GT") && !(nLeft > nRight)) return false;
-      else if ((operator === "LE") && !(nLeft <= nRight)) return false;
-      else if ((operator === "GE") && !(nLeft >= nRight)) return false;
-    } catch {
-      // try comparing strings.
-      if ((operator === "EQ") && !(left == right)) return false;
-      else if (["LT", "LE"].includes(operator) && !(right.includes(left))) return false;
-      else if (["GT", "GE"].includes(operator) && !(left.includes(right))) return false;
-    }
-  }
-  return true;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * For damage rolls only, filter by the attack classification and mode.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects                Subject config.
- * @param {object} filter                         The array of attack types.
- * @param {Set<string>} filter.value              The attack type (melee, ranged).
- * @param {Set<string>} filter.classification     The attack classification (weapon, spell, unarmed).
- * @param {Set<string>} filter.mode               The attack mode (offhand, one-handed, etc.).
- * @param {DetailsConfig} details                 Details config.
- * @returns {boolean}                             Whether the item has any of the required attack types.
- */
-function attackModes(subjects, filter, details) {
-  if (subjects.activity.type !== "attack") return true;
-  const {value, classification} = subjects.activity.attack.type;
-  if (filter.value.size && !filter.value.has(value)) return false;
-  if (filter.classification.size && !filter.classification.has(classification)) return false;
-  if (filter.mode.size && !filter.mode.has(details.attackMode)) return false;
-
-  return true;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor is wearing one of the included armor types
- * in the filter and none of the excluded types. Note that this includes shields as well.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of base armor keys.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the rolling actor is wearing appropriate armor.
- */
-function baseArmors(subjects, filter, details) {
-  const {included, excluded} = _splitExclusion(filter);
-
-  const ac = subjects.actor.system.attributes?.ac ?? {};
-  const shield = ac?.equippedShield ?? null;
-  const armor = ac?.equippedArmor ?? null;
-  const types = new Set();
-  if (shield) types.add(shield.system.type.baseItem).add(shield.system.type.value);
-  if (armor) types.add(armor.system.type.baseItem).add(armor.system.type.value);
-  if (ac.calc === "natural") types.add("natural");
-
-  // If no armor worn.
-  if (!types.size) return !(included.size > 0);
-
-  return _testInclusion(types, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the tool being rolled for a check is one of the correct types.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The types of tool types.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the tool type matches the filter.
- */
-function baseTools(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  if (!details.toolId) return !included.size;
-
-  const types = new Set(proficiencyTree(details.toolId, "tool"));
-  return _testInclusion(types, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item's base weapon type is one of the valid ones in the filter.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of weapon baseItem keys.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item's baseItem was in the filter.
- */
-function baseWeapons(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  if (subjects.item.type !== "weapon") return !included.size;
-  const types = new Set([subjects.item.system.type.value, subjects.item.system.type.baseItem]);
-  return _testInclusion(types, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the target is one of the included creature types and none of the excluded types.
- * In the case of no targets, refer to whether any specific creature type was included.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of creature types the target must or must not be.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the target is of a valid creature type.
- */
-function creatureTypes(subjects, filter, details) {
-  if (!filter.size) return true;
-  const target = resolveSubjectTarget(subjects);
-  const {included, excluded} = _splitExclusion(filter);
-  const ad = target?.actor?.system.details;
-  if (!ad) return !included.size;
-
-  // All the races the target is a member of.
-  const races = _splitRaces(target.actor);
-
-  return _testInclusion(races, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the embedded script returns true.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {string} script               The script saved in the filter.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   True if the script returns true, otherwise false.
- */
-function customScripts(subjects, script, details) {
-  if (!script?.length) return true;
-  if (game.settings.get(MODULE.ID, SETTINGS.SCRIPT)) return true;
-  try {
-    const {actor, item, activity} = subjects;
-    const func = Function("actor", "item", "token", "bonus", "activity", "details", script);
-    const token = (actor.isToken ? actor.token.object : actor.getActiveTokens()[0]) ?? null;
-    const valid = func.call(func, actor, item, token, this, activity, details) === true;
-    return valid;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item has any of the included damage types in its damage parts and none of the excluded types.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of damage types.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item's damage types overlap with the filter.
- */
-function damageTypes(subjects, filter, details) {
-  if (!filter.size) return true;
-  let parts;
-  switch (subjects.activity.type) {
-    case "heal":
-      parts = [subjects.activity.healing];
-      break;
-    case "attack":
-    case "damage":
-    case "save":
-      parts = subjects.activity.damage.parts;
-      break;
-    default:
-      return false;
-  }
-  const types = parts.reduce((acc, part) => acc.union(part.types), new Set());
-  const {included, excluded} = _splitExclusion(filter);
-  return _testInclusion(types, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item that made the roll was the correct feature type and feature subtype.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {object} filter               The filter object.
- * @param {string} [filter.type]        The feature type.
- * @param {string} [filter.subtype]     The feature subtype.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the feature is the correct type.
- */
-function featureTypes(subjects, {type, subtype}, details) {
-  const config = CONFIG.DND5E.featureTypes;
-  if (!type || !(type in config)) return true;
-  if (subjects.item.type !== "feat") return false;
-  if (type !== subjects.item.system.type.value) return false;
-
-  const subtypes = config[type]?.subtypes ?? {};
-  const hasSubtype = !foundry.utils.isEmpty(subtypes);
-  if (!hasSubtype || !subtype) return true;
-
-  return subjects.item.system.type.subtype === subtype;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the health of the actor is at or above/below the threshold.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {object} filter               The object used for the filtering.
- * @param {number} filter.value         The hit point percentage threshold.
- * @param {number} filter.type          The type of threshold (0 for 'x or lower' and 1 for 'x and higher').
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the threshold is obeyed.
- */
-function healthPercentages(subjects, filter, details) {
-  if (!Number.isNumeric(filter.value) || ![0, 1].includes(filter.type)) return true;
-  if (!subjects.actor.system.attributes?.hp) return false;
-  const hp = subjects.actor.system.attributes.hp.pct; // this takes tempmax into account, but not temphp.
-  return ((filter.type === 0) && (hp <= filter.value)) || ((filter.type === 1) && (hp >= filter.value));
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item being used has the right identifier.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects        Subject config.
- * @param {object} filter                 The filter data.
- * @param {Set<string>} filter.values     The set of identifiers.
- * @param {DetailsConfig} details         Details config.
- * @returns {boolean}                     Whether the identifier of the item is valid.
- */
-function identifiers(subjects, filter, details) {
-  return !filter.values.size || filter.values.has(subjects.item.identifier);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item's type is one of the valid ones in the filter.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of item type keys.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item's type was in the filter.
- */
-function itemTypes(subjects, filter, details) {
-  return !filter.size || filter.has(subjects.item.type);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor or item has any of the valid markers, as well as the target.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects        Subject config.
- * @param {object} filter                 The filter data.
- * @param {Set<string>} filter.values     The set of valid markers on the one performing the roll.
- * @param {Set<string>} filter.target     The set of valid markers on the target.
- * @param {DetailsConfig} details         Details config.
- * @returns {boolean}                     Whether the actor or item has any of the valid markers.
- */
-function markers(subjects, filter, details) {
-
-  const _hasMarker = (document, markers) => {
-    const stored = document.getFlag(MODULE.ID, "markers") ?? [];
-    return stored.some(marker => markers.has(marker));
-  };
-
-  const hasMarker = (document, markers) => {
-    if (_hasMarker(document, markers)) return true;
-
-    for (const effect of document.allApplicableEffects?.() ?? []) {
-      if (effect.active && _hasMarker(effect, markers)) return true;
-    }
-
-    return false;
-  };
-
-  if (filter.values.size) {
-    const itemMarked = !subjects.item || hasMarker(subjects.item, filter.values);
-    if (!itemMarked && !hasMarker(subjects.actor, filter.values)) return false;
-  }
-
-  if (filter.target.size) {
-    const targetActor = resolveSubjectTarget(subjects)?.actor;
-    if (!targetActor || !hasMarker(targetActor, filter.target)) return false;
-  }
-
-  return true;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the spell that is cast is one able to consume a spell slot.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The types of preparation modes allowed.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the spell matches the preparation mode.
- */
-function preparationModes(subjects, filter, details) {
-  return !filter.size || ((subjects.item.type === "spell") && filter.has(subjects.item.system.preparation.mode));
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the roll was proficient, and if at a valid level.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<number>} filter          The levels of valid proficiencies.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the roll was one of the proficiency levels.
- */
-function proficiencyLevels(subjects, filter, details) {
-  if (!filter.size) return true;
-
-  // Case 1: Skill.
-  if (details.skillId) {
-    return filter.has(subjects.actor.system.skills[details.skillId]?.prof.multiplier || 0);
-  }
-
-  // Case 2: Ability Check.
-  else if (details.abilityId && !details.toolId) {
-    return filter.has(subjects.actor.system.abilities[details.abilityId]?.checkProf.multiplier || 0);
-  }
-
-  // Case 3: Death Saving Throw.
-  else if (details.isDeath) {
-    return filter.has(Number(subjects.actor.flags.dnd5e?.diamondSoul || false));
-  }
-
-  // Case 4: Saving Throw.
-  else if (details.ability) {
-    return filter.has(subjects.actor.system.abilities[details.ability]?.saveProf.multiplier || 0);
-  }
-
-  // Case 5: Weapon, equipment, spell, tool item.
-  else if (subjects.item) {
-    return filter.has(subjects.item.system.prof.multiplier);
-  }
-
-  // Case 6: Tool check without an item.
-  else if (details.toolId) {
-    return filter.has(subjects.actor.system.tools[details.toolId]?.prof.multiplier || 0);
-  }
-
-  // Else somehow return false.
-  else return false;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor has a number of spell slots remaining between the min and max.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {object} filter               The filtering for the bonus.
- * @param {number} filter.min           The minimum value available required for the bonus to apply.
- * @param {number} filter.max           The maximum value available required for the bonus to apply.
- * @param {boolean} [filter.size]       Whether to take the size of the spell slot into account.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the number of spell slots remaining falls within the bounds.
- */
-function remainingSpellSlots(subjects, {min, max, size = false}, details) {
-  if (![min, max].some(m => Number.isInteger(m))) return true;
-  const spells = Object.values(subjects.actor.system.spells ?? {}).reduce((acc, val) => {
-    if (!val.level || !val.value || !val.max) return acc;
-    return acc + Math.clamp(val.value, 0, val.max) * (size ? val.level : 1);
-  }, 0);
-  return spells.between(min || 0, max || Infinity);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the saving throw in the activity is set using an ability in the filter.
- * This filter is only available for bonuses applying specifically to saving throw DCs.
- * Special consideration is made for activities with save DC set using spellcasting ability.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The ability that is used to set the DC of the item's saving throw.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item's saving throw is set using an ability in the filter.
- */
-function saveAbilities(subjects, filter, details) {
-  if (!filter.size) return true;
-  if (subjects.activity.type !== "save") return false;
-  if (!subjects.activity.save.dc.calculation) return false;
-
-  const {included, excluded} = _splitExclusion(filter);
-  let abl;
-  if (subjects.activity.save.dc.calculation === "spellcasting") {
-    abl = subjects.activity.spellcastingAbility;
-  } else {
-    abl = subjects.activity.save.dc.calculation;
-  }
-
-  return _testInclusion(new Set([abl]), included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the skill being rolled is one of the correct types.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The types of skill ids.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the skill matches the filter.
- */
-function skillIds(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  if (!details.skillId) return !included.size;
-  return _testInclusion(new Set([details.skillId]), included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Does this spell belong to a specific class?
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects        Subject config.
- * @param {object} filter                 The filter data.
- * @param {Set<string>} filter.values     The set of class identifiers.
- * @param {DetailsConfig} details         Details config.
- * @returns {boolean}                     Whether the source class of the spell is valid.
- */
-function sourceClasses(subjects, filter, details) {
-  if (subjects.item.type !== "spell") return true;
-  return !filter.values.size || filter.values.has(subjects.item.system.sourceClass);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item is a spell and has any, or all, of the required spell components.
- * The item must match either all or at least one, depending on what is set.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects        Subject config.
- * @param {object} filter                 The filtering object.
- * @param {Set<string>} filter.types      The array of spell components in the filter.
- * @param {string} filter.match           The type of matching, either 'ALL' or 'ANY'.
- * @param {DetailsConfig} details         Details config.
- * @returns {boolean}                     Whether the item matched correctly with the components.
- */
-function spellComponents(subjects, filter, details) {
-  if (!filter.types.size) return true;
-  if (subjects.item.type !== "spell") return false;
-  const comps = subjects.item.system.properties;
-
-  switch (filter.match) {
-    case "ALL":
-      return filter.types.isSubset(comps);
-    case "ANY":
-      return filter.types.intersects(comps);
-    default:
-      return false;
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item was cast at any of the required spell levels. When a spell is upcast,
- * the item here is the cloned spell only in the case of save dc bonuses, meaning we need to
- * pass on the correct spell level for attack and damage roll bonuses.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<number>} filter          The set of spell levels in the filter.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item is at one of the appropriate levels.
- */
-function spellLevels(subjects, filter, details) {
-  if (!filter.size) return true;
-  if (subjects.item.type !== "spell") return false;
-  return filter.has(details.spellLevel ?? subjects.item.system.level);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item is a spell and belongs to one of the filter's spell schools.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of spell schools.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item is a spell and is of one of these schools.
- */
-function spellSchools(subjects, filter, details) {
-  return !filter.size || ((subjects.item.type === "spell") && filter.has(subjects.item.system.school));
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor has any of the included effects and none of the excluded effects.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of effect statuses you must have or must not have.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the actor has any included effects and no excluded effects.
- */
-function statusEffects(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-
-  // Discard any conditions the actor is immune to.
-  const ci = subjects.actor.system.traits?.ci?.value ?? new Set();
-  for (const k of ci) {
-    included.delete(k);
-    excluded.delete(k);
-  }
-
-  return _testInclusion(subjects.actor.statuses, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the actor is wearing one of the included armor types
- * in the filter and none of the excluded types. Note that this includes shields as well.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of base armor keys.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the rolling actor is wearing appropriate armor.
- */
-function targetArmors(subjects, filter, details) {
-  const target = resolveSubjectTarget(subjects)?.actor;
-  if (!target) return !_splitExclusion(filter).included.size;
-  return baseArmors({actor: target}, filter);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the target actor has any of the status conditions required.
- * The bonus will apply if the target actor exists and has at least one.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of effect statuses the target must have or must not have.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the target actor has any of the status effects.
- */
-function targetEffects(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  const actor = resolveSubjectTarget(subjects)?.actor;
-  if (!actor) return !included.size;
-
-  // Discard any conditions the actor is immune to.
-  const ci = actor.system.traits?.ci?.value ?? new Set();
-  for (const k of ci) {
-    included.delete(k);
-    excluded.delete(k);
-  }
-
-  return _testInclusion(actor.statuses, included, excluded);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the bonus should apply to this type of saving throw.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of saving throw types to check for.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the throw type is in the filter.
- */
-function throwTypes(subjects, filter, details) {
-  if (!filter.size) return true;
-  return (!!details.ability && filter.has(details.ability))
-    || (filter.has("concentration") && details.isConcentration)
-    || (filter.has("death") && details.isDeath);
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the targeted token is at least x-by-x or larger, or at most x-by-x or smaller,
- * while optionally also at most as big or small as the roller's token.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {object} filter               The filtering for the bonus.
- * @param {number} filter.size          The minimum/maximum size of the targeted token.
- * @param {number} filter.type          Whether it is 'at least' (0) or 'at most' (1).
- * @param {boolean} filter.self         Whether to clamp using the rolling token's size.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the targeted token matches the filter.
- */
-function tokenSizes(subjects, filter, details) {
-  if (!(filter.size > 0)) return true;
-  const target = resolveSubjectTarget(subjects)?.document;
-  if (!target) return false;
-  const enemySize = Math.max(target.width, target.height);
-
-  let se;
-  if (filter.self) {
-    const token = subjects.actor.token ?? subjects.actor.getActiveTokens(false, true)[0];
-    if (!token) return false;
-    se = Math.max(token.width, token.height);
-  } else {
-    se = filter.size;
-  }
-
-  switch (filter.type) {
-    case 0:
-      return enemySize >= Math.max(se, filter.size);
-    case 1:
-      return enemySize <= Math.min(se, filter.size);
-    default:
-      return false;
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Find out if the item has any of the included weapon properties and none of the excluded properties.
- * @this {ContextualBonus}
- * @param {SubjectConfig} subjects      Subject config.
- * @param {Set<string>} filter          The set of properties you must have one of or none of.
- * @param {DetailsConfig} details       Details config.
- * @returns {boolean}                   Whether the item has any of the included and none of the excluded properties.
- */
-function weaponProperties(subjects, filter, details) {
-  if (!filter.size) return true;
-  const {included, excluded} = _splitExclusion(filter);
-  if (subjects.item.type !== "weapon") return !included.size;
-  const props = subjects.item.system.properties;
-  return _testInclusion(props, included, excluded);
-}
-
-const {ApplicationV2: ApplicationV2$1, HandlebarsApplicationMixin: HandlebarsApplicationMixin$1} = foundry.applications.api;
-
-class BonusWorkshop extends HandlebarsApplicationMixin$1(ApplicationV2$1) {
-  constructor(object, options = {}) {
-    const uniqueId = `${MODULE.ID}-${object.uuid.replaceAll(".", "-")}`;
-    super({...options, uniqueId});
-    this.object = object;
-    this.isItem = object.documentName === "Item";
-    this.isEffect = object.documentName === "ActiveEffect";
-    this.isActor = object.documentName === "Actor";
-    this._documentAppId = uniqueId;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The right-hand side bonuses that have a collapsed description.
-   * @type {Set<string>}
-   */
-  #collapsedBonuses = new Set();
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A reference to the owner of the bonuses.
-   * @type {Actor5e|Item5e|ActiveEffect5e|RegionDocument}
-   */
-  get document() {
-    return this.object;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get isEditable() {
-    return !!this.document.sheet?.isEditable;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get title() {
-    return `${MODULE.NAME}: ${this.document.name}`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A reference to the collection of bonuses on this document.
-   * @type {Collection<ContextualBonus>}
-   */
-  get collection() {
-    return getCollection(this.document);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static DEFAULT_OPTIONS = {
-    classes: [MODULE.ID, "builder", "dnd5e2"],
-    window: {
-      icon: MODULE.ICON,
-      resizable: true
-    },
-    position: {
-      width: 820,
-      height: 720
-    },
-    actions: {
-      "pick-type": this.#onClickType,
-      "current-collapse": this.#onCollapseBonus,
-      "current-toggle": this.#onToggleBonus,
-      "current-copy": this.#onCopyBonus,
-      "current-edit": this.#onClickBonus,
-      "current-delete": this.#onDeleteBonus,
-      "current-id": {handler: this.#onClickId, buttons: [0, 2]}
-    }
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static PARTS = {
-    main: {
-      template: `modules/${MODULE.ID}/templates/bonus-workshop.hbs`,
-      scrollable: [".current-bonuses .bonuses"]
-    }
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  async _prepareContext() {
-    const data = {
-      isItem: this.isItem,
-      isEffect: this.isEffect,
-      isActor: this.isActor,
-      parentName: this.document.name,
-      currentBonuses: []
-    };
-
-    for (const bonus of this.collection) {
-      data.currentBonuses.push({
-        bonus,
-        context: {
-          collapsed: this.#collapsedBonuses.has(bonus.id),
-          description: await foundry.applications.ux.TextEditor.implementation.enrichHTML(bonus.description, {
-            rollData: bonus.getRollData(), relativeTo: bonus.origin
-          }),
-          icon: bonus.icon,
-          typeTooltip: `BUILD_N_ACTION.${bonus.type.toUpperCase()}.Label`
-        }
-      });
-    }
-    data.currentBonuses.sort((a, b) => a.bonus.name.localeCompare(b.bonus.name));
-
-    data.createButtons = Object.entries(contextualBonuses).map(([type, cls]) => ({
-      type, icon: cls.metadata.icon, label: `BUILD_N_ACTION.${type.toUpperCase()}.Label`
-    }));
-    data.ICON = MODULE.ICON;
-    return data;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _onRender(...args) {
-    super._onRender(...args);
-    this.#updateResponsiveLayout(this.position.width);
-
-    const content = this.element;
-    if (!this.isEditable) {
-      content.querySelectorAll(".select-type, .current-bonuses .functions").forEach(element => {
-        element.style.pointerEvents = "none";
-        element.classList.add("locked");
-      });
-      return;
-    }
-
-    content.querySelectorAll("[data-action='current-collapse']").forEach(element => {
-      element.draggable = true;
-      element.addEventListener("dragstart", this.#onDragStart.bind(this));
-    });
-
-    const dropZone = content.querySelector(".current-bonuses .bonuses");
-    dropZone?.addEventListener("dragover", event => event.preventDefault());
-    dropZone?.addEventListener("drop", this.#onDrop.bind(this));
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _onPosition(position) {
-    super._onPosition(position);
-    this.#updateResponsiveLayout(position.width);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Keep the type selector usable at narrow window sizes. */
-  #updateResponsiveLayout(width) {
-    const selector = this.element?.querySelector(".pages .select-type");
-    selector?.classList.toggle("bna-compact", Number.parseInt(width) < 680);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  render(...args) {
-    this.document.apps[this._documentAppId] = this;
-    return super.render(...args);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _onClose(options) {
-    delete this.document.apps[this._documentAppId];
-    return super._onClose(options);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Start dragging a contextual bonus. */
-  #onDragStart(event) {
-    const label = event.currentTarget.closest(".bonus");
-    const bonus = this.collection.get(label?.dataset.id);
-    const dragData = bonus?.toDragData();
-    if (dragData) event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Copy a dropped contextual bonus to this document. */
-  async #onDrop(event) {
-    event.preventDefault();
-    if (!this.isEditable) return;
-
-    let data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
-    if (!data.uuid || (data.type !== "ContextualBonus")) return;
-
-    let bonus = await fromUuid(data.uuid);
-    if (!bonus || (bonus.parent === this.document)) return;
-
-    data = bonus.toObject();
-    data.id = foundry.utils.randomID();
-    bonus = new contextualBonuses[data.type](data, {parent: this.document});
-    await embedBonus(this.document, bonus);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Handle creating a new bonus. */
-  static async #onClickType(event, target) {
-    if (!this.isEditable) return;
-    const type = target.dataset.type;
-    const bonus = new contextualBonuses[type]({}, {parent: this.document});
-    return embedBonus(this.document, bonus);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Render the sheet of an existing bonus. */
-  static #onClickBonus(event, target) {
-    if (!this.isEditable) return;
-    const bonus = this.collection.get(target.closest(".bonus").dataset.id);
-    return bonus.sheet.render({force: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Collapse or expand a bonus description. */
-  static #onCollapseBonus(event, target) {
-    const bonus = target.closest(".bonus");
-    const id = bonus.dataset.id;
-    const isCollapsed = this.#collapsedBonuses.has(id);
-    bonus.classList.toggle("collapsed", !isCollapsed);
-    if (isCollapsed) this.#collapsedBonuses.delete(id);
-    else this.#collapsedBonuses.add(id);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Copy the id or uuid of a bonus. */
-  static async #onClickId(event, target) {
-    event.preventDefault();
-    const bonus = this.collection.get(target.closest(".bonus").dataset.id);
-    const isId = event.button === 2;
-    const id = isId ? bonus.id : bonus.uuid;
-    await game.clipboard.copyPlainText(id);
-    ui.notifications.info(game.i18n.format("DOCUMENT.IdCopiedClipboard", {
-      id, label: "ContextualBonus", type: isId ? "id" : "uuid"
-    }));
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Delete a bonus. */
-  static #onDeleteBonus(event, target) {
-    if (!this.isEditable) return;
-    return this.collection.get(target.closest(".bonus").dataset.id).deleteDialog();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Toggle a bonus. */
-  static #onToggleBonus(event, target) {
-    if (!this.isEditable) return;
-    return this.collection.get(target.closest(".bonus").dataset.id).toggle();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Duplicate a bonus. */
-  static #onCopyBonus(event, target) {
-    if (!this.isEditable) return;
-    const bonus = this.collection.get(target.closest(".bonus").dataset.id);
-    return duplicateBonus(bonus);
-  }
-}
-
-/**
- * Render the bonus workshop for a supported document.
- *
- * @param {Document} document
- * @returns {BonusWorkshop}
- */
-function openBonusWorkshop(document) {
-  if (!isEmbeddableDocument(document)) {
-    throw new Error("The document provided is not a valid document type for Build-n-Action!");
-  }
-  return new BonusWorkshop(document).render(true);
-}
-
-var api = {
-  applyMarkers,
-  createBonus,
-  duplicateBonus,
-  embedBonus,
-  findEmbeddedDocumentsWithBonuses,
-  fromUuid,
-  fromUuidSync: fromUuidSync$1,
-  getCollection,
-  hasArmorProficiency,
-  hasToolProficiency,
-  hasWeaponProficiency,
-  hotbarToggle,
-  openBonusWorkshop,
-  proficiencyTree,
-  speaksLanguage
-};
-
-/**
- * Apply markers to a document for the Markers filter.
- *
- * @param {Document} document
- * @returns {Promise<Document|null>}
- */
-async function applyMarkers(document) {
-  const {SetField, StringField} = foundry.data.fields;
-  const field = new SetField(new StringField());
-  const value = document.getFlag(MODULE.ID, "markers") ?? [];
-  const html = field.toFormGroup({
-    label: "BUILD_N_ACTION.MarkersDialog.field.label",
-    hint: "BUILD_N_ACTION.MarkersDialog.field.hint",
-    localize: true
-  }, {value, name: "markers", slug: true}).outerHTML;
-
-  return foundry.applications.api.DialogV2.prompt({
-    rejectClose: false,
-    content: `<fieldset>${html}</fieldset>`,
-    window: {
-      icon: "fa-solid fa-tags",
-      title: game.i18n.format("BUILD_N_ACTION.MarkersDialog.title", {name: document.name})
-    },
-    position: {width: 400},
-    ok: {
-      callback: async (event, button) => {
-        const markers = Array.from(button.form.elements.markers.value);
-        await document.setFlag(MODULE.ID, "markers", markers);
-        return document;
-      }
-    }
-  });
-}
-
-/**
- * Toggle a contextual bonus from a hotbar macro.
- *
- * @param {string} uuid
- * @returns {Promise<ContextualBonus|undefined>}
- */
-async function hotbarToggle(uuid) {
-  const bonus = await fromUuid(uuid);
-  if (!bonus) {
-    ui.notifications.warn("BUILD_N_ACTION.BonusNotFound", {localize: true});
-    return;
-  }
-  return bonus.toggle();
-}
-
-/**
- * Persist an explicitly selected image on a contextual bonus.
- *
- * Image selection is kept out of the parent DocumentSheet form submission so
- * the ContextualBonus remains the only owner of its nested flag data.
- *
- * @param {ContextualBonus} bonus
- * @param {string} path
- * @returns {Promise<ContextualBonus>}
- */
-async function updateBonusImage(bonus, path) {
-  path = String(path ?? "").trim();
-  if (!path || (path === bonus.img)) return bonus;
-  await bonus.update({img: path});
-  return bonus;
-}
-
-/**
- * Scroll one filter card into view inside the filter picker.
- * Using the picker's own scroll offset avoids scrollIntoView selecting an outer
- * ApplicationV2 scroll container when the filter tab has two scrollable columns.
- *
- * @param {HTMLElement|null} tab     Filter tab root.
- * @param {string} id                Filter identifier.
- * @param {object} [options]
- * @param {ScrollBehavior} [options.behavior="smooth"]
- * @returns {boolean}                Whether a matching filter was found.
- */
-function scrollFilterIntoView(tab, id, {behavior = "smooth"} = {}) {
-  const picker = tab?.querySelector?.(".picker");
-  if (!picker || !id) return false;
-
-  const filters = Array.from(picker.querySelectorAll(".filter[data-id]"));
-  const element = filters.find(filter => filter.dataset.id === id);
-  if (!element) return false;
-
-  const pickerTop = picker.getBoundingClientRect().top;
-  const elementTop = element.getBoundingClientRect().top;
-  const top = Math.max(0, picker.scrollTop + elementTop - pickerTop);
-
-  if (typeof picker.scrollTo === "function") picker.scrollTo({top, behavior});
-  else picker.scrollTop = top;
-
-  for (const entry of tab.querySelectorAll(".toc [data-id]")) {
-    entry.classList.toggle("viewed", entry.dataset.id === id);
-  }
-  return true;
-}
-
-class KeysDialog extends foundry.applications.api.DialogV2 {
-  /** @override */
-  static DEFAULT_OPTIONS = {
-    classes: [MODULE.ID, "keys-dialog"],
-    modal: true,
-    window: {
-      resizable: false,
-      icon: MODULE.ICON
-    },
-    position: {
-      height: "auto",
-      width: 400
-    },
-    actions: {
-      cycle: this.#onCycleRight,
-      cycleAll: this.#onCycleAll,
-      cycleLeft: this.#onCycleLeft,
-      cycleRight: this.#onCycleRight
-    }
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static async prompt({canExclude, values, filterId, ...configuration} = {}) {
-    const description = (filterId === "auraBlockers")
-      ? "BUILD_N_ACTION.FIELDS.aura.blockers.hint"
-      : `BUILD_N_ACTION.FIELDS.filters.${filterId}.hint`;
-
-    configuration.content = await foundry.applications.handlebars.renderTemplate(
-      `modules/${MODULE.ID}/templates/subapplications/keys-dialog.hbs`, {
-        canExclude: canExclude,
-        values: values,
-        description: description
-      }
-    );
-    configuration.filterId = filterId;
-    configuration.rejectClose = false;
-    return super.prompt(configuration);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get title() {
-    const name = (this.options.filterId === "auraBlockers")
-      ? "BUILD_N_ACTION.FIELDS.aura.blockers.label"
-      : `BUILD_N_ACTION.FIELDS.filters.${this.options.filterId}.label`;
-    return game.i18n.format("BUILD_N_ACTION.KeysDialogTitle", {name: game.i18n.localize(name)});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Cycle all selects in a column between the valid options.
-   * @param {Event} event     The initiating click event.
-   */
-  static #onCycleAll(event, target) {
-    const table = target.closest(".table");
-    const selects = table.querySelectorAll("select");
-    const newIndex = (selects[0].selectedIndex + 1) % selects[0].options.length;
-    selects.forEach(select => select.selectedIndex = newIndex);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Custom implementation for label-to-checkbox linking.
-   * @param {Event} event     The initiating click event.
-   */
-  static #onCycleRight(event, target) {
-    const select = target.closest(".row").querySelector(".select select");
-    const newIndex = (select.selectedIndex + 1) % select.options.length;
-    select.selectedIndex = newIndex;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Cycle backwards in the select options.
-   * @param {Event} event     The initiating click event.
-   */
-  static #onCycleLeft(event, target) {
-    const select = target.nextElementSibling;
-    const n = select.selectedIndex - 1;
-    const mod = select.options.length;
-    const newIndex = ((n % mod) + mod) % mod;
-    select.selectedIndex = newIndex;
-  }
-}
-
-const copy = value => structuredClone(value);
-const NODE_WIDTH = 218;
-const NODE_HEIGHT = 148;
-
-/** Find a nearby free slot, including clearance for connection ports. */
-function freeNodePosition(nodes, preferred) {
-  const available = point => nodes.every(node => Math.abs(node.x - point.x) >= NODE_WIDTH + 24 || Math.abs(node.y - point.y) >= NODE_HEIGHT + 24);
-  if (available(preferred)) return {...preferred};
-  for (let radius = 1; radius <= nodes.length + 1; radius++) {
-    for (let y = -radius; y <= radius; y++) for (let x = -radius; x <= radius; x++) {
-      if (Math.abs(x) !== radius && Math.abs(y) !== radius) continue;
-      const point = {x: preferred.x + x * (NODE_WIDTH + 48), y: preferred.y + y * (NODE_HEIGHT + 40)};
-      if (available(point)) return point;
-    }
-  }
-}
-
-/** Bounded, detached history includes filter parameters as well as graph topology. */
-class BlueprintHistory {
-  constructor(initial) { this.entries = [copy(initial)]; this.index = 0; }
-  get current() { return copy(this.entries[this.index]); }
-  get canUndo() { return this.index > 0; }
-  get canRedo() { return this.index < this.entries.length - 1; }
-  push(value) {
-    if (JSON.stringify(value) === JSON.stringify(this.entries[this.index])) return;
-    this.entries.splice(this.index + 1);
-    this.entries.push(copy(value));
-    if (this.entries.length > 60) this.entries.shift();
-    this.index = this.entries.length - 1;
-  }
-  undo() { if (this.canUndo) this.index--; return this.current; }
-  redo() { if (this.canRedo) this.index++; return this.current; }
-}
-
-/** Reject invalid port directions and cycles before changing the graph. */
-function connectNodes(graph, from, to, fromPort = 'out', toPort = 'in') {
-  const source = graph.nodes.find(n => n.id === from);
-  const target = graph.nodes.find(n => n.id === to);
-  if (!source || !target || from === to || !outputPorts(source).includes(fromPort) || !inputPorts(target).includes(toPort)) return false;
-  if (graph.edges.some(e => e.from === from && e.to === to && outputPort(e) === fromPort && inputPort(e) === toPort)) return false;
-  const visit = [to], seen = new Set();
-  while (visit.length) {
-    const id = visit.pop();
-    if (id === from) return false;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    for (const edge of graph.edges) if (edge.from === id) visit.push(edge.to);
-  }
-  if (["not", "result", "branch"].includes(target.type) || BINARY_TYPES.has(target.type)) graph.edges = graph.edges.filter(e => e.to !== to || inputPort(e) !== toPort);
-  graph.edges.push({from, to, ...(fromPort !== 'out' ? {fromPort} : {}), ...(toPort !== 'in' ? {toPort} : {})});
-  return true;
-}
-
-function removeNode(graph, id) {
-  const node = graph.nodes.find(n => n.id === id);
-  if (!node || node.type === "result") return false;
-  graph.nodes = graph.nodes.filter(n => n.id !== id);
-  graph.edges = graph.edges.filter(e => e.from !== id && e.to !== id);
-  return true;
-}
-
-function fitGraph(graph, width, height) {
-  if (!graph.nodes.length || width <= 0 || height <= 0) return {x: 40, y: 40, scale: 1};
-  const minX = Math.min(...graph.nodes.map(n => n.x || 0));
-  const minY = Math.min(...graph.nodes.map(n => n.y || 0));
-  const w = Math.max(...graph.nodes.map(n => n.x || 0)) - minX + NODE_WIDTH;
-  const h = Math.max(...graph.nodes.map(n => n.y || 0)) - minY + NODE_HEIGHT;
-  const scale = Math.max(.15, Math.min(1, (width - 72) / w, (height - 72) / h));
-  return {x: (width - w * scale) / 2 - minX * scale, y: (height - h * scale) / 2 - minY * scale, scale};
-}
-
-function graphPoint(point, view) {
-  return {x: (point.x - view.x) / view.scale, y: (point.y - view.y) / view.scale};
-}
-
-function connectionPath(from, to, edge = {}) {
-  const x1 = from.x + NODE_WIDTH, y1 = from.y + portY(from, outputPort(edge));
-  const x2 = to.x, y2 = to.y + portY(to, inputPort(edge));
-  const bend = Math.max(64, Math.abs(x2 - x1) * .5);
-  return `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`;
-}
-
-const ACTOR = new Set(["actorCreatureSizes", "actorCreatureTypes", "actorLanguages", "baseArmors", "healthPercentages", "remainingSpellSlots", "statusEffects"]);
-const ITEM = new Set(["baseTools", "baseWeapons", "creatureTypes", "featureTypes", "identifiers", "itemTypes", "preparationModes", "sourceClasses", "spellComponents", "spellLevels", "spellSchools", "weaponProperties"]);
-const ACTIVITY = new Set(["attackModes", "damageTypes", "saveAbilities"]);
-const TARGET = new Set(["targetArmors", "targetEffects", "tokenSizes"]);
-const SPECIAL = new Set(["abilities", "markers", "proficiencyLevels", "skillIds", "throwTypes"]);
-
-/** A deliberately limited read-only trial: never dispatch scripts or dice formulas. */
-function evaluateTrialCondition(id, bonus, registry, subjects = {}, details = {}) {
-  if (id === "customScripts") return {result: null, reason: "ScriptSkipped"};
-  if (id === "arbitraryComparisons") return {result: null, reason: "FormulaSkipped"};
-  if (![ACTOR, ITEM, ACTIVITY, TARGET, SPECIAL].some(set => set.has(id))) return {result: null, reason: "EvaluationError"};
-  let missing = !subjects.actor;
-  if (ITEM.has(id)) missing ||= !subjects.item;
-  if (ACTIVITY.has(id)) missing ||= !subjects.activity;
-  if (TARGET.has(id)) missing ||= !subjects.target?.actor;
-  if (id === "tokenSizes") missing ||= !subjects.target?.document;
-  if (id === "abilities") missing ||= !(subjects.activity?.ability || details.abilityId);
-  if (id === "skillIds") missing ||= !details.skillId;
-  if (id === "throwTypes") missing ||= !(details.ability || details.isDeath || details.isConcentration);
-  if (id === "proficiencyLevels") missing ||= !(subjects.item || details.abilityId || details.ability || details.skillId || details.toolId || details.isDeath);
-  if (id === "markers" && bonus.filters.markers?.target?.size) missing ||= !subjects.target?.actor;
-  if (missing) return {result: null, reason: "MissingContext"};
-  try {
-    const value = registry[id].call(bonus, {...subjects, target: subjects.target ?? null}, bonus.filters[id], details);
-    return typeof value === "boolean" ? {result: value} : {result: null, reason: "EvaluationError"};
-  } catch { return {result: null, reason: "EvaluationError"}; }
-}
-
-/** One source of field help for the visual editor and the existing filter picker. */
-function getConditionHelp(id, localize = key => globalThis.game.i18n.localize(key)) {
-  return {
-    description: localize(`BUILD_N_ACTION.FIELDS.filters.${id}.hint`).replace(/<[^>]*>/g, ""),
-    example: localize(`BUILD_N_ACTION.ConditionHelp.${id}.example`),
-    context: localize(`BUILD_N_ACTION.ConditionHelp.${id}.context`)
-  };
-}
-
-/** Texture-driven fire, shared by the editor's active node surfaces. */
-class FireVFX {
-  constructor(canvas, textureUrl, {width=218,height=148,padding=80}={}) {
-    this.canvas=canvas;this.width=width;this.height=height;this.padding=padding;
-    const gl=this.gl=canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,antialias:false,preserveDrawingBuffer:true});
-    if(!gl)throw Error('WebGL unavailable');
-    const vertex=`attribute vec2 aPosition;void main(){gl_Position=vec4(aPosition,0.,1.);}`;
-    const fragment=`precision highp float;
-      uniform vec2 uResolution;uniform vec2 uSize;uniform float uPadding;uniform float uTime;uniform float uIntensity;uniform sampler2D uFire;
-      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-      float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
-      float fbm(vec2 p){float n=0.,a=.5;for(int i=0;i<4;i++){n+=a*noise(p);p=mat2(.8,-.6,.6,.8)*p*2.03+13.7;a*=.5;}return n;}
-      vec3 sampleFire(vec2 q,float seed){
-        vec2 flow=vec2(q.x*3.5+seed,q.y*2.5-uTime*.48);
-        vec2 curl=vec2(fbm(flow+vec2(0,fbm(flow+6.))),fbm(flow+vec2(8.,2.)))-.5;
-        vec2 uv=q+curl*vec2(.13,.17)*(.3+q.y);
-        uv.x+=sin(uTime*.23+seed)*.018;
-        uv.y*=.89+.16*fbm(vec2(q.x*5.+seed,uTime*.34));
-        vec3 c=texture2D(uFire,clamp(uv,vec2(.001),vec2(.999))).rgb;
-        float edge=smoothstep(0.,.05,q.x)*(1.-smoothstep(.95,1.,q.x));
-        return c*edge*(.78+.3*fbm(flow*2.5+4.));
-      }
-      void main(){
-        vec2 extent=uSize+2.*uPadding;
-        vec2 p=vec2(gl_FragCoord.x/uResolution.x,1.-gl_FragCoord.y/uResolution.y)*extent-uPadding;
-        // Signed distance masks the inside of the rounded node, leaving its content untouched.
-        vec2 box=abs(p-uSize*.5)-(uSize*.5-vec2(6.));
-        float sd=length(max(box,0.))+min(max(box.x,box.y),0.)-6.;
-        float outside=smoothstep(-1.,1.,sd);
-        vec3 color=vec3(0.);
-        // Overlapping fields blend continuously around the shoulders; no horizontal cut plane.
-        vec3 crown=vec3(0.);
-        {
-          float rise=max(-p.y,0.);
-          float plume=.5+.5*sin(p.x*.071+sin(p.x*.033)+uTime*.32);
-          float wind=sin(rise*.043-uTime*.9)*9.+(fbm(vec2(rise*.035,uTime*.4))-.5)*22.;
-          float spread=28.+rise*.22;
-          vec2 uv=vec2((p.x+spread-wind)/(uSize.x+spread*2.),rise/142.+.38+(1.-plume)*.12);
-          float perimeter=smoothstep(-spread,-spread+22.,p.x-wind)*(1.-smoothstep(uSize.x+spread-22.,uSize.x+spread,p.x-wind));
-          crown=sampleFire(uv,0.)*perimeter*(1.-smoothstep(58.,78.,rise))*.9;
-        }
-        // Vertical edge sheets keep their upward flow instead of rotating flames sideways.
-        float side=min(abs(p.x),abs(p.x-uSize.x));
-        float seed=p.x<uSize.x*.5 ? 2. : 17.;
-        float eddy=fbm(vec2(p.y*.046-uTime*.85,seed+uTime*.18));
-        float reach=10.+eddy*35.+7.*sin(p.y*.072+seed-uTime*1.6);
-        // Rounded emission ends dissipate through the texture instead of fading into flat feet.
-        float tip=max(p.y-uSize.y+14.,0.);
-        float distanceToSheet=length(vec2(side,tip*1.5));
-        vec2 sideUV=vec2(.2+eddy*.48, .35+distanceToSheet/(reach*2.)+.1*sin(p.y*.04-uTime));
-        float ragged=1.-smoothstep(reach*.38,reach,distanceToSheet+(noise(p*.13+vec2(0.,uTime*2.))-.5)*9.);
-        vec3 sheet=sampleFire(sideUV,seed)*ragged*.68;
-        float shoulder=smoothstep(-22.,30.+eddy*12.,p.y);
-        color=mix(crown,sheet,shoulder);
-        float glow=exp(-max(sd,0.)*.17)*(.06+.035*noise(p*.045+vec2(0.,-uTime)));
-        color+=vec3(1.,.26,.035)*glow;
-        // Sparse embers drift upward along independent trajectories.
-        for(int i=0;i<20;i++){
-          float id=float(i),life=fract(uTime*(.13+hash(vec2(id,3.))*.1)+hash(vec2(id,9.)));
-          float x=hash(vec2(id,4.))*(uSize.x+40.)-20.;
-          vec2 spark=vec2(x+sin(life*4.+id)*16.,-life*74.);
-          float d=length((p-spark)*vec2(1.,.6));
-          color+=vec3(1.,.53,.17)*exp(-d*d*1.2)*sin(life*3.14159)*.68;
-        }
-        color*=outside*uIntensity;
-        float alpha=clamp(max(color.r,max(color.g,color.b)),0.,.96);
-        gl_FragColor=vec4(min(color,vec3(alpha)),alpha);
-      }`;
-    const compile=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s;};
-    this.vertex=compile(gl.VERTEX_SHADER,vertex);this.fragment=compile(gl.FRAGMENT_SHADER,fragment);
-    this.program=gl.createProgram();gl.attachShader(this.program,this.vertex);gl.attachShader(this.program,this.fragment);gl.linkProgram(this.program);
-    if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));
-    gl.useProgram(this.program);this.buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
-    const position=gl.getAttribLocation(this.program,'aPosition');gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
-    this.uniforms=Object.fromEntries(['uResolution','uSize','uPadding','uTime','uIntensity','uFire'].map(k=>[k,gl.getUniformLocation(this.program,k)]));
-    this.texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,0]));
-    for(const name of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,name,gl.CLAMP_TO_EDGE);
-    for(const name of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,name,gl.LINEAR);
-    this.ready=new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>{if(this.destroyed){resolve();return;}gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);resolve();};image.onerror=()=>reject(Error('Fire texture could not be loaded'));image.src=textureUrl;});
-    const ratio=Math.min(devicePixelRatio||1,2);canvas.width=Math.round((width+padding*2)*ratio);canvas.height=Math.round((height+padding*2)*ratio);
-    canvas.style.width=`${width+padding*2}px`;canvas.style.height=`${height+padding*2}px`;
-  }
-  draw(time,intensity=1){
-    if(this.destroyed)return;
-    const gl=this.gl,u=this.uniforms;gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.useProgram(this.program);
-    gl.uniform2f(u.uResolution,this.canvas.width,this.canvas.height);gl.uniform2f(u.uSize,this.width,this.height);gl.uniform1f(u.uPadding,this.padding);gl.uniform1f(u.uTime,time);gl.uniform1f(u.uIntensity,intensity);gl.uniform1i(u.uFire,0);gl.drawArrays(gl.TRIANGLES,0,6);
-  }
-  destroy(){if(this.destroyed)return;this.destroyed=true;const gl=this.gl;gl.deleteTexture(this.texture);gl.deleteBuffer(this.buffer);gl.deleteProgram(this.program);gl.deleteShader(this.vertex);gl.deleteShader(this.fragment);gl.getExtension('WEBGL_lose_context')?.loseContext();}
-}
-
-const TAU$1=Math.PI*2;
-const fract=n=>n-Math.floor(n);
-const wave=(i,t)=>Math.sin(i*7.17+t)*.62+Math.sin(i*2.31-t*1.73)*.38;
-
-/** Material-specific motion. Coordinates are local to the node; the caller protects its text. */
-function drawAmbientVFX(ctx,{width:w,height:h,element,time:t,health=50},glow,stroke,crystal) {
-  if(element==='lightning') {
-    // Discharges jump between independent anchors; they never orbit the card.
-    const epoch=Math.floor(t*2.2),phase=fract(t*2.2);
-    const envelope=.22+.78*Math.exp(-phase*7);
-    for(let k=0;k<4;k++) {
-      const side=k%2 ? w : 0,sign=k%2 ? 1 : -1,y=18+fract(k*.618+epoch*.173)*(h-28);
-      const points=[[side,y]];
-      for(let j=1;j<9;j++)points.push([side+sign*(j*4+wave(j+k*8,epoch)*7),y-j*5+wave(j*3+k,epoch)*12]);
-      stroke(ctx,points,'126,162,255',envelope*.9,1.1);
-      stroke(ctx,points,'231,244,255',envelope*.85,.45);
-      const fork=points[4];stroke(ctx,[fork,[fork[0]+sign*12,fork[1]+8],[fork[0]+sign*18,fork[1]-3]],'156,184,255',envelope*.55,.6);
-      glow(ctx,side,y,18,'103,145,255',envelope*.2);
-    }
-  } else if(element==='cold') {
-    for(let i=0;i<30;i++) {
-      const side=i%3,x=side===0 ? 0 : side===1 ? w : fract(i*.618)*w;
-      const y=side===2 ? 1 : fract(i*.754)*h;
-      const angle=side===0 ? -.6 : side===1 ? .6 : wave(i,0)*.4;
-      crystal(ctx,x,y,8+fract(i*.47)*22,angle,.42+.18*Math.sin(t*.7+i));
-      if(i%4===0)glow(ctx,x,y,21,'126,215,250',.12);
-    }
-    for(let i=0;i<20;i++) {
-      const life=fract(t*.065+i*.618),x=fract(i*.754)*(w+70)-35+Math.sin(t*.4+i)*6,y=-40+life*(h+75);
-      crystal(ctx,x,y,2+i%3,t*.1+i,Math.sin(life*Math.PI)*.4);
-    }
-  } else if(element==='acid') {
-    for(let i=0;i<20;i++) {
-      const life=fract(t*.24+i*.618),x=(i%2 ? w+3 : -3)+wave(i,life*3)*9,y=h-life*(h+20),r=1+life*4;
-      glow(ctx,x,y,12,'180,230,62',Math.sin(life*Math.PI)*.16);
-      ctx.strokeStyle=`rgba(183,228,76,${Math.sin(life*Math.PI)*.7})`;ctx.lineWidth=.8;ctx.beginPath();ctx.arc(x,y,r,0,TAU$1);ctx.stroke();
-      ctx.fillStyle=`rgba(240,255,188,${Math.sin(life*Math.PI)*.7})`;ctx.beginPath();ctx.arc(x-r*.3,y-r*.4,.7,0,TAU$1);ctx.fill();
-      if(life>.8)stroke(ctx,[[x-r*2,y],[x-r*3,y-3]],'210,244,136',(1-life)*2,.7);
-    }
-  } else if(element==='poison'||element==='necrotic') {
-    const rgb=element==='poison' ? '120,185,103' : '135,105,186';
-    for(let i=0;i<28;i++) {
-      const life=fract(t*.09+i*.618),sign=i%2 ? 1 : -1,x=(i%2 ? w : 0)+sign*(5+life*16)+wave(i,t*.6)*7,y=h+7-life*(h+53);
-      const alpha=Math.sin(life*Math.PI)**2;
-      glow(ctx,x,y,10+life*15,rgb,alpha*.11);
-      const points=Array.from({length:12},(_,j)=>[x+Math.sin(j*.35+t*.6+i)*(3+j*.4),y-j*2]);
-      stroke(ctx,points,rgb,alpha*.12,.7);
-      if(element==='necrotic')glow(ctx,x+3,y,4,'208,181,239',alpha*.3);
-    }
-  } else if(element==='radiant') {
-    for(let i=0;i<18;i++) {
-      const x=fract(i*.618)*(w+32)-16,y=fract(i*.754)*(h+44)-22,a=.25+.6*Math.sin(t*.65+i)**6;
-      glow(ctx,x,y,19,'255,210,122',a*.15);
-      const length=3+a*6;
-      stroke(ctx,[[x-length,y],[x+length,y]],'255,230,174',a*.7,.6);
-      stroke(ctx,[[x,y-length*1.6],[x,y+length*1.6]],'255,248,217',a,.7);
-    }
-  } else if(element.startsWith('health-')) {
-    // A threshold cue, not a claim about the actor's current health.
-    const low=element==='health-low',rgb=low ? '239,101,115' : '106,220,164';
-    const rate=low ? 1.05+(1-health/100)*.45 : .7,phase=fract(t*rate);
-    const beat=Math.exp(-(((phase-.12)/.055)**2))+.55*Math.exp(-(((phase-.3)/.075)**2));
-    for(const x of [0,w])glow(ctx,x,h*.46,30,rgb,.08+beat*.2);
-    const y=-9,points=[];
-    for(let i=0;i<=90;i++) {
-      const x=i/90*w,q=fract(x/w-t*.23),pulse=Math.exp(-(((q-.48)/.017)**2))*-14+Math.exp(-(((q-.51)/.018)**2))*7;
-      points.push([x,y+pulse]);
-    }
-    stroke(ctx,points,rgb,.45+beat*.22,.85);
-    const x=w*.5,yHeart=-25;
-    ctx.save();ctx.translate(x,yHeart);ctx.scale(1+beat*.12,1+beat*.12);ctx.fillStyle=`rgba(${rgb},${.5+beat*.35})`;
-    ctx.beginPath();ctx.moveTo(0,5);ctx.bezierCurveTo(-12,-2,-6,-10,0,-4);ctx.bezierCurveTo(6,-10,12,-2,0,5);ctx.fill();ctx.restore();
-  } else if(element==='force'||element==='thunder') {
-    const rgb=element==='force' ? '184,151,255' : '151,191,223';
-    for(let i=0;i<3;i++) {
-      const life=fract(t*.45+i/3),a=Math.sin(life*Math.PI)*.35;
-      ctx.strokeStyle=`rgba(${rgb},${a})`;ctx.lineWidth=1.3-life;
-      for(const side of [-1,1]) {
-        ctx.beginPath();ctx.ellipse(side<0 ? 0 : w,h*.5,9+life*30,18+life*40,0,side<0 ? Math.PI*.6 : -Math.PI*.4,side<0 ? Math.PI*1.4 : Math.PI*.4);ctx.stroke();
-      }
-    }
-  }
-}
-
-const TAU = Math.PI * 2;
-const EFFECT_PADDING = 80;
-const EFFECT_ELEMENTS = new Set(['fire', 'cold', 'lightning', 'acid', 'poison', 'radiant', 'necrotic', 'health-low', 'health-high', 'force', 'thunder']);
-const noise = (i, t) => Math.sin(i * 7.17 + t) * .62 + Math.sin(i * 2.31 - t * 1.73) * .38;
-const fraction = value => value - Math.floor(value);
-
-function glow(ctx, x, y, radius, color, alpha) {
-  const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
-  g.addColorStop(0, `rgba(${color},${alpha})`); g.addColorStop(1, `rgba(${color},0)`);
-  ctx.fillStyle = g; ctx.fillRect(x-radius, y-radius, radius*2, radius*2);
-}
-
-function strokeGlow(ctx, points, rgb, alpha, width=1) {
-  for (const [line, opacity] of [[width*7,alpha*.06],[width*3,alpha*.17],[width,alpha]]) {
-    ctx.beginPath();points.forEach(([x,y],i)=>i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
-    ctx.strokeStyle=`rgba(${rgb},${opacity})`;ctx.lineWidth=line;ctx.lineJoin='round';ctx.lineCap='round';ctx.stroke();
-  }
-}
-
-function crystal(ctx,x,y,length,angle,alpha) {
-  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
-  const g=ctx.createLinearGradient(-3,0,4,-length);g.addColorStop(0,`rgba(86,163,202,${alpha*.15})`);g.addColorStop(.5,`rgba(178,230,250,${alpha*.55})`);g.addColorStop(1,`rgba(239,253,255,${alpha})`);
-  ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(-3,0);ctx.lineTo(-4,-length*.55);ctx.lineTo(0,-length);ctx.lineTo(4,-length*.4);ctx.lineTo(3,0);ctx.closePath();ctx.fill();
-  strokeGlow(ctx,[[0,0],[0,-length]],'215,246,255',alpha*.6,.5);ctx.restore();
-}
-
-function flame(ctx, x, y, height, width, sway, opacity) {
-  const g = ctx.createLinearGradient(x, y, x+sway, y-height);
-  g.addColorStop(0, `rgba(255,232,157,${opacity})`);
-  g.addColorStop(.22, `rgba(255,167,47,${opacity*.95})`);
-  g.addColorStop(.65, `rgba(243,79,17,${opacity*.7})`);
-  g.addColorStop(1, 'rgba(164,35,8,0)');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.moveTo(x-width, y);
-  ctx.bezierCurveTo(x-width*1.3, y-height*.36, x+sway-width*.35, y-height*.64, x+sway, y-height);
-  ctx.bezierCurveTo(x+sway+width*.8, y-height*.52, x+width, y-height*.28, x+width, y);
-  ctx.closePath(); ctx.fill();
-}
-
-/** All motion is continuous in time, so frame rate changes never speed up the effect. */
-function drawElementalEffect(ctx, {width, height, element, time = 0, intensity = 1, health = 50}) {
-  const p = EFFECT_PADDING, w = width, h = height;
-  ctx.clearRect(0, 0, w+p*2, h+p*2);
-  if (!EFFECT_ELEMENTS.has(element) || intensity <= 0) return;
-  ctx.save(); ctx.translate(p, p); ctx.globalAlpha = intensity;
-  // Never paint over names, values, or inspector content, even with an opaque flame.
-  ctx.beginPath(); ctx.rect(-p, -p, w+p*2, h+p*2); ctx.roundRect(3, 3, w-6, h-6, 5); ctx.clip('evenodd');
-  if(element!=='fire') {
-    drawAmbientVFX(ctx,{width,height,element,time,health},glow,strokeGlow,crystal);
-    ctx.restore();return;
-  }
-  if (element === 'fire') {
-    ctx.filter='blur(0.55px)';
-    for (let i=0; i<18; i++) {
-      const x=5+fraction(i*.618034)*(w-10)+noise(i+3,time*.7)*2, n=noise(i, time*2.4);
-      const tall = 12 + 18*(.5+.5*n) + 10*(.5+.5*Math.sin(i*4.8));
-      const sway=noise(i+8,time*1.9)*11;
-      glow(ctx,x,2,18,'246,104,23',.08);
-      flame(ctx,x,4,tall,4.5+3*Math.sin(i*2.4)**2,sway,.4);
-      flame(ctx,x,3,tall*.49,2.5,sway*.4,.48);
-    }
-    for (const side of [0,w]) for (let i=0; i<7; i++) {
-      const y=24+i*(h-28)/7, n=noise(i+side,time*3);
-      glow(ctx,side,y,15,'255,105,20',.13);
-      flame(ctx,side,y,15+n*7,4, (side ? 1 : -1)*(3+n*2),.4);
-    }
-    ctx.filter='none';
-    for (let i=0; i<32; i++) {
-      const life=fraction(time*(.19+(i%4)*.035)+i*.618);
-      const side=i%3, x0=side===0 ? -3 : side===1 ? w+3 : fraction(i*.754)*w;
-      const y0=side===2 ? 0 : fraction(i*.421)*h;
-      const x=x0+noise(i,time*.9+life*2)*9, y=y0-life*52;
-      const a=Math.sin(life*Math.PI)**2*.65;
-      glow(ctx,x,y,3,'255,162,53',a*.25);
-      ctx.fillStyle=`rgba(255,208,121,${a})`; ctx.beginPath(); ctx.ellipse(x,y,.6+(i%3)*.18,1.1,noise(i,time)*.3,0,TAU); ctx.fill();
-    }
-    glow(ctx,4,h-4,20,'255,127,28',.16); glow(ctx,w-4,h-4,20,'255,127,28',.16);
-  }
-  ctx.restore();
-}
-
-/** A single scheduler per editor, running only while a visible node is active or fading. */
-class ElementalEffects {
-  constructor(root) {
-    this.root=root; this.abort=new AbortController(); this.surfaces=[];
-    this.motion=matchMedia('(prefers-reduced-motion: reduce)');
-    const options={signal:this.abort.signal};
-    for(const event of ['pointerover','pointerout','focusin','focusout']) root.addEventListener(event,()=>this.wake(),options);
-    this.motion.addEventListener('change',()=>this.wake(),options);
-    document.addEventListener('visibilitychange',()=>this.wake(),options);
-    this.preferences=new MutationObserver(()=>this.wake());
-    this.preferences.observe(document.body,{attributes:true,attributeFilter:['data-bna-effects','data-bna-motion']});
-    this.refresh();
-  }
-  refresh() {
-    this.surfaces=this.surfaces.filter(s=>{if(s.node.isConnected)return true;s.canvas.remove();return false;});
-    for(const node of this.root.querySelectorAll('.bna-node[data-element]')) {
-      if(!EFFECT_ELEMENTS.has(node.dataset.element) || this.surfaces.some(s=>s.node===node))continue;
-      const canvas=document.createElement('canvas'); canvas.className='bna-elemental-canvas';canvas.setAttribute('aria-hidden','true');
-      const width=node.offsetWidth, height=node.offsetHeight, ratio=Math.min(devicePixelRatio || 1,2);
-      canvas.width=Math.ceil((width+EFFECT_PADDING*2)*ratio);canvas.height=Math.ceil((height+EFFECT_PADDING*2)*ratio);
-      canvas.style.width=`${width+EFFECT_PADDING*2}px`;canvas.style.height=`${height+EFFECT_PADDING*2}px`;
-      node.append(canvas);const ctx=canvas.getContext('2d');if(!ctx){canvas.remove();continue;}ctx.scale(ratio,ratio);
-      this.surfaces.push({node,canvas,ctx,width,height,intensity:0,health:Number(node.dataset.health ?? 50)});
-    }
-    this.wake();
-  }
-  prepareFire(width,height) {
-    if(this.fireFailed||this.fire)return;
-    try {
-      const url=globalThis.foundry?.utils?.getRoute?.('modules/build-n-action/assets/vfx/fire-bed-v1.png') ?? 'modules/build-n-action/assets/vfx/fire-bed-v1.png';
-      this.fire=new FireVFX(document.createElement('canvas'),url,{width,height,padding:EFFECT_PADDING});
-      this.fire.ready.then(()=>{if(!this.destroyed){this.fireReady=true;this.wake();}}).catch(()=>{this.fireFailed=true;this.fire?.destroy();this.fire=null;});
-    } catch {this.fireFailed=true;this.fire?.destroy();this.fire=null;}
-  }
-  wake() { if(!this.destroyed&&!this.frame)this.frame=requestAnimationFrame(t=>this.tick(t)); }
-  tick(now) {
-    this.frame=0;
-    const enabled=document.body.dataset.bnaEffects!=='off' && !document.hidden;
-    const animated=document.body.dataset.bnaMotion!=='off' && !this.motion.matches;
-    const dt=Math.min((now-(this.last ?? now-16))/1000,.05);this.last=now;
-    let running=false;
-    for(const s of this.surfaces) {
-      const editingHealth=s.node.dataset.element.startsWith('health-') && this.root.querySelector('[name^="filters.healthPercentages."]:focus-within');
-      const active=enabled && s.node.isConnected && s.node.getClientRects().length>0 && (s.node.matches(':hover,:focus-within')||!!editingHealth);
-      const target=active ? 1 : 0;
-      s.intensity=animated && enabled ? s.intensity+(target-s.intensity)*(1-Math.exp(-dt*(active ? 9 : 5))) : target;
-      if(Math.abs(s.intensity-target)<.005)s.intensity=target;
-      const element=s.node.dataset.element,time=animated ? now/1000 : 0,intensity=s.intensity*(animated ? 1 : .35);
-      if(element==='fire'&&intensity>0)this.prepareFire(s.width,s.height);
-      if(element==='fire'&&this.fireReady&&this.fire) {
-        this.fire.draw(time,intensity);
-        s.ctx.clearRect(0,0,s.width+EFFECT_PADDING*2,s.height+EFFECT_PADDING*2);
-        s.ctx.drawImage(this.fire.canvas,0,0,s.width+EFFECT_PADDING*2,s.height+EFFECT_PADDING*2);
-      } else drawElementalEffect(s.ctx,{...s,element,time,intensity});
-      running ||= enabled && animated && (active || s.intensity>0);
-    }
-    if(running)this.wake();else this.last=null;
-  }
-  destroy() { this.destroyed=true;cancelAnimationFrame(this.frame);this.frame=0;this.abort.abort();this.preferences.disconnect();this.fire?.destroy();this.fire=null;for(const s of this.surfaces)s.canvas.remove();this.surfaces=[]; }
-}
-
-const t = key => game.i18n.localize(`BUILD_N_ACTION.Blueprint.${key}`);
-const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
-const icon = type => ({condition: "filter", context: 'crosshairs', branch: 'code-branch', xor: 'not-equal', nand: 'ban', nor: 'ban', and: "code-branch", or: "shuffle", not: "ban", result: "bolt"}[type] ?? "circle-question");
-const configured = bonus => Object.keys(bonus.filters).filter(id => fields[id]?.storage(bonus));
-const json = value => JSON.stringify(value);
-
-/** Detached graph draft: all document writes happen at the explicit Save boundary. */
-class ConditionBlueprint extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
-  static DEFAULT_OPTIONS = {
-    classes: [MODULE.ID, "blueprint"], tag: "form",
-    window: {icon: "fa-solid fa-diagram-project", resizable: true},
-    form: {handler: () => {}, submitOnChange: false, closeOnSubmit: false},
-    position: {width: 1240, height: 820},
-    actions: {keysDialog: this.onKeys, deleteFilter: this.onDeleteFilter}
-  };
-  static PARTS = {editor: {template: `modules/${MODULE.ID}/templates/condition-blueprint.hbs`}};
-
-  constructor({bonus, ...options}) {
-    super({...options, id: `bna-blueprint-${bonus.uuid.replaceAll(".", "-")}`});
-    this.owner = bonus.parent;
-    this.bonusId = bonus.id;
-    this.BonusClass = bonus.constructor;
-    this.baseline = json(bonus.toObject());
-    this.draft = new this.BonusClass(bonus.toObject(), {parent: this.owner});
-    const stored = bonus.conditionGraph;
-    const readable = stored?.version === 1 && Array.isArray(stored.nodes) && stored.nodes.length <= 256 && stored.nodes.every(n => n && typeof n.id === "string" && /^[a-zA-Z0-9_-]{1,80}$/.test(n.id) && GRAPH_TYPES.has(n.type)) && Array.isArray(stored.edges) && stored.edges.length <= 1024 && stored.edges.every(e => e && typeof e.from === "string" && typeof e.to === "string");
-    this.graph = structuredClone(readable
-      ? stored : createConditionGraph(configured(bonus)));
-    this.graph.enabled = true;
-    this.graph.nodes.forEach((node, index) => { node.x = Number.isFinite(node.x) ? node.x : 40; node.y = Number.isFinite(node.y) ? node.y : 30 + index * 140; });
-    this.unsupported = !!stored && !readable;
-    this.history = new BlueprintHistory(this.snapshot());
-    this.saved = stored?.enabled ? json(this.snapshot()) : null;
-    this.view = {x: 45, y: 60, scale: 1};
-    this.selected = this.graph.nodes.find(n => n.type === "result")?.id;
-    this.trialContext = {actor: bonus.actor?.id ?? "", item: bonus.item?.id ?? "", activity: "", target: game.user.targets?.first?.()?.id ?? ""};
-  }
-
-  get title() { return `${t("Title")}: ${this.draft.name}`; }
-  get dirty() { return json(this.snapshot()) !== this.saved; }
-  snapshot() { return {graph: this.graph, filters: this.draft.toObject().filters}; }
-  get editable() { return !!this.owner.isOwner && !this.saving; }
-  async _prepareContext() {
-    return {name: this.draft.name, gates: ["and", "or", "not", 'branch', 'xor', 'nand', 'nor'].map(type => ({type, label: t(type), hint: t(`${type}Hint`)}))};
-  }
-
-  _onRender(...args) {
-    super._onRender(...args);
-    this.effects?.destroy();
-    this.effects = null;
-    this.listeners?.abort();
-    this.listeners = new AbortController();
-    const options = {signal: this.listeners.signal};
-    this.element.addEventListener("submit", event => event.preventDefault(), options);
-    this.element.addEventListener("click", event => {
-      const button = event.target.closest("[data-bp-action]");
-      if (button) { event.preventDefault(); this.action(button.dataset.bpAction, button).catch(err => this.showError(err)); }
-    }, options);
-    this.element.addEventListener("change", event => {
-      if (event.target.closest("[data-bp-inspector]")) {
-        event.stopPropagation();
-        this.readParameters();
-      }
-      const context = event.target.dataset.bpContext;
-      if (context) {
-        this.trialContext[context] = event.target.value;
-        if (context === "actor") { this.trialContext.item = ""; this.trialContext.activity = ""; }
-        if (context === "item") this.trialContext.activity = "";
-        this.clearTrial(); this.renderGraph(); this.renderDiagnostics(); this.renderTrialContext();
-      }
-    }, options);
-    this.element.querySelector("[data-bp-search]").addEventListener("input", () => this.renderCatalog(), options);
-    this.element.addEventListener("keydown", event => this.onKey(event), options);
-    const canvas = this.element.querySelector("[data-bp-canvas]");
-    canvas.addEventListener("pointerdown", event => this.onPointerDown(event), options);
-    canvas.addEventListener("wheel", event => {
-      event.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      this.zoom(event.deltaY < 0 ? 1.1 : 1 / 1.1, {x: event.clientX - rect.left, y: event.clientY - rect.top});
-    }, {...options, passive: false});
-    this.renderCatalog(); this.renderGraph(); this.renderInspector(); this.renderDiagnostics(); this.renderTrialContext();
-    this.effects = new ElementalEffects(this.element);
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = new ResizeObserver(() => this.autoFit ? this.fit() : this.applyView());
-    this.resizeObserver.observe(canvas);
-    if (!this.fitted) { this.fit(); this.fitted = true; }
-  }
-
-  readParameters() {
-    if (!this.editable) return;
-    const node = this.graph.nodes.find(n => n.id === this.selected);
-    if (node?.type !== "condition") return;
-    try {
-      const form = new foundry.applications.ux.FormDataExtended(this.element);
-      const changes = foundry.utils.expandObject(form.object).filters;
-      if (!changes || !Object.hasOwn(changes, node.filter)) return;
-      this.draft.updateSource({filters: changes});
-      this.parameterError = null;
-      this.commit();
-      // Rebuild dependent field choices after validation without losing graph viewport.
-      this.renderInspector();
-    } catch (err) {
-      this.parameterError = {nodeId: node.id, message: String(err.message ?? err)};
-      this.renderDiagnostics();
-    }
-  }
-
-  commit() {
-    this.history.push(this.snapshot()); this.clearTrial();
-    this.renderGraph(); this.renderDiagnostics(); this.renderCatalog();
-  }
-
-  restore(snapshot) {
-    this.connecting = null;
-    this.graph = snapshot.graph;
-    this.draft = new this.BonusClass({...this.draft.toObject(), filters: snapshot.filters}, {parent: this.owner});
-    this.parameterError = null; this.clearTrial();
-    this.renderGraph(); this.renderInspector(); this.renderDiagnostics(); this.renderCatalog();
-  }
-
-  label(node) {
-    if (node.type === 'context') return t(node.predicate);
-    if (node.type !== "condition") return t(node.type);
-    return Object.hasOwn(this.draft.filters, node.filter) ? this.draft.schema.getField(`filters.${node.filter}`).label : node.filter;
-  }
-
-  renderCatalog() {
-    const search = this.element.querySelector("[data-bp-search]").value.toLocaleLowerCase();
-    const entries = Object.keys(this.draft.filters).map(id => ({id, label: this.draft.schema.getField(`filters.${id}`).label})).sort((a, b) => a.label.localeCompare(b.label));
-    this.element.querySelector("[data-bp-catalog]").innerHTML = entries.filter(entry => `${entry.label} ${entry.id}`.toLocaleLowerCase().includes(search)).map(entry => {
-      const present = this.graph.nodes.some(node => node.filter === entry.id);
-      return `<button type="button" class="bna-catalog-entry" data-bp-action="add" data-type="condition" data-filter="${escape(entry.id)}" title="${escape(getConditionHelp(entry.id).description)}"><i class="fa-solid fa-${present ? "check" : "plus"}" aria-hidden="true"></i><span>${escape(entry.label)}</span></button>`;
-    }).join("") || `<p class="hint">${escape(t("SearchEmpty"))}</p>`;
-    this.element.querySelector('[data-bp-catalog]').insertAdjacentHTML('afterbegin', CONTEXT_PREDICATES.filter(id => `${t(id)} ${id}`.toLocaleLowerCase().includes(search)).map(id => `<button type="button" class="bna-catalog-entry" data-bp-action="add" data-type="context" data-predicate="${id}" title="${escape(t(`${id}Hint`))}"><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>${escape(t(id))}</span></button>`).join(''));
-  }
-
-  renderPorts(node, direction) {
-    const ports = direction === 'in' ? inputPorts(node) : outputPorts(node);
-    return ports.map(port => {
-      const label = ['true','false'].includes(port) ? t(port === 'true' ? 'Yes' : 'No') : ['a','b'].includes(port) ? port.toUpperCase() : t(direction === 'in' ? 'Input' : 'Output');
-      const active = this.connecting?.id === node.id && this.connecting?.port === port;
-      return `<button type="button" class="bna-port bna-port-${direction} ${active ? 'connecting' : ''}" style="top:${portY(node, port) - 9}px" data-bp-action="${direction === 'in' ? 'portIn' : 'portOut'}" data-id="${escape(node.id)}" data-port="${port}" aria-label="${escape(t(direction === 'in' ? 'Input' : 'Output'))}: ${escape(this.label(node))} · ${escape(label)}"><span>${escape(label)}</span></button>`;
-    }).join('');
-  }
-
-  renderGraph() {
-    const element = [...(this.draft.bonuses?.damageType ?? [])][0] ?? "";
-    const traces = new Map((this.trial?.trace ?? []).map(item => [item.nodeId, item]));
-    this.element.querySelector("[data-bp-nodes]").innerHTML = this.graph.nodes.map(node => {
-      const trace = traces.get(node.id);
-      const status = trace?.status ?? "";
-      const health=this.draft.filters.healthPercentages;
-      const effect=node.type==='result' ? element : node.type==='condition' && node.filter==='healthPercentages' && [0,1].includes(health?.type) ? (health.type===0 ? 'health-low' : 'health-high') : '';
-      return `<article class="bna-node ${this.selected === node.id ? "selected" : ""}" data-node-id="${escape(node.id)}" data-type="${escape(node.type)}" data-element="${escape(effect)}" data-health="${Number(health?.value ?? 50)}" data-trace="${escape(status)}" style="transform:translate(${Number(node.x) || 0}px,${Number(node.y) || 0}px)" tabindex="0" aria-label="${escape(this.label(node))}">
-        ${this.renderPorts(node, 'in')}
-        <div class="bna-node-heading"><i class="fa-solid fa-${icon(node.type)}" aria-hidden="true"></i><span>${escape(t(node.type === "condition" ? "Condition" : "Logic"))}</span>${trace ? `<span class="bna-node-trace">${escape(t(status[0]?.toUpperCase() + status.slice(1)))}</span>` : ""}</div>
-        <strong title="${escape(this.label(node))}">${escape(this.label(node))}</strong><small title="${escape(node.type === 'context' ? t(`${node.predicate}Hint`) : '')}">${escape(node.type === "result" ? this.draft.bonuses?.bonus || t("ResultHint") : node.type === "condition" ? this.conditionSummary(node.filter) : t(`${node.type === 'context' ? node.predicate : node.type}Hint`))}</small>
-        ${this.renderPorts(node, 'out')}
-      </article>`;
-    }).join("");
-    this.drawEdges(); this.applyView(); this.effects?.refresh();
-  }
-
-  conditionSummary(id) {
-    if (!configured(this.draft).includes(id)) return t("Parameters");
-    const value = this.draft.toObject().filters[id];
-    return (Array.isArray(value) ? value.map(v => typeof v === "object" ? Object.values(v).join(" ") : v).join(" · ") : typeof value === "object" ? Object.values(value).map(v => Array.isArray(v) ? v.join(", ") : v).join(" · ") : String(value)).slice(0, 90);
-  }
-
-  drawEdges() {
-    const nodes = new Map(this.graph.nodes.map(node => [node.id, node]));
-    this.element.querySelector("[data-bp-edges]").innerHTML = this.graph.edges.map(edge => {
-      if (!nodes.has(edge.from) || !nodes.has(edge.to)) return "";
-      const path = connectionPath(nodes.get(edge.from), nodes.get(edge.to), edge);
-      return `<path class="bna-edge ${this.selected === edge.from || this.selected === edge.to ? "selected" : ""}" d="${path}" />`;
-    }).join("");
-  }
-
-  renderInspector() {
-    const container = this.element.querySelector("[data-bp-inspector]");
-    const node = this.graph.nodes.find(n => n.id === this.selected);
-    if (!node) { container.innerHTML = `<h3>${escape(t("Inspector"))}</h3><p class="hint">${escape(t("SelectNode"))}</p>`; return; }
-    const help = node.type === "condition" && Object.hasOwn(this.draft.filters, node.filter) ? getConditionHelp(node.filter) : {description: t(node.type === "result" ? "ResultHint" : node.type === "condition" ? "FilterError" : `${node.type === 'context' ? node.predicate : node.type}Hint`)};
-    let parameters = "";
-    try { if (node.type === "condition") parameters = fields[node.filter]?.render(this.draft) ?? ""; }
-    catch (err) { parameters = `<p class="bna-error">${escape(t("FilterError"))}: ${escape(err.message)}</p>`; }
-    const links = this.graph.edges.map((edge, index) => ({edge, index})).filter(({edge}) => edge.from === node.id || edge.to === node.id);
-    container.innerHTML = `<div class="bna-inspector-title"><i class="fa-solid fa-${icon(node.type)}" aria-hidden="true"></i><div><span>${escape(t("Inspector"))}</span><h3>${escape(this.label(node))}</h3></div></div>
-      <p>${escape(help.description)}</p>${help.example ? `<div class="bna-help-example"><strong>${escape(t("Example"))}</strong><p>${escape(help.example)}</p></div><p class="bna-help-context"><strong>${escape(t("Context"))}</strong> ${escape(help.context)}</p>` : ""}
-      ${node.type === "condition" ? `<div class="bna-blueprint-parameters">${parameters}</div><p class="hint">${escape(t("SharedFilterHint"))}</p>${fields[node.filter]?.repeatable ? `<button type="button" data-bp-action="repeat">${escape(t("AddRepeat"))}</button>` : ""}` : ""}
-      <h4>${escape(t("Connections"))}</h4><div class="bna-connections">${links.map(({edge, index}) => `<div><span>${escape(this.connectionLabel(edge, node))}</span><button type="button" data-bp-action="disconnect" data-index="${index}" title="${escape(t("Disconnect"))}" aria-label="${escape(t("Disconnect"))}: ${escape(this.connectionLabel(edge, node))}"><i class="fa-solid fa-link-slash" aria-hidden="true"></i></button></div>`).join("") || `<p class="hint">${escape(t("NoConnections"))}</p>`}</div>
-      ${node.type !== "result" ? `<button type="button" class="bna-remove-node" data-bp-action="remove"><i class="fa-solid fa-trash" aria-hidden="true"></i> ${escape(t("Remove"))}</button>` : ""}`;
-    if (!this.editable) container.querySelectorAll("input,select,textarea,button").forEach(input => input.disabled = true);
-  }
-
-  connectionLabel(edge, node) {
-    const other = this.graph.nodes.find(n => n.id === (edge.from === node.id ? edge.to : edge.from));
-    const portLabel = port => ({true:t('Yes'), false:t('No'), in:t('Input'), out:t('Output')}[port] ?? port.toUpperCase());
-    return `${other ? this.label(other) : '?'} · ${portLabel(outputPort(edge))} → ${portLabel(inputPort(edge))}`;
-  }
-
-  validation() {
-    const report = validateConditionGraph(this.graph, {knownFilters: Object.keys(this.draft.filters), configuredFilters: configured(this.draft)});
-    if (this.unsupported) report.issues.push({code: "UnsupportedGraph", severity: "error"});
-    if (this.parameterError) report.issues.push({code: "FilterError", severity: "error", ...this.parameterError});
-    // Repeated comparisons can be structurally present yet contain blank operands.
-    for (const node of this.graph.nodes) {
-      if (node.filter === "arbitraryComparisons" && this.draft.filters.arbitraryComparisons.some(v => !v.one?.trim() || !v.other?.trim())) report.issues.push({nodeId: node.id, code: "FilterError", severity: "error"});
-    }
-    report.valid = !report.issues.some(i => i.severity === "error");
-    return report;
-  }
-
-  renderDiagnostics() {
-    const report = this.validation();
-    this.element.querySelector("[data-bp-diagnostics]").innerHTML = report.issues.map(issue => {
-      const node = this.graph.nodes.find(n => n.id === issue.nodeId);
-      const key = `BUILD_N_ACTION.Blueprint.Issues.${issue.code}`;
-      const message = game.i18n.has?.(key) ? game.i18n.localize(key) : t(issue.code) !== `BUILD_N_ACTION.Blueprint.${issue.code}` ? t(issue.code) : issue.code;
-      return `<button type="button" class="bna-diagnostic ${issue.severity}" data-bp-action="focus" data-id="${escape(issue.nodeId ?? "")}"><i class="fa-solid fa-${issue.severity === "error" ? "circle-exclamation" : "triangle-exclamation"}" aria-hidden="true"></i><span>${node ? `${escape(this.label(node))}: ` : ""}${escape(message)}${issue.message ? ` — ${escape(issue.message)}` : ""}</span></button>`;
-    }).join("") || `<p class="bna-valid"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> ${escape(t("Valid"))}</p>`;
-    this.element.querySelector("[data-bp-issue-count]").textContent = report.issues.length || "";
-    this.element.querySelector("[data-bp-validity]").textContent = report.valid ? "✓" : report.issues.length;
-    this.element.querySelector('[data-bp-action="save"]').disabled = !report.valid || !this.editable || this.saving;
-    this.element.querySelector('[data-bp-action="undo"]').disabled = !this.history.canUndo;
-    this.element.querySelector('[data-bp-action="redo"]').disabled = !this.history.canRedo;
-    this.element.querySelector(".bna-blueprint-workspace").inert = !!this.saving;
-    this.element.querySelector("[data-bp-status]").textContent = this.dirty ? t("Unsaved") : t("Saved");
-    const invalid = new Set(report.issues.filter(i => i.severity === "error").map(i => i.nodeId));
-    this.element.querySelectorAll("[data-node-id]").forEach(node => node.classList.toggle("invalid", invalid.has(node.dataset.nodeId)));
-  }
-
-  async action(action, button) {
-    const editableActions = new Set(["add", "repeat", "remove", "disconnect", "portIn", "portOut", "undo", "redo", "save"]);
-    if (editableActions.has(action) && !this.editable) throw Error(t("PermissionDenied"));
-    if (action === "save") return this.save();
-    if (action === "fit") return this.fit();
-    if (action === "zoomIn" || action === "zoomOut") return this.zoom(action === "zoomIn" ? 1.2 : 1 / 1.2);
-    if (action === "undo" || action === "redo") return this.restore(this.history[action]());
-    if (action === "validate") { this.renderDiagnostics(); this.element.querySelector(".bna-blueprint-diagnostics").open = true; return; }
-    if (action === "trial") return this.runTrial();
-    if (action === "focus") return this.select(button.dataset.id, true);
-    if (action === "portOut") { this.connecting = this.connecting?.id === button.dataset.id && this.connecting?.port === button.dataset.port ? null : {id:button.dataset.id,port:button.dataset.port}; this.renderGraph(); return; }
-    if (action === "portIn") {
-      if (this.connecting && connectNodes(this.graph, this.connecting.id, button.dataset.id, this.connecting.port, button.dataset.port)) { this.connecting = null; this.commit(); this.renderInspector(); }
-      return;
-    }
-    if (action === "add") {
-      if (button.dataset.type === "condition") {
-        const existing = this.graph.nodes.find(n => n.filter === button.dataset.filter);
-        if (existing) return this.select(existing.id, true);
-      }
-      const canvas = this.element.querySelector("[data-bp-canvas]");
-      const center = graphPoint({x: canvas.clientWidth / 2, y: canvas.clientHeight / 2}, this.view);
-      const point = freeNodePosition(this.graph.nodes, {x: center.x - NODE_WIDTH / 2, y: center.y - NODE_HEIGHT / 2});
-      const node = {id: foundry.utils.randomID(), type: button.dataset.type, x: Math.round(point.x), y: Math.round(point.y)};
-      if (node.type === 'context') node.predicate = button.dataset.predicate;
-      if (node.type === "condition") {
-        node.filter = button.dataset.filter;
-        if (fields[node.filter].repeatable && !this.draft.filters[node.filter].length) this.draft.updateSource({filters: {[node.filter]: [{}]}});
-      }
-      this.graph.nodes.push(node); this.selected = node.id; this.fit();
-    }
-    if (action === "remove") {
-      const node = this.graph.nodes.find(n => n.id === this.selected);
-      if (node && removeNode(this.graph, node.id)) {
-        if (node.filter) {
-          const source = this.draft.toObject(); delete source.filters[node.filter];
-          this.draft = new this.BonusClass(source, {parent: this.owner});
-        }
-        this.selected = null;
-      }
-    }
-    if (action === "disconnect") this.graph.edges.splice(Number(button.dataset.index), 1);
-    if (action === "repeat") {
-      const node = this.graph.nodes.find(n => n.id === this.selected);
-      const values = this.draft.toObject().filters[node.filter]; values.push({});
-      this.draft.updateSource({filters: {[node.filter]: values}});
-    }
-    this.parameterError = null; this.commit(); this.renderInspector();
-  }
-
-  select(id, center = false) {
-    this.selected = id; this.renderGraph(); this.renderInspector(); this.renderDiagnostics();
-    const node = this.graph.nodes.find(n => n.id === id);
-    if (center && node) {
-      const canvas = this.element.querySelector("[data-bp-canvas]");
-      this.view.x = canvas.clientWidth / 2 - (node.x + NODE_WIDTH / 2) * this.view.scale;
-      this.view.y = canvas.clientHeight / 2 - (node.y + NODE_HEIGHT / 2) * this.view.scale;
-      this.applyView();
-    }
-  }
-
-  onPointerDown(event) {
-    if (event.target.closest("button")) return;
-    if (![0, 1].includes(event.button)) return;
-    const canvas = this.element.querySelector("[data-bp-canvas]");
-    const target = event.target.closest("[data-node-id]");
-    const node = event.button === 0 && target ? this.graph.nodes.find(n => n.id === target.dataset.nodeId) : null;
-    if (node) { this.selected = node.id; this.renderInspector(); canvas.querySelectorAll("[data-node-id]").forEach(el => el.classList.toggle("selected", el.dataset.nodeId === node.id)); }
-    if (node && !this.editable) return;
-    event.preventDefault(); canvas.focus();
-    this.autoFit = false;
-    const start = {x: event.clientX, y: event.clientY, nx: node?.x ?? this.view.x, ny: node?.y ?? this.view.y};
-    canvas.setPointerCapture(event.pointerId);
-    let moved = false;
-    const move = current => {
-      const dx = current.clientX - start.x, dy = current.clientY - start.y;
-      moved ||= Math.abs(dx) + Math.abs(dy) > 3;
-      if (node) {
-        node.x = Math.round(start.nx + dx / this.view.scale); node.y = Math.round(start.ny + dy / this.view.scale);
-        target.style.transform = `translate(${node.x}px,${node.y}px)`; this.drawEdges();
-      } else { this.view.x = start.nx + dx; this.view.y = start.ny + dy; this.applyView(); }
-    };
-    const end = () => {
-      canvas.removeEventListener("pointermove", move); canvas.removeEventListener("pointerup", end); canvas.removeEventListener("pointercancel", end);
-      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-      if (node && moved) this.commit(); else if (node) { this.renderGraph(); this.renderDiagnostics(); }
-    };
-    canvas.addEventListener("pointermove", move, {signal: this.listeners.signal});
-    canvas.addEventListener("pointerup", end, {signal: this.listeners.signal});
-    canvas.addEventListener("pointercancel", end, {signal: this.listeners.signal});
-  }
-
-  onKey(event) {
-    if (event.target.closest("input,select,textarea,[contenteditable=true]")) return;
-    if (event.target.closest('button') && ['Enter',' '].includes(event.key)) return;
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") { event.preventDefault(); if (this.editable) this.restore(this.history[event.shiftKey ? "redo" : "undo"]()); }
-    if (event.key === "Escape") { this.connecting = null; this.renderGraph(); }
-    const focused = event.target.closest("[data-node-id]");
-    if (focused && ["Enter", " "].includes(event.key)) { event.preventDefault(); this.select(focused.dataset.nodeId); }
-    if (event.key === "Delete" && this.selected && this.editable) { event.preventDefault(); this.action("remove", {}).catch(err => this.showError(err)); }
-    if (focused && event.key.startsWith("Arrow") && this.editable) {
-      event.preventDefault(); const node = this.graph.nodes.find(n => n.id === focused.dataset.nodeId);
-      const step = event.shiftKey ? 40 : 10;
-      node.x += ({ArrowLeft: -step, ArrowRight: step}[event.key] ?? 0); node.y += ({ArrowUp: -step, ArrowDown: step}[event.key] ?? 0);
-      this.commit(); this.element.querySelector(`[data-node-id="${node.id}"]`)?.focus();
-    }
-  }
-
-  applyView() {
-    const world = this.element.querySelector("[data-bp-world]");
-    if (!world) return;
-    world.style.transform = `translate(${this.view.x}px, ${this.view.y}px) scale(${this.view.scale})`;
-    this.element.querySelector("[data-bp-zoom]").textContent = `${Math.round(this.view.scale * 100)}%`;
-  }
-  fit() { const canvas = this.element.querySelector("[data-bp-canvas]"); this.autoFit = true; this.view = fitGraph(this.graph, canvas.clientWidth, canvas.clientHeight); this.applyView(); }
-  zoom(factor, pivot) {
-    this.autoFit = false;
-    const canvas = this.element.querySelector("[data-bp-canvas]");
-    pivot ??= {x: canvas.clientWidth / 2, y: canvas.clientHeight / 2};
-    const point = graphPoint(pivot, this.view);
-    this.view.scale = Math.max(.15, Math.min(2.5, this.view.scale * factor));
-    this.view.x = pivot.x - point.x * this.view.scale; this.view.y = pivot.y - point.y * this.view.scale; this.applyView();
-  }
-
-  renderTrialContext() {
-    const values = collection => Array.from(collection?.values?.() ?? collection ?? []);
-    const actors = values(game.actors).filter(actor => actor.isOwner || game.user.isGM);
-    const actor = actors.find(entry => entry.id === this.trialContext.actor);
-    const items = values(actor?.items);
-    const item = items.find(entry => entry.id === this.trialContext.item);
-    const activities = values(item?.system?.activities);
-    const targets = (globalThis.canvas?.tokens?.placeables ?? []).filter(token => token.isVisible && token.actor);
-    for (const [key, entries] of Object.entries({actor: actors, item: items, activity: activities, target: targets})) {
-      const select = this.element.querySelector(`[data-bp-context="${key}"]`);
-      if (!entries.some(entry => entry.id === this.trialContext[key])) this.trialContext[key] = "";
-      select.innerHTML = `<option value="">${escape(t("None"))}</option>` + entries.map(entry => `<option value="${escape(entry.id)}" ${entry.id === this.trialContext[key] ? "selected" : ""}>${escape(entry.name)}</option>`).join("");
-    }
-  }
-
-  runTrial() {
-    if (!this.validation().valid) { this.renderDiagnostics(); return; }
-    const actor = game.actors.get(this.trialContext.actor);
-    const item = actor?.items.get(this.trialContext.item);
-    const activity = item?.system.activities.get(this.trialContext.activity);
-    const target = globalThis.canvas?.tokens?.get(this.trialContext.target) ?? null;
-    const registry = game.modules.get(MODULE.ID).api.filters;
-    const reasons = new Map();
-    this.trial = evaluateConditionGraph(this.graph, node => {
-      if (node.type === 'context') return evaluateContextCondition(node, {actor, item, activity, target}, {combatActive: !!game.combat?.started});
-      const evaluation = evaluateTrialCondition(node.filter, this.draft, registry, {actor, item, activity, target});
-      if (evaluation.reason) reasons.set(node.id, evaluation.reason);
-      return evaluation.result;
-    });
-    const result = this.element.querySelector("[data-bp-trial-result]");
-    result.innerHTML = `<strong>${escape(t(this.trial.result === true ? "Pass" : this.trial.result === false ? "Fail" : "Unknown"))}</strong>` + this.trial.trace.map(trace => {
-      const node = this.graph.nodes.find(n => n.id === trace.nodeId);
-      return `<button type="button" class="bna-trial-row" data-bp-action="focus" data-id="${escape(trace.nodeId)}"><span>${escape(node ? this.label(node) : trace.nodeId)}</span><span>${escape(t(trace.status[0].toUpperCase() + trace.status.slice(1)))}${reasons.has(trace.nodeId) ? ` — ${escape(t(reasons.get(trace.nodeId)))}` : ""}</span></button>`;
-    }).join("");
-    this.renderGraph(); this.renderDiagnostics();
-  }
-  clearTrial() { this.trial = null; const result = this.element?.querySelector("[data-bp-trial-result]"); if (result) result.replaceChildren(); }
-
-  async save() {
-    if (this.saving) return;
-    if (!this.editable) throw Error(t("PermissionDenied"));
-    if (!this.validation().valid) { this.renderDiagnostics(); return; }
-    const current = getCollection(this.owner).get(this.bonusId);
-    if (!current || json(current.toObject()) !== this.baseline) throw Error(t("Conflict"));
-    this.saving = true; this.renderDiagnostics();
-    try {
-      const data = this.draft.toObject(); data.conditionGraph = structuredClone(this.graph);
-      await upsertStoredBonus(this.owner, this.bonusId, data);
-      this.draft = new this.BonusClass(data, {parent: this.owner});
-      this.baseline = json(this.draft.toObject()); this.saved = json(this.snapshot());
-      const sheet = foundry.applications.instances.get(`build-n-action-bonus-${current.uuid.replaceAll(".", "-")}`);
-      if (sheet) { sheet._filters = new Set(configured(this.draft)); sheet.render({force: true}); }
-    } finally { this.saving = false; this.renderDiagnostics(); }
-  }
-  showError(err) { ui.notifications.error(`${t("SaveError")}: ${err.message ?? err}`); }
-
-  static async onKeys(event, button) {
-    if (!this.editable) return;
-    const field = fields[button.dataset.id];
-    const property = button.dataset.property;
-    const values = foundry.utils.getProperty(this.draft, property);
-    const list = field.choices().map(entry => ({...entry, include: values.has(entry.value), exclude: values.has(`!${entry.value}`)}));
-    await KeysDialog.prompt({filterId: button.dataset.id, values: list, canExclude: field.canExclude, ok: {
-      label: "BUILD_N_ACTION.KeysDialogApplySelection", icon: "fa-solid fa-check",
-      callback: (_event, submit) => {
-        const selected = Array.from(submit.form.querySelectorAll(".table .select select")).flatMap(select => select.value === "include" ? [select.dataset.value] : select.value === "exclude" ? [`!${select.dataset.value}`] : []);
-        this.draft.updateSource(foundry.utils.expandObject({[property]: selected})); this.commit(); this.renderInspector();
-      }
-    }});
-  }
-  static onDeleteFilter(event, button) {
-    if (!this.editable) return;
-    const node = this.graph.nodes.find(n => n.id === this.selected);
-    if (fields[node?.filter]?.repeatable && button.dataset.idx !== undefined) {
-      const values = this.draft.toObject().filters[node.filter]; values.splice(Number(button.dataset.idx), 1);
-      this.draft.updateSource({filters: {[node.filter]: values}}); this.commit(); this.renderInspector();
-    } else this.action("remove", button).catch(err => this.showError(err));
-  }
-
-  async close(options = {}) {
-    if (this.saving) return this;
-    if (this.dirty && !options.force) {
-      const discard = await foundry.applications.api.DialogV2.confirm({window: {title: t("Title")}, content: `<p>${escape(t("CloseConfirm"))}</p>`});
-      if (!discard) return this;
-    }
-    this.effects?.destroy(); this.listeners?.abort(); this.resizeObserver?.disconnect();
-    return super.close(options);
-  }
-}
-
-class BonusSheet extends foundry.applications.api.HandlebarsApplicationMixin(
-  foundry.applications.api.DocumentSheetV2
-) {
-  /**
-   * @param {object} options            Optional configuration parameters for how the sheet behaves.
-   * @param {ContextualBonus} options.bonus     The buildNAction managed by this sheet.
-   */
-  constructor({bonus, ...options}) {
-    super({
-      ...options,
-      id: BonusSheet.applicationId(bonus),
-      document: bonus.parent,
-      bonusId: bonus.id
-    });
-
-    const ids = new Set(Object.keys(bonus.toObject().filters)).filter(id => {
-      return fields[id].storage(bonus);
-    });
-
-    /**
-     * The filters that are currently active.
-     * @type {Set<string>}
-     */
-    this._filters = ids;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Return the stable ApplicationV2 id for a contextual bonus sheet.
-   * @param {ContextualBonus} bonus
-   * @returns {string}
-   */
-  static applicationId(bonus) {
-    return `${MODULE.ID}-bonus-${bonus.uuid.replaceAll(".", "-")}`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static DEFAULT_OPTIONS = {
-    classes: [MODULE.ID, "sheet"],
-    sheetConfig: false,
-    window: {
-      icon: MODULE.ICON,
-      resizable: true,
-      contentClasses: ["standard-form"]
-    },
-    position: {
-      width: 760,
-      height: 760
-    },
-    form: {
-      submitOnChange: true,
-      closeOnSubmit: false
-    },
-    actions: {
-      addFilter: this.#onAddFilter,
-      copyUuid: {handler: this.#onCopyUuid, buttons: [0, 2]},
-      deleteFilter: this.#onDeleteFilter,
-      editImage: this.#onEditImage,
-      keysDialog: this.#onKeysDialog,
-      openBlueprint: this.#onOpenBlueprint,
-      viewFilter: this.#onViewFilter
-    },
-    bonusId: null
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static PARTS = {
-    header: {
-      template: `modules/${MODULE.ID}/templates/sheet-header.hbs`
-    },
-    navigation: {
-      template: `modules/${MODULE.ID}/templates/sheet-navigation.hbs`
-    },
-    description: {
-      template: `modules/${MODULE.ID}/templates/sheet-description.hbs`,
-      scrollable: [""]
-    },
-    bonuses: {
-      template: `modules/${MODULE.ID}/templates/sheet-bonuses.hbs`,
-      scrollable: [""]
-    },
-    configuration: {
-      template: `modules/${MODULE.ID}/templates/sheet-configuration.hbs`,
-      scrollable: [""]
-    },
-    filters: {
-      template: `modules/${MODULE.ID}/templates/sheet-filters.hbs`,
-      scrollable: [".toc", ".picker"]
-    },
-    advanced: {
-      template: `modules/${MODULE.ID}/templates/sheet-advanced.hbs`,
-      scrollable: [""]
-    }
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  tabGroups = {
-    main: "description"
-  };
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction represented by this sheet.
-   * @type {ContextualBonus}
-   */
-  get bonus() {
-    return getCollection(this.document).get(this.options.bonusId);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get title() {
-    return `${game.i18n.localize("BUILD_N_ACTION.ModuleTitle")}: ${this.bonus.name}`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get isEditable() {
-    return super.isEditable && !!this.document.isOwner;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _prepareSubmitData(event, form, formData) {
-    const submitData = foundry.utils.expandObject(formData.object);
-
-    // Move bonuses.modifiers.config.enabled into respective objects.
-    let enabled = submitData.bonuses?.modifiers?.config?.enabled;
-    if (enabled) {
-      enabled = new Set(enabled);
-      for (const k of ["amount", "explode", "maximum", "minimum", "reroll", "size"]) {
-        foundry.utils.setProperty(submitData, `bonuses.modifiers.${k}.enabled`, enabled.has(k));
-      }
-    }
-
-    const bonus = this.bonus;
-
-    bonus.validate({changes: submitData, clean: true, fallback: false});
-    submitData.id = bonus.id;
-    const collection = getCollection(this.document).contents.map(k => k.toObject());
-    bonus.updateSource(submitData);
-    collection.findSplice(k => k.id === bonus.id, bonus.toObject());
-    return {flags: {[MODULE.ID]: {bonuses: collection}}};
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  render(...T) {
-    if (!this.bonus) return this.close();
-    return super.render(...T);
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  _onRender(...T) {
-    super._onRender(...T);
-
-    const imageInput = this.element.querySelector("input[name=img]");
-    const imagePreview = this.element.querySelector("[data-bna-image-preview]");
-    const fallbackImage = imagePreview?.dataset.fallbackSrc ?? "icons/svg/dice-target.svg";
-    const showImagePreview = path => {
-      if (imagePreview) imagePreview.src = String(path ?? "").trim() || fallbackImage;
-    };
-    imagePreview?.addEventListener("error", () => {
-      if (!imagePreview.src.endsWith(fallbackImage)) imagePreview.src = fallbackImage;
-    });
-    imageInput?.addEventListener("input", event => showImagePreview(event.currentTarget.value));
-    imageInput?.addEventListener("change", async event => {
-      // Prevent DocumentSheetV2 submit-on-change from persisting nested bonus
-      // data through the parent ActiveEffect. ContextualBonus owns this field.
-      event.stopPropagation();
-      await updateBonusImage(this.bonus, event.currentTarget.value);
-      await this.render({force: true});
-    });
-
-    // Keep a single table-of-contents entry synchronized with the right-hand scroll position.
-    const tab = this.element.querySelector(".tab[data-tab=filters]");
-    const picker = tab?.querySelector(".picker");
-    const filters = Array.from(picker?.querySelectorAll(".filter[data-id]") ?? []);
-    const entries = Array.from(tab?.querySelectorAll(".toc [data-id]") ?? []);
-    if (!picker || !filters.length || !entries.length) return;
-
-    const updateViewedFilter = () => {
-      const top = picker.getBoundingClientRect().top + 8;
-      let current = filters[0];
-      for (const filter of filters) {
-        if (filter.getBoundingClientRect().top > top) break;
-        current = filter;
-      }
-      const isAtBottom = picker.scrollTop + picker.clientHeight >= picker.scrollHeight - 1;
-      if (isAtBottom) current = filters.at(-1);
-      for (const entry of entries) entry.classList.toggle("viewed", entry.dataset.id === current.dataset.id);
-    };
-
-    picker.addEventListener("scroll", updateViewedFilter, {passive: true});
-    updateViewedFilter();
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  async _prepareContext() {
-    const bonus = this.bonus;
-    const source = bonus.toObject();
-    const rollData = bonus.getRollData();
-    const makeField = this.#createFieldFactory(bonus, source);
-    return {
-      aura: this.#prepareAura(makeField),
-      bonus,
-      hasGraph: !!bonus.conditionGraph?.enabled,
-      bonuses: this.#prepareBonuses(makeField, source),
-      consume: this.#prepareConsumption(makeField, source),
-      fields: await this.#prepareRootFields(makeField, rollData),
-      filterpickers: this.#prepareFilterPicker(),
-      filters: this.#prepareFilters(),
-      hasModifiers: !!source.bonuses?.modifiers,
-      labels: this._prepareLabels(),
-      modifiers: this.#prepareModifiers(makeField, source, rollData),
-      tabs: this.#prepareTabs()
-    };
-  }
-
-  #prepareTabs() {
-    const tabs = {
-      description: {
-        icon: "fa-solid fa-pen-fancy",
-        label: "BUILD_N_ACTION.SheetTabs.Description"
-      },
-      bonuses: {
-        icon: "fa-solid fa-dice",
-        label: "BUILD_N_ACTION.SheetTabs.Bonuses"
-      },
-      configuration: {
-        icon: "fa-solid fa-wrench",
-        label: "BUILD_N_ACTION.SheetTabs.Configuration"
-      },
-      filters: {
-        icon: "fa-solid fa-plug",
-        label: "BUILD_N_ACTION.SheetTabs.Filters"
-      },
-      advanced: {
-        icon: "fa-solid fa-cubes",
-        label: "BUILD_N_ACTION.SheetTabs.Advanced"
-      }
-    };
-    for (const [id, tab] of Object.entries(tabs)) {
-      tab.cssClass = (this.tabGroups.main === id) ? "active" : "";
-      tab.id = id;
-    }
-    return tabs;
-  }
-
-  #createFieldFactory(bonus, source) {
-    return (path, options = {}) => {
-      const field = bonus.schema.getField(path);
-      const value = foundry.utils.getProperty(source, path);
-      return {field, value, ...options};
-    };
-  }
-
-  async #prepareRootFields(makeField, rollData) {
-    const bonus = this.bonus;
-    const fields = {};
-    fields.enabled = makeField("enabled");
-    fields.exclusive = makeField("exclusive");
-    fields.optional = makeField("optional");
-    fields.reminder = makeField("reminder", {disabled: !bonus.canRemind});
-    fields.img = makeField("img");
-    fields.description = makeField("description", {
-      height: 200,
-      enriched: await foundry.applications.ux.TextEditor.implementation.enrichHTML(bonus.description, {
-        rollData,
-        relativeTo: bonus.origin
-      })
-    });
-    return fields;
-  }
-
-  #prepareBonuses(makeField, source) {
-    const bonuses = [];
-    for (const key of Object.keys(source.bonuses)) {
-      if (key === "modifiers") continue;
-      let options = {};
-      if (key === "damageType") {
-        options = {isDamage: true, options: []};
-        const damageGroup = game.i18n.localize("DND5E.Damage");
-        const healingGroup = game.i18n.localize("DND5E.HEAL.Type.HealingShort");
-        for (const [value, config] of Object.entries(CONFIG.DND5E.damageTypes)) {
-          options.options.push({group: damageGroup, value, label: config.label});
-        }
-        for (const [value, config] of Object.entries(CONFIG.DND5E.healingTypes)) {
-          options.options.push({group: healingGroup, value, label: config.label});
-        }
-      }
-      bonuses.push(makeField(`bonuses.${key}`, options));
-    }
-    return bonuses;
-  }
-
-  #prepareModifiers(makeField, source, rollData) {
-    if (!source.bonuses?.modifiers) return undefined;
-    const model = this.bonus.bonuses.modifiers;
-    const initial = model.schema.getInitialValue({});
-    const modifiers = {enabled: {value: new Set(), choices: []}};
-    for (const path of Object.keys(foundry.utils.flattenObject(initial))) {
-      const parts = path.split(".");
-      const key = parts.shift();
-      const tail = parts.pop();
-      modifiers[key] ??= {};
-      if (tail !== "enabled") {
-        modifiers[key][tail] = makeField(`bonuses.modifiers.${path}`);
-        continue;
-      }
-      if (source.bonuses.modifiers[key].enabled) {
-        modifiers[key].enabled = true;
-        modifiers.enabled.value.add(key);
-      }
-      modifiers.enabled.choices.push({
-        value: key,
-        label: model.schema.getField(`${key}.enabled`).label
-      });
-    }
-    modifiers.enabled.field = new foundry.data.fields.SetField(new foundry.data.fields.StringField(), {
-      label: game.i18n.localize("BUILD_N_ACTION.MODIFIERS.FIELDS.config.enabled.label"),
-      hint: game.i18n.localize("BUILD_N_ACTION.MODIFIERS.FIELDS.config.enabled.hint")
-    });
-
-    const parts = ["3", "2d10", "1d4"];
-    model.modifyParts(parts, rollData);
-    modifiers.config ??= {};
-    modifiers.config.example = parts.join(" + ");
-    return modifiers;
-  }
-
-  #prepareConsumption(makeField, source) {
-    const bonus = this.bonus;
-    const consume = {};
-    if (!["save", "hitdie"].includes(bonus.type)) {
-      consume.enabled = makeField("consume.enabled");
-      consume.type = makeField("consume.type");
-      consume.subtype = makeField("consume.subtype");
-      consume.formula = makeField("consume.formula", {
-        placeholder: bonus.bonuses.bonus,
-        show: bonus.consume.scales
-      });
-      consume.step = makeField("consume.value.step", {
-        show: ["health", "currency"].includes(source.consume.type) && bonus.consume.scales
-      });
-
-      const isSlot = (source.consume.type === "slots") ? "Slot" : "";
-      const {scales, value} = bonus.consume;
-      consume.value = {
-        min: makeField("consume.value.min", {
-          placeholder: game.i18n.localize(`BUILD_N_ACTION.FIELDS.consume.value.min.label${isSlot}`)
-        }),
-        max: makeField("consume.value.max", {
-          placeholder: game.i18n.localize(`BUILD_N_ACTION.FIELDS.consume.value.max.label${isSlot}`)
-        }),
-        label: game.i18n.localize(`BUILD_N_ACTION.FIELDS.consume.value.label${isSlot}`),
-        hint: game.i18n.localize(`BUILD_N_ACTION.FIELDS.consume.value.hint${scales ? "Scale" : ""}${isSlot}`),
-        range: (scales && value.min && value.max) ? `(${value.min}&ndash;${value.max})` : null
-      };
-
-      consume.scales = makeField("consume.scales", {
-        unavailable: !source.consume.type || ["effect", "inspiration"].includes(source.consume.type)
-      });
-      this.#prepareConsumptionSubtype(consume.subtype, source.consume.type);
-    } else {
-      consume.enabled = makeField("consume.enabled", {value: false, disabled: true});
-    }
-    return consume;
-  }
-
-  #prepareConsumptionSubtype(subtype, type) {
-    subtype.show = true;
-    if (type === "currency") {
-      subtype.choices = Object.entries(CONFIG.DND5E.currencies)
-        .sort((left, right) => right[1].conversion - left[1].conversion)
-        .reduce((choices, [key, config]) => {
-          choices[key] = config.label;
-          return choices;
-        }, {});
-    } else if (type === "hitdice") {
-      subtype.choices = CONFIG.DND5E.hitDieTypes.reduce((choices, denominator) => {
-        choices[denominator] = denominator;
-        return choices;
-      }, {
-        smallest: game.i18n.localize("DND5E.ConsumeHitDiceSmallest"),
-        largest: game.i18n.localize("DND5E.ConsumeHitDiceLargest")
-      });
-    } else subtype.show = false;
-  }
-
-  #prepareAura(makeField) {
-    const bonus = this.bonus;
-    const aura = {};
-    aura.enabled = makeField("aura.enabled");
-    if (aura.enabled.value) {
-      aura.range = makeField("aura.range");
-      let label;
-      let range;
-      if (!bonus.aura.range || (bonus.aura.range > 0)) {
-        label = "BUILD_N_ACTION.FIELDS.aura.range.labelFt";
-        range = bonus.aura.range;
-      } else if (bonus.aura.range === -1) {
-        label = "BUILD_N_ACTION.FIELDS.aura.range.labelUnlimited";
-        range = game.i18n.localize("DND5E.Unlimited");
-      }
-      if (label) aura.range.label = game.i18n.format(label, {range});
-
-      aura.template = makeField("aura.template");
-      aura.disposition = makeField("aura.disposition");
-      aura.self = makeField("aura.self");
-      aura.blockers = makeField("aura.blockers");
-      aura.requirements = ["move", "light", "sight", "sound"].map(k => {
-        return makeField(`aura.require.${k}`);
-      });
-    }
-    return aura;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Prepare the filter picker.
-   * @returns {object[]}
-   */
-  #prepareFilterPicker() {
-    const bonus = this.bonus;
-    const keys = Object.keys(bonus.filters);
-    return keys.reduce((acc, key) => {
-      if (!this._filters.has(key) || fields[key].repeatable) acc.push({
-        id: key,
-        repeats: fields[key].repeatable ? bonus.filters[key].length : null,
-        example: getConditionHelp(key).example,
-        field: bonus.schema.getField(`filters.${key}`)
-      });
-      return acc;
-    }, []).sort((a, b) => {
-      a = bonus.schema.getField(`filters.${a.id}`).label;
-      b = bonus.schema.getField(`filters.${b.id}`).label;
-      return a.localeCompare(b);
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Prepare filters.
-   * @returns {string[]}
-   */
-  #prepareFilters() {
-    const htmls = [];
-    const bonus = this.bonus;
-    const keys = [...this._filters].sort((a, b) => {
-      a = bonus.schema.getField(`filters.${a}`).label;
-      b = bonus.schema.getField(`filters.${b}`).label;
-      return a.localeCompare(b);
-    });
-    for (const key of keys) {
-      const filter = fields[key];
-      htmls.push(filter.render(bonus));
-    }
-    return htmls;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Prepare labels.
-   * @returns {string[]}
-   */
-  _prepareLabels() {
-    const labels = [];
-    const bonus = this.bonus;
-
-    labels.push(game.i18n.localize(`BUILD_N_ACTION.${bonus.type.toUpperCase()}.Label`));
-
-    const filterLabels = Object.keys(bonus.filters).filter(key => {
-      return fields[key].storage(bonus);
-    }).length;
-    labels.push(game.i18n.format("BUILD_N_ACTION.Labels.Filters", {n: filterLabels}));
-
-    if (!bonus.enabled) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.Disabled"));
-    if (bonus.isExclusive) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.Exclusive"));
-    if (bonus.isOptional) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.Optional"));
-    if (bonus.consume.isValidConsumption && bonus.consume.enabled) {
-      labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.Consuming"));
-    }
-    if (bonus.aura.isToken) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.TokenAura"));
-    if (bonus.aura.isTemplate) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.TemplateAura"));
-    if (bonus.isReminder) labels.push(game.i18n.localize("BUILD_N_ACTION.Labels.Reminder"));
-
-    return labels;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Handle deleting a filter.
-   * @param {Event} event             The initiating click event.
-   * @param {HTMLElement} target      Targeted html element.
-   */
-  static #onDeleteFilter(event, target) {
-    const bonus = this.bonus;
-    const id = target.dataset.id;
-    const data = bonus.toObject();
-
-    if (fields[id].repeatable) {
-      const idx = parseInt(target.dataset.idx);
-      const property = foundry.utils.deepClone(data.filters[id]);
-      property.splice(idx, 1);
-      // Removing the last repeat drops the filter entirely, the same as a single one.
-      if (property.length) {
-        data.filters[id] = property;
-      } else {
-        this._filters.delete(id);
-        delete data.filters[id];
-      }
-    } else {
-      this._filters.delete(id);
-      delete data.filters[id];
-    }
-
-    const collection = getCollection(this.document).contents.map(k => k.toObject());
-    collection.findSplice(k => k.id === bonus.id, data);
-    this.document.update({[`flags.${MODULE.ID}.bonuses`]: collection});
-  }
-
-  static #onOpenBlueprint() {
-    const id = `bna-blueprint-${this.bonus.uuid.replaceAll(".", "-")}`;
-    const existing = foundry.applications.instances.get(id);
-    if (existing) { existing.render({force: true}); existing.bringToFront(); }
-    else new ConditionBlueprint({bonus: this.bonus}).render({force: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Handle adding a filter.
-   * @param {Event} event             The initiating click event.
-   * @param {HTMLElement} target      Targeted html element.
-   */
-  static #onAddFilter(event, target) {
-    const bonus = this.bonus;
-    const id = target.closest("[data-id]").dataset.id;
-    this._filters.add(id);
-    if (fields[id].repeatable) {
-      const data = bonus.toObject();
-      data.filters[id].push({});
-      const collection = getCollection(this.document).contents.map(k => k.toObject());
-      collection.findSplice(k => k.id === bonus.id, data);
-      this.document.update({[`flags.${MODULE.ID}.bonuses`]: collection});
-    } else {
-      this.render();
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Helper function to display the keys dialog and update the corresponding filter value.
-   * @param {Event} event             The initiating click event.
-   * @param {HTMLElement} target      Targeted html element.
-   */
-  static #onKeysDialog(event, target) {
-    const bonus = this.bonus;
-    const filterId = target.dataset.id;
-    const filter = fields[filterId];
-    const property = target.dataset.property;
-    const list = filter.choices();
-    const values = foundry.utils.getProperty(bonus, property);
-
-    for (const value of values) {
-      const key = value.replaceAll("!", "");
-      const val = list.find(e => e.value === key);
-      if (!val) continue;
-      if (value.startsWith("!")) val.exclude = true;
-      else val.include = true;
-    }
-
-    const types = {
-      baseWeapons: CONFIG.DND5E.weaponTypes,
-      baseArmors: CONFIG.DND5E.armorTypes,
-      targetArmors: CONFIG.DND5E.armorTypes,
-      baseTools: CONFIG.DND5E.toolTypes
-    }[filterId] ?? null;
-
-    const categories = [];
-    if (types) {
-      for (const [k, v] of Object.entries(types)) {
-        const val = values.find(v => v.replaceAll("!", "") === k);
-        categories.push({
-          isCategory: true,
-          exclude: val ? val.startsWith("!") : false,
-          include: val ? !val.startsWith("!") : false,
-          value: k,
-          label: v
-        });
-      }
-    }
-
-    KeysDialog.prompt({
-      ok: {
-        label: "BUILD_N_ACTION.KeysDialogApplySelection",
-        icon: "fa-solid fa-check",
-        callback: async function(event, button) {
-          const values = [];
-          button.form.querySelectorAll(".table .select select").forEach(s => {
-            if (s.value === "include") values.push(s.dataset.value);
-            else if (s.value === "exclude") values.push("!" + s.dataset.value);
-          });
-          bonus.update({[property]: values});
-        }
-      },
-      filterId: filterId,
-      values: categories.length ? categories.concat(list) : list,
-      canExclude: filter.canExclude
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Copy the uuid or id of the bonus.
-   * @param {Event} event             The initiating click event.
-   * @param {HTMLElement} target      Targeted html element.
-   */
-  static #onCopyUuid(event, target) {
-    event.preventDefault(); // Don't open context menu
-    event.stopPropagation(); // Don't trigger other events
-    if (event.detail > 1) return; // Ignore repeated clicks
-
-    const bonus = this.bonus;
-    const id = (event.button === 2) ? bonus.id : bonus.uuid;
-    const type = (event.button === 2) ? "id" : "uuid";
-    const label = game.i18n.localize(bonus.constructor.metadata.label);
-    game.clipboard.copyPlainText(id);
-    ui.notifications.info(game.i18n.format("DOCUMENT.IdCopiedClipboard", {label, type, id}));
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Select and persist a bonus image without routing it through the parent
-   * DocumentSheet form submission.
-   */
-  static async #onEditImage() {
-    if (!this.isEditable) return;
-    const bonus = this.bonus;
-    const picker = new foundry.applications.apps.FilePicker.implementation({
-      current: bonus.img,
-      type: "image",
-      document: bonus.parent,
-      callback: async path => {
-        await updateBonusImage(bonus, path);
-        await this.render({force: true});
-      },
-      position: {
-        top: this.position.top + 40,
-        left: this.position.left + 10
-      }
-    });
-    return picker.browse();
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Scroll a filter into view in the picker.
-   * @param {Event} event             The initiating click event.
-   * @param {HTMLElement} target      Targeted html element.
-   */
-  static #onViewFilter(event, target) {
-    event.preventDefault();
-    const id = target.closest("[data-id]")?.dataset.id;
-    const tab = target.closest(".tab[data-tab=filters]");
-    scrollFilterIntoView(tab, id);
-  }
-}
-
-const currentAuras = {};
-
-class TokenAura {
-  /**
-   * @constructor
-   * @param {TokenDocument5e} token
-   * @param {ContextualBonus} bonus
-   */
-  constructor(token, bonus) {
-    this.#token = token;
-    this.#bonus = bonus;
-    this.showAuras = game.settings.get(MODULE.ID, SETTINGS.AURA);
-    this.padRadius = !canvas.grid.isGridless || game.settings.get(MODULE.ID, SETTINGS.RADIUS);
-
-    const auras = this.auras;
-    const old = auras[bonus.uuid];
-    if (old) old.destroy({fadeOut: false});
-    auras[bonus.uuid] = this;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Apply current display settings to all tracked auras. */
-  static refreshAll() {
-    const auras = this.values();
-    const grid = globalThis.canvas?.grid;
-    if (!auras.length || !grid) return;
-    const showAuras = game.settings.get(MODULE.ID, SETTINGS.AURA);
-    const padRadius = !grid.isGridless || game.settings.get(MODULE.ID, SETTINGS.RADIUS);
-    for (const aura of auras) {
-      aura.showAuras = showAuras;
-      aura.padRadius = padRadius;
-      aura.refresh();
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @returns {TokenAura[]} */
-  static values() {
-    return Object.values(currentAuras);
-  }
-
-  /** Remove all tracked aura references during canvas teardown. */
-  static clear() {
-    for (const key of Object.keys(currentAuras)) delete currentAuras[key];
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The color of the aura when the target is not contained within it.
-   * @type {Color}
-   */
-  static RED = new Color(0xFF0000);
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The color of the aura when the target is contained within it.
-   * @type {Color}
-   */
-  static GREEN = new Color(0x00FF00);
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The untinted default color of the aura.
-   * @type {Color}
-   */
-  static WHITE = new Color(0xFFFFFF);
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The collection of auras being kept track of.
-   * @type {Record<string, TokenAura>}
-   */
-  get auras() {
-    return currentAuras;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The default color of the aura (white).
-   * @type {Color}
-   */
-  get white() {
-    return this.constructor.WHITE;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The name of this aura.
-   * @type {string}
-   */
-  get name() {
-    return `${this.bonus.uuid}-aura`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Do auras show and fade in and out?
-   * @type {boolean}
-   */
-  #showAuras = true;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Do auras show and fade in and out?
-   * @type {boolean}
-   */
-  get showAuras() {
-    return this.#showAuras;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set whether auras show and fade in and out.
-   * @param {boolean} bool      Whether to show.
-   */
-  set showAuras(bool) {
-    this.#showAuras = bool;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Do auras pad the radius due to token sizes?
-   * @type {boolean}
-   */
-  #padRadius = true;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Do auras pad the radius due to token sizes?
-   * @type {boolean}
-   */
-  get padRadius() {
-    return this.#padRadius;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set whether auras are padded due to token size.
-   * @param {boolean} bool      Whether to pad.
-   */
-  set padRadius(bool) {
-    this.#padRadius = bool;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The origin of the aura.
-   * @type {TokenDocument5e}
-   */
-  #token = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The origin of the aura.
-   * @type {TokenDocument5e}
-   */
-  get token() {
-    return this.#token;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction from which to draw data.
-   * @type {ContextualBonus}
-   */
-  #bonus = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The buildNAction from which to draw data.
-   * @type {ContextualBonus}
-   */
-  get bonus() {
-    return this.#bonus;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The drawn pixi graphics.
-   * @type {PIXI.Graphics|null}
-   */
-  #element = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The drawn pixi graphics.
-   * @type {PIXI.Graphics|null}
-   */
-  get element() {
-    return this.#element;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set the displayed pixi graphical element.
-   * @param {PIXI.Graphics}
-   */
-  set element(g) {
-    this.#element = g;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The container element for the aura.
-   * @type {PIXI.Container}
-   */
-  #container = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The container element for the aura.
-   * @type {PIXI.Container}
-   */
-  get container() {
-    return this.#container;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set the container element for the aura.
-   * @param {PIXI.Container} c      The container.
-   */
-  set container(c) {
-    this.#container = c;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A current token target this aura is being evaluated against. Not the origin of the aura.
-   * @type {Token5e}
-   */
-  #target = null;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A current token target this aura is being evaluated against. Not the origin of the aura.
-   * @type {Token5e}
-   */
-  get target() {
-    return this.#target;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set the current token target of this aura.
-   * @param {Token5e}
-   */
-  set target(token) {
-    this.#target = token;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The type of wall restrictions that apply to this bonus.
-   * @type {Set<string>}
-   */
-  get restrictions() {
-    const r = new Set();
-    for (const [k, v] of Object.entries(this.bonus.aura.require)) {
-      if (v) r.add(k);
-    }
-    return r;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The radius of this aura, in grid measurement units.
-   * @type {number}
-   */
-  get radius() {
-    return this.bonus.aura.range;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Can this aura be drawn?
-   * @type {boolean}
-   */
-  get isDrawable() {
-    return this.bonus.aura._validRange;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Should this aura apply its bonus to the target?
-   * @type {boolean}
-   */
-  get isApplying() {
-    return this.element?.tint === this.constructor.GREEN;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Is this aura visible?
-   * @type {boolean}
-   */
-  get visible() {
-    return Boolean(this.token.object?.visible && this.token.object.renderable);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Initialize the aura.
-   * @param {Token5e} target      The target to test containment against.
-   */
-  initialize(target) {
-    this.target = target;
-    this.refresh({fadeIn: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Refresh the drawn state of the container and the contained aura.
-   * @param {object} [options]
-   * @param {boolean} [options.fadeIn]      Should the aura fade in?
-   */
-  refresh({fadeIn = false} = {}) {
-    // Create element.
-    this.create();
-
-    // Create container if missing.
-    this.draw();
-
-    // Color the element.
-    this.colorize();
-
-    // Add element to container.
-    if (!this.container) return;
-    this.container.addChild(this.element);
-
-    // Fade in the container.
-    if (!this.showAuras || !this.visible) this.hide();
-    else if (fadeIn) this.fadeIn();
-    else this.show();
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Immediately hide this aura.
-   */
-  hide() {
-    if (!this.container) return;
-    CanvasAnimation.terminateAnimation(this.name);
-    this.container.alpha = 0;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Immediately show this aura.
-   */
-  show() {
-    if (!this.container) return;
-    CanvasAnimation.terminateAnimation(this.name);
-    this.container.alpha = 1;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Fade in the aura over a period of time.
-   */
-  fadeIn() {
-    if (!this.container || !this.showAuras) return;
-    this.show();
-    CanvasAnimation.animate(
-      [{attribute: "alpha", parent: this.container, to: 1, from: 0}],
-      {name: this.name, duration: 200, easing: (x) => x * x}
-    );
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Create the inner pixi element and assign it.
-   * @returns {PIXI.Graphics|null}
-   */
-  create() {
-    if (!this.isDrawable || !this.token.object) return null;
-
-    let radius = this.radius;
-    if (this.padRadius) radius += canvas.grid.distance * Math.max(this.token.width, this.token.height) * 0.5;
-
-    const center = this.token.object.center;
-    const points = canvas.grid.getCircle(center, radius);
-
-    let sweep = new PIXI.Polygon(points);
-    for (const type of this.restrictions) {
-      sweep = ClockwiseSweepPolygon.create(center, {
-        includeDarkness: type === "sight",
-        type: type,
-        debug: false,
-        useThreshold: type !== "move",
-        boundaryShapes: [sweep]
-      });
-    }
-
-    if (this.element) this.element.destroy();
-
-    const g = new PIXI.Graphics();
-    g.lineStyle({width: 3, color: this.white, alpha: 0.75});
-    g.beginFill(0xFFFFFF, 0.03).drawPolygon(sweep).endFill();
-
-    this.element = g;
-
-    return g;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Create and assign a container if one is missing,
-   * add the aura element to it, and add the container to the grid.
-   * @returns {PIXI.Container|null}
-   */
-  draw() {
-    if (!this.element || !this.token.object) return null;
-
-    if (!this.container) {
-      const container = new PIXI.Container();
-      canvas.interface.grid.addChild(container);
-      this.container = container;
-
-      if (this.showAuras) this.show();
-      else this.hide();
-    }
-    return this.container;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Set the color of the aura to either white, red, or green.
-   */
-  colorize() {
-    if (!this.target) this.element.tint = this.white;
-    else this.element.tint = this.contains(this.target) ? this.constructor.GREEN : this.constructor.RED;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this aura contain a token within its bounds?
-   * @param {Token5e} token     A token placeable to test.
-   * @returns {boolean}
-   */
-  contains(token) {
-    if (!this.element || !token) return false;
-    return collectTokenCenters(token).some(point => this.element.containsPoint(point));
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Destroy the aura and its container.
-   * @param {object} [options]
-   * @param {boolean} [options.fadeOut]     Should the aura fade out or be destroyed immediately?
-   * @param {number} [options.duration]     Fade-out duration.
-   */
-  destroy({fadeOut = true, duration = 500} = {}) {
-    const remove = () => {
-      this.container?.destroy();
-      delete this.auras[this.bonus.uuid];
-    };
-
-    if (this.container && fadeOut && this.showAuras && this.visible) {
-      this.show();
-      CanvasAnimation.animate(
-        [{attribute: "alpha", parent: this.container, to: 0, from: 1}],
-        {name: this.name, duration, easing: (x) => x * x}
-      ).then(() => remove());
-    } else remove();
-  }
-}
-
-var applications = {
-  BonusSheet,
-  BonusWorkshop,
-  KeysDialog,
-  TokenAura,
-  ConditionBlueprint
-};
-
-/**
- * Match a contextual bonus row against a user-entered search query.
- *
- * @param {string} text
- * @param {string} query
- * @param {string} [locale]
- * @returns {boolean}
- */
-function matchesBonusSearch(text, query, locale) {
-  query = String(query ?? "").trim().toLocaleLowerCase(locale);
-  if (!query) return true;
-  return String(text ?? "").toLocaleLowerCase(locale).includes(query);
-}
-
-const SHEET_MAPPINGS = new WeakMap();
-const SHEET_SEARCHES = new WeakMap();
-
-/**
- * Resolve a bonus from the current render mapping, falling back to its UUID.
- * The fallback handles partial sheet renders which can outlive the mapping
- * that existed when their DOM listeners were attached.
- *
- * @param {ActorSheet} sheet  Sheet containing the bonus row.
- * @param {string} uuid       Contextual bonus UUID from the row.
- * @returns {ContextualBonus|null}
- */
-function _resolveBonus(sheet, uuid) {
-  if (!uuid) return null;
-  return SHEET_MAPPINGS.get(sheet)?.get(uuid) ?? fromUuidSync$1(uuid);
-}
-
-/**
- * Prepare one bonus row for the character-sheet tab.
- * @param {ActorSheet} sheet
- * @param {ContextualBonus} bonus
- * @param {object} rollData
- * @param {object} sections
- * @param {Set<string>} uuids
- */
-async function _prepareBonusRow(sheet, bonus, rollData, sections, uuids) {
-  SHEET_MAPPINGS.get(sheet).set(bonus.uuid, bonus);
-  uuids.add(bonus.uuid);
-  const section = sections[bonus.type] ??= {
-    label: `BUILD_N_ACTION.${bonus.type.toUpperCase()}.Label`,
-    key: bonus.type,
-    bonuses: []
-  };
-  section.bonuses.push({
-    bonus,
-    labels: bonus.sheet._prepareLabels().slice(1).filterJoin(" &bull; "),
-    tooltip: await foundry.applications.ux.TextEditor.implementation.enrichHTML(bonus.description, {
-      rollData,
-      relativeTo: bonus.origin
-    }),
-    isEmbedded: bonus.parent.isEmbedded,
-    parentName: bonus.parent.name
-  });
-}
-
-/**
- * Collect every bonus visible from an actor and its embedded documents.
- * @param {ActorSheet} sheet
- * @returns {Promise<{sections: object, uuids: Set<string>}>}
- */
-async function _collectSheetBonuses(sheet) {
-  const sections = {};
-  const uuids = new Set();
-  SHEET_MAPPINGS.set(sheet, new Map());
-
-  const actorRollData = sheet.actor.getRollData();
-  for (const bonus of getCollection(sheet.actor)) {
-    await _prepareBonusRow(sheet, bonus, actorRollData, sections, uuids);
-  }
-  for (const item of sheet.actor.items) {
-    const itemRollData = item.getRollData();
-    for (const bonus of getCollection(item)) {
-      await _prepareBonusRow(sheet, bonus, itemRollData, sections, uuids);
-    }
-    for (const effect of item.effects) {
-      for (const bonus of getCollection(effect)) {
-        await _prepareBonusRow(sheet, bonus, itemRollData, sections, uuids);
-      }
-    }
-  }
-  for (const effect of sheet.actor.effects) {
-    for (const bonus of getCollection(effect)) {
-      await _prepareBonusRow(sheet, bonus, actorRollData, sections, uuids);
-    }
-  }
-  for (const section of Object.values(sections)) {
-    section.bonuses.sort((a, b) => a.bonus.name.localeCompare(b.bonus.name, game.i18n.lang));
-  }
-  return {sections, uuids};
-}
-
-/**
- * Render the tab markup.
- * @param {ActorSheet} sheet
- * @param {object} sections
- * @returns {Promise<HTMLDivElement>}
- */
-async function _renderSheetTab(sheet, sections) {
-  const template = `modules/${MODULE.ID}/templates/subapplications/character-sheet-tab.hbs`;
-  const div = document.createElement("DIV");
-  const isActive = sheet.tabGroups.primary === MODULE.ID ? "active" : "";
-  const isEdit = sheet.isEditMode;
-  div.innerHTML = await foundry.applications.handlebars.renderTemplate(template, {
-    ICON: MODULE.ICON,
-    parentName: sheet.document.name,
-    isActive,
-    isEdit,
-    searchQuery: SHEET_SEARCHES.get(sheet) ?? "",
-    sections: Object.values(sections).sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang))
-  });
-  return div;
-}
-
-/**
- * Add the Build-n-Action control to the public tab markup rendered by the
- * dnd5e 5.3.3 character and NPC sheets. The target structure comes from the
- * system's templates/shared/sidebar-tabs.hbs contract for the supported
- * version; no sheet class or prototype is mutated.
- *
- * @param {ActorSheet} sheet
- * @param {HTMLElement} html
- * @returns {HTMLElement|null}
- */
-function _ensureTabControl(sheet, html) {
-  const nav = html.querySelector("nav.tabs[data-group=primary]");
-  if (!nav) return null;
-  let control = nav.querySelector(`[data-tab="${MODULE.ID}"]`);
-  if (control) return control;
-
-  control = document.createElement("A");
-  control.classList.add("item", "control");
-  control.dataset.group = "primary";
-  control.dataset.tab = MODULE.ID;
-  const label = game.i18n.localize("BUILD_N_ACTION.ModuleTitle");
-  control.dataset.tooltip = label;
-  control.setAttribute("aria-label", label);
-  const icon = document.createElement("I");
-  icon.classList.add(...MODULE.ICON.split(" "));
-  icon.inert = true;
-  control.append(icon);
-  nav.append(control);
-  control.classList.toggle("active", sheet.tabGroups.primary === MODULE.ID);
-  control.addEventListener("click", event => {
-    event.preventDefault();
-    sheet.changeTab(MODULE.ID, "primary", {event, navElement: control, updatePosition: true});
-  });
-  return control;
-}
-
-/**
- * Synchronize the tab control's bonus indicator and accessible label.
- * @param {HTMLElement} html
- * @param {boolean} hasBonuses
- */
-function _configureTabControl(html, hasBonuses) {
-  const tabControl = html.querySelector(`nav [data-tab="${MODULE.ID}"]`);
-  if (!tabControl) return;
-  const tooltip = game.i18n.localize("BUILD_N_ACTION.ModuleTitle");
-  tabControl.classList.toggle("has-build-n-action-bonuses", hasBonuses);
-  tabControl.dataset.tooltip = tooltip;
-  tabControl.setAttribute("aria-label", tooltip);
-}
-
-/** Register the tab-owned bonus search without dnd5e private list methods. */
-function _registerSearch(sheet, tab) {
-  const input = tab.querySelector("[data-bna-search]");
-  const clear = tab.querySelector("[data-action=clearSearch]");
-  const apply = query => {
-    SHEET_SEARCHES.set(sheet, query);
-    let visible = 0;
-    for (const row of tab.querySelectorAll(".item[data-search-value]")) {
-      row.hidden = !matchesBonusSearch(row.dataset.searchValue, query, game.i18n.lang);
-      if (!row.hidden) visible++;
-    }
-    for (const section of tab.querySelectorAll(".items-section")) {
-      section.hidden = !section.querySelector(".item:not([hidden])");
-    }
-    clear?.classList.toggle("active", !!String(query).trim());
-    input?.setAttribute("aria-label", `${game.i18n.localize("BUILD_N_ACTION.SearchBonuses")}: ${visible}`);
-  };
-  input?.addEventListener("input", event => apply(event.currentTarget.value));
-  clear?.addEventListener("click", () => {
-    if (input) input.value = "";
-    apply("");
-    input?.focus();
-  });
-  apply(input?.value ?? "");
-}
-
-/**
- * Register actions that operate on a rendered bonus row.
- * @param {ActorSheet} sheet
- * @param {HTMLElement} tab
- */
-function _registerBonusActions(sheet, tab) {
-  tab.querySelectorAll("[data-action]").forEach(node => {
-    node.addEventListener("click", async event => {
-      const target = event.currentTarget;
-      if (target.dataset.action === "create") return _createChildBonus.call(sheet);
-      if (target.dataset.action === "clearSearch") return;
-      const uuid = target.closest("[data-item-uuid]")?.dataset.itemUuid;
-      const bonus = _resolveBonus(sheet, uuid);
-      if (!bonus) return;
-      switch (target.dataset.action) {
-        case "toggle":
-          return bonus.toggle();
-        case "edit":
-          return bonus.sheet.render({force: true});
-        case "delete":
-          return bonus.deleteDialog();
-        case "contextMenu":
-          event.preventDefault();
-          event.stopPropagation();
-          return target.dispatchEvent(new PointerEvent("contextmenu", {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-            clientX: event.clientX,
-            clientY: event.clientY
-          }));
-        default:
-          return;
-      }
-    });
-  });
-}
-
-/**
- * Register drag-and-drop behavior for bonus rows and sources.
- * @param {ActorSheet} sheet
- * @param {HTMLElement} tab
- * @param {Set<string>} uuids
- */
-function _registerDragAndDrop(sheet, tab, uuids) {
-  tab.addEventListener("drop", async event => {
-    const data = foundry.applications.ux.TextEditor.implementation.getDragEventData(event);
-    if (!sheet.isEditable) return;
-    const bonus = await fromUuid(data.uuid);
-    if (!bonus || uuids.has(bonus.uuid)) return;
-    embedBonus(sheet.document, bonus);
-  });
-  tab.querySelectorAll("[data-item-uuid][draggable]").forEach(node => {
-    node.addEventListener("dragstart", event => {
-      const bonus = _resolveBonus(sheet, event.currentTarget.dataset.itemUuid);
-      const dragData = bonus?.toDragData();
-      if (!dragData) return;
-      event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
-    });
-  });
-}
-
-/**
- * Register links back to a bonus source document.
- * @param {HTMLElement} tab
- */
-function _registerSourceActions(tab) {
-  tab.querySelectorAll("[data-action='bonus-source']").forEach(node => {
-    node.addEventListener("click", async event => {
-      const item = await fromUuid(event.currentTarget.dataset.uuid);
-      return item?.sheet.render(true);
-    });
-  });
-}
-
-/**
- * Handle rendering a new tab on the v2 character sheet.
- * @param {ActorSheet} sheet      The rendered sheet.
- * @param {HTMLElement} html      The element of the sheet.
- */
-async function _onRenderCharacterSheet2(sheet, html) {
-  const {sections, uuids} = await _collectSheetBonuses(sheet);
-  const div = await _renderSheetTab(sheet, sections);
-  // Listeners must be bound to the tab itself rather than the wrapper it was rendered in:
-  // the tab is moved into the sheet below, leaving that wrapper empty, so a handler which
-  // queries the wrapper later - the search box - would find no rows left to filter.
-  const tab = div.firstElementChild;
-  _ensureTabControl(sheet, html);
-  _configureTabControl(html, uuids.size > 0);
-  _registerBonusActions(sheet, tab);
-  _registerDragAndDrop(sheet, tab, uuids);
-  _registerSourceActions(tab);
-  _registerSearch(sheet, tab);
-
-  const body = html.querySelector(".tab-body");
-  if (!body) return;
-  const current = body.querySelector(`:scope > .tab.${MODULE.ID}`);
-  if (current) current.replaceWith(tab);
-  else body.appendChild(tab);
-
-  new dnd5e.applications.ContextMenu5e(html, ".build-n-action-list .item[data-item-uuid]", [], {
-    jQuery: false,
-    onOpen: _onOpenContextMenu.bind(sheet)
-  });
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Populate the context menu options.
- * @this {ActorSheet}
- * @param {HTMLElement} element     The targeted element.
- */
-function _onOpenContextMenu(element) {
-  const bonus = _resolveBonus(this, element.dataset.itemUuid);
-  if (!bonus) {
-    ui.context.menuItems = [];
-    return;
-  }
-  ui.context.menuItems = [{
-    name: "BUILD_N_ACTION.ContextMenu.Edit",
-    icon: "<i class='fa-solid fa-edit'></i>",
-    callback: () => bonus.sheet.render({force: true})
-  }, {
-    name: "BUILD_N_ACTION.ContextMenu.Duplicate",
-    icon: "<i class='fa-solid fa-copy'></i>",
-    callback: () => duplicateBonus(bonus)
-  }, {
-    name: "BUILD_N_ACTION.ContextMenu.Delete",
-    icon: "<i class='fa-solid fa-trash'></i>",
-    callback: () => bonus.deleteDialog()
-  }, {
-    name: "BUILD_N_ACTION.ContextMenu.Enable",
-    icon: "<i class='fa-solid fa-toggle-on'></i>",
-    condition: () => !bonus.enabled,
-    callback: () => bonus.toggle(),
-    group: "instance"
-  }, {
-    name: "BUILD_N_ACTION.ContextMenu.Disable",
-    icon: "<i class='fa-solid fa-toggle-off'></i>",
-    condition: () => bonus.enabled,
-    callback: () => bonus.toggle(),
-    group: "instance"
-  }];
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Utility method that creates a popup dialog for a new bonus.
- * @this {ActorSheet}
- * @returns {Promise}
- */
-async function _createChildBonus() {
-  if (!this.isEditable || (this.tabGroups.primary !== MODULE.ID)) return;
-  const template = "systems/dnd5e/templates/apps/document-create.hbs";
-  const data = {
-    folders: [],
-    folder: null,
-    hasFolders: false,
-    type: Object.keys(contextualBonuses)[0],
-    types: Object.keys(contextualBonuses).reduce((acc, type) => {
-      const label = game.i18n.localize(`BUILD_N_ACTION.${type.toUpperCase()}.Label`);
-      acc.push({
-        type: type,
-        label: label,
-        icon: contextualBonuses[type].metadata.defaultImg
-      });
-      return acc;
-    }, []).sort((a, b) => a.label.localeCompare(b.label, game.i18n.lang))
-  };
-  const title = game.i18n.localize("BUILD_N_ACTION.Create");
-  return foundry.applications.api.DialogV2.prompt({
-    content: await foundry.applications.handlebars.renderTemplate(template, data),
-    window: {title},
-    position: {width: 350},
-    classes: ["dnd5e2", "create-document", "dialog", MODULE.ID],
-    ok: {
-      label: title,
-      callback: async (event, button) => {
-        const form = button.form.querySelector("form") ?? button.form;
-        const formData = new FormDataExtended(form).object;
-        if (!formData.name?.trim()) delete formData.name;
-        const bonus = createBonus(formData, this.document);
-        return embedBonus(this.document, bonus);
-      }
-    },
-    rejectClose: false,
-    modal: true
-  });
-}
-
-/* -------------------------------------------------- */
-
-/** Initialize this part of the module. */
-function characterSheetTabSetup() {
-  if (!game.settings.get(MODULE.ID, SETTINGS.SHEET_TAB)) return;
-  if (!game.user.isGM && !game.settings.get(MODULE.ID, SETTINGS.PLAYERS)) return;
-  Hooks.on("renderCharacterActorSheet", _onRenderCharacterSheet2);
-  Hooks.on("renderNPCActorSheet", _onRenderCharacterSheet2);
-}
-
-/**
- * Register enrichers.
- */
-function enricherSetup() {
-  CONFIG.TextEditor.enrichers.push({
-    pattern: /@BNA\[(?<uuid>[^\]]+)\]/g,
-    enricher: enrichContextualBonus
-  });
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Enrich a content link.
- * @param {object} config     Configuration for the enrichment.
- * @returns {HTMLElement}     The created element.
- */
-async function enrichContextualBonus(config) {
-  const uuid = config.groups.uuid;
-  const bonus = await fromUuid(uuid);
-  if (!bonus) return;
-  const anchor = document.createElement("A");
-  anchor.dataset.uuid = uuid;
-  anchor.dataset.link = "";
-  anchor.classList.add(MODULE.ID, "content-link");
-  if (bonus.enabled) anchor.classList.add("enabled");
-  anchor.innerHTML = `<i class="${MODULE.ICON}"></i>${bonus.name}`;
-  anchor.addEventListener("click", () => bonus.toggle());
-  return anchor;
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Add a click event listener to content links.
- */
-document.addEventListener("click", async (event) => {
-  const target = event.target.closest(`a.${MODULE.ID}.content-link`);
-  if (!target) return;
-  if (event.detail > 1) event.preventDefault();
-  const bonus = await fromUuid(target.dataset.uuid);
-  await bonus?.toggle();
-});
-
-/**
- * Utility extension of Map to keep track of rolls and bonuses that apply to them.
- *
- * An entry is created for every roll that has applicable bonuses, but there is no
- * single point at which it becomes obsolete: a fast-forwarded roll never opens a
- * dialog, and a dialog can be dismissed without notice. Entries therefore expire by
- * age -- only the most recent rolls can still have a dialog or an overview open.
- */
-class RollRegistry extends Map {
-  /**
-   * How many roll configurations to retain. Older entries are evicted on registration.
-   * @type {number}
-   */
-  static MAX_ENTRIES = 20;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Register an object of data with a generated id.
-   * @param {object} config     The data to store.
-   * @returns {string}          Randomly generated id to later retrieve the stored data.
-   */
-  register(config) {
-    const id = foundry.utils.randomID();
-    this.set(id, config);
-    this.#evictOldest();
-    return id;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Drop the least recently registered entries once the cap is exceeded. A Map
-   * iterates in insertion order, so the first key is always the oldest.
-   */
-  #evictOldest() {
-    while (this.size > this.constructor.MAX_ENTRIES) {
-      const [oldest] = this.keys();
-      this.delete(oldest);
-    }
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * The registry of rolls being made.
- * @type {RollRegistry<string, object>}
- */
-var registry = new RollRegistry();
-
-const {ApplicationV2, HandlebarsApplicationMixin} = foundry.applications.api;
-
-class AppliedBonusesDialog extends HandlebarsApplicationMixin(ApplicationV2) {
-  constructor({id: registryId, dialog, ...options}) {
-    super({...options, registryId, uniqueId: `${dialog.id}-bonuses-overview`});
-    this.dialog = dialog;
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get title() {
-    return game.i18n.localize("BUILD_N_ACTION.OverviewTitle");
-  }
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static DEFAULT_OPTIONS = {
-    classes: [MODULE.ID, "overview"],
-    window: {
-      icon: MODULE.ICON,
-      resizable: false
-    },
-    position: {
-      width: 400,
-      height: "auto"
-    },
-    actions: {
-      close: this.#onCloseDialog,
-      copyUuid: this.#onClickUuid
-    },
-    registryId: null
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  static PARTS = {
-    main: {
-      template: `modules/${MODULE.ID}/templates/subapplications/applied-bonuses-dialog.hbs`
-    }
-  };
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  async _prepareContext() {
-    // The registry holds a BonusCollection; the template needs an iterable list.
-    const bonuses = registry.get(this.options.registryId)?.bonuses;
-    return {bonuses: bonuses ? Array.from(bonuses.all) : []};
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Copy a source document UUID. */
-  static async #onClickUuid(event, target) {
-    await game.clipboard.copyPlainText(target.dataset.uuid);
-    ui.notifications.info("BUILD_N_ACTION.OverviewCopied", {localize: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Close the overview. */
-  static #onCloseDialog() {
-    return this.close();
-  }
-}
-
-/**
- * Count bonuses stored directly on a document without constructing their data models.
- *
- * @param {Document|object|null} document  Document whose module flags should be inspected.
- * @returns {number}                       Number of configured Build-n-Action bonuses.
- */
-function countDocumentBonuses(document) {
-  const bonuses = document?.getFlag?.(MODULE.ID, "bonuses")
-    ?? document?.flags?.[MODULE.ID]?.bonuses;
-
-  if (Array.isArray(bonuses)) return bonuses.filter(Boolean).length;
-  if ((bonuses instanceof Map) || (bonuses instanceof Set)) return bonuses.size;
-  if (bonuses && (typeof bonuses === "object")) return Object.values(bonuses).filter(Boolean).length;
-  return 0;
-}
-
-/**
- * Utility class for injecting header buttons onto actor, item, and effect sheets.
- */
-class HeaderButton {
-  constructor(application) {
-    this.#application = application;
-    this.#bonusCount = countDocumentBonuses(application.document);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The sheet that is having a header button or tab attached.
-   */
-  #application = null;
-
-  /** Number of bonuses stored directly on the sheet document. */
-  #bonusCount = 0;
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Should the button be available for this user?
-   * @type {boolean}
-   */
-  get showButton() {
-    return game.settings.get(MODULE.ID, SETTINGS.PLAYERS) || game.user.isGM;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Should the label be shown in a header button or just icon?
-   * @type {boolean}
-   */
-  get showLabel() {
-    return game.settings.get(MODULE.ID, SETTINGS.LABEL);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does this application show a tab instead of a button?
-   * @type {boolean}
-   */
-  get showTab() {
-    switch (this.#application.constructor.name) {
-      case "ActorSheet5eCharacter2":
-      case "ActorSheet5eNPC2":
-      case "CharacterActorSheet":
-      case "NPCActorSheet":
-        return game.settings.get(MODULE.ID, SETTINGS.SHEET_TAB);
-      default:
-        return false;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The invalid document types that should prevent the button from being shown.
-   * @type {Set<string>}
-   */
-  get invalidTypes() {
-    switch (this.#application.document.documentName) {
-      case "Actor":
-        return new Set(["group"]);
-      default:
-        return new Set();
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The button label.
-   * @type {string}
-   */
-  get label() {
-    return game.i18n.localize("BUILD_N_ACTION.ModuleTitle");
-  }
-
-  /* -------------------------------------------------- */
-
-  /** Header icon, marked when the document owns one or more bonuses. */
-  get icon() {
-    const marker = this.#bonusCount ? ` ${MODULE.ID}-bonus-marker` : "";
-    return `${MODULE.ICON}${marker}`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Inject the button in the application's header.
-   * @param {Application} application     The rendered application.
-   * @param {object[]} array              The array of buttons.
-   */
-  static inject(application, array) {
-    const instance = new this(application);
-
-    // Invalid document subtype.
-    if (instance.invalidTypes.has(application.document.type)) return;
-
-    // This application shows a tab instead of a header button.
-    if (instance.showTab) return;
-
-    // Header buttons are disabled.
-    if (!instance.showButton) return;
-
-    // Insert button.
-    array.unshift({
-      class: `${MODULE.ID}${instance.#bonusCount ? " has-bonuses" : ""}`,
-      icon: instance.icon,
-      onclick: () => openBonusWorkshop(application.document),
-      label: instance.showLabel ? instance.label : ""
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Inject a control into a Foundry v14 ApplicationV2 header.
-   * @param {ApplicationV2} application                  The rendered application.
-   * @param {ApplicationHeaderControlsEntry[]} controls  The array of controls.
-   */
-  static injectV2(application, controls) {
-    const document = application.document;
-    if (!isEmbeddableDocument(document)) return;
-
-    const instance = new this(application);
-    if (instance.invalidTypes.has(document.type) || instance.showTab || !instance.showButton) return;
-
-    controls.unshift({
-      action: `${MODULE.ID}-builder`,
-      icon: instance.icon,
-      label: instance.label,
-      onClick: () => openBonusWorkshop(document)
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-/**
- * Add a header button to display the source of all applied bonuses.
- * Supports both legacy roll dialogs and ApplicationV2 roll configuration.
- */
-class HeaderButtonDialog extends HeaderButton {
-  /** @override */
-  static inject(application, array) {
-    const id = application.options[MODULE.ID]?.registry;
-    if (!id) return;
-
-    const instance = new this(application);
-    array.unshift({
-      class: MODULE.ID,
-      icon: MODULE.ICON,
-      onclick: () => new AppliedBonusesDialog({id, dialog: application}).render(true),
-      label: instance.showLabel ? instance.label : ""
-    });
-  }
-
-  /** @override */
-  static injectV2(application, controls) {
-    const id = application.options[MODULE.ID]?.registry;
-    if (!id) return;
-
-    const instance = new this(application);
-    controls.unshift({
-      action: `${MODULE.ID}-applied`,
-      icon: MODULE.ICON,
-      label: instance.label,
-      onClick: () => new AppliedBonusesDialog({id, dialog: application}).render(true)
-    });
-  }
-}
-
-/* -------------------------------------------------- */
-
-/** Inject form element on scene region configs. */
-function injectRegionConfigElement(config, element) {
-  if (!config.isEditable) return;
-  const fg = element.querySelector("[name=visibility]").closest(".form-group");
-  const div = document.createElement("FIELDSET");
-  div.classList.add(MODULE.ID);
-  div.innerHTML = `
-  <legend>${game.i18n.localize("BUILD_N_ACTION.ModuleTitle")}</legend>
-  <button type="button" data-action="buildNActionBuilder">
-    <i class="${MODULE.ICON}"></i>
-    ${game.i18n.localize("BUILD_N_ACTION.ModuleTitle")}
-  </button>
-  <p class="hint">${game.i18n.localize("BUILD_N_ACTION.RegionConfigHint")}</p>`;
-  div.querySelector("[data-action]").addEventListener("click", () => openBonusWorkshop(config.document));
-  fg.after(div);
-}
-
-/* -------------------------------------------------- */
-
-var injections = {
-  HeaderButton,
-  HeaderButtonDialog,
-  injectRegionConfigElement
-};
-
-const SUPPORTED_INTEGRATIONS = Object.freeze({
-  "midi-qol": Object.freeze({label: "Midi QOL", minimum: "14.0.10"}),
-  dae: Object.freeze({label: "DAE", minimum: "14.0.12"})
-});
-
-/**
- * Report the runtime state of optional automation integrations.
- * @returns {Record<string, {active: boolean, compatible: boolean, minimum: string, version: string|null}>}
- */
-function getIntegrationStatus() {
-  return Object.fromEntries(Object.entries(SUPPORTED_INTEGRATIONS).map(([id, support]) => {
-    const module = game.modules.get(id);
-    const version = module?.version ?? null;
-    const compatible = !module?.active || !version || !foundry.utils.isNewerVersion(support.minimum, version);
-    return [id, {
-      active: module?.active === true,
-      compatible,
-      minimum: support.minimum,
-      version
-    }];
-  }));
-}
-
-/** Validate active integrations without making either module mandatory. */
-function validateIntegrations() {
-  const status = getIntegrationStatus();
-  for (const [id, state] of Object.entries(status)) {
-    if (!state.active || state.compatible) continue;
-    const {label} = SUPPORTED_INTEGRATIONS[id];
-    console.warn(`${MODULE.NAME} | ${label} ${state.version} is older than supported ${state.minimum}.`);
-  }
-  return status;
-}
-
-var models = {
-  AuraModel,
-  ConsumptionModel,
-  ModifiersModel,
-  ContextualBonus: contextualBonuses
-};
-
-/**
- * Apply immediate additive and critical damage bonuses.
- *
- * @param {object} config
- * @param {BonusCollection} bonuses
- * @param {Function} [simplifyBonus]
- */
-function applyImmediateDamageBonuses(
-  config,
-  bonuses,
-  simplifyBonus = dnd5e.utils.simplifyBonus
-) {
-  const critical = config.critical ??= {};
-  critical.bonusDice ??= 0;
-  critical.bonusDamage ??= "";
-
-  for (const bonus of bonuses.nonoptional) {
-    const rollData = config.rolls[0].data;
-    if (bonus.hasPropertyBonuses) {
-      critical.bonusDice += simplifyBonus(bonus.bonuses.criticalBonusDice, rollData);
-      critical.bonusDamage = joinFormula(critical.bonusDamage, bonus.bonuses.criticalBonusDamage);
-    }
-    if (bonus.hasAdditiveBonus) appendDamagePart(config, bonus, rollData);
-  }
-}
-
-/**
- * Apply dice modifiers and retain modifiers that can affect later optional bonuses.
- *
- * @param {object} config
- * @param {BonusCollection} bonuses
- * @param {Collection} modifiers
- */
-function applyDamageDiceModifiers(config, bonuses, modifiers) {
-  for (const bonus of bonuses.nonoptional) {
-    if (!bonus.hasDiceModifiers) continue;
-    applyModifierToRolls(config, bonus);
-    applyModifierToCritical(config, bonus);
-    if (!bonus._halted) modifiers.set(bonus.uuid, bonus);
-  }
-}
-
-/**
- * Clamp and validate accumulated critical bonuses.
- *
- * @param {object} config
- * @param {Function} [validateFormula]
- */
-function sanitizeCriticalBonuses(config, validateFormula = Roll.validate) {
-  const critical = config.critical ??= {};
-  critical.bonusDice = Math.max(0, critical.bonusDice ?? 0);
-  if (critical.bonusDamage && !validateFormula(critical.bonusDamage)) {
-    console.warn("Critical bonus damage resulted in invalid formula:", critical.bonusDamage);
-    critical.bonusDamage = "";
-  }
-}
-
-function appendDamagePart(config, bonus, rollData) {
-  const roll = config.rolls.find(candidate => {
-    if (!bonus.hasDamageType) return true;
-    if (bonus.bonuses.damageType.size > 1) return false;
-    return candidate.options.types.includes(bonus.bonuses.damageType.first());
-  });
-
-  if (roll) {
-    roll.parts.push(bonus.bonuses.bonus);
-    return;
-  }
-
-  config.rolls.push({
-    data: rollData,
-    parts: [bonus.bonuses.bonus],
-    options: {
-      properties: [...config.rolls[0].options.properties ?? []],
-      type: bonus.bonuses.damageType.first(),
-      types: Array.from(bonus.bonuses.damageType)
-    }
-  });
-}
-
-function applyModifierToRolls(config, bonus) {
-  for (const {parts, data, options} of config.rolls) {
-    if (bonus._halted) break;
-    bonus._halted = bonus.bonuses.modifiers.modifyParts(parts, data) || false;
-
-    if (!bonus._halted && options.critical?.bonusDamage) {
-      const criticalParts = [options.critical.bonusDamage];
-      bonus._halted = bonus.bonuses.modifiers.modifyParts(criticalParts, bonus.getRollData()) || false;
-      options.critical.bonusDamage = criticalParts[0];
-    }
-  }
-}
-
-function applyModifierToCritical(config, bonus) {
-  if (bonus._halted || !config.critical?.bonusDamage) return;
-  const parts = [config.critical.bonusDamage];
-  bonus._halted = bonus.bonuses.modifiers.modifyParts(parts, bonus.getRollData()) || false;
-  config.critical.bonusDamage = parts[0];
-}
-
-function joinFormula(current, addition) {
-  if (!addition) return current;
-  return current ? `${current} + ${addition}` : addition;
-}
-
-/**
- * Keep the dnd5e roll-configuration dialog available when a contextual bonus
- * still needs a user decision. This intentionally overrides Midi-QOL fast
- * forward only for rolls that actually have optional Build-n-Action bonuses.
- *
- * @param {object} dialog
- * @param {object} bonuses
- * @returns {boolean} Whether the dialog was required.
- */
-function requireOptionalRollDialog(dialog, bonuses) {
-  if (!dialog || !bonuses?.optionals?.size) return false;
-  dialog.configure = true;
-  return true;
-}
-
-/**
- * Append an additive part to every roll in a dnd5e BasicRoll process configuration.
- * @param {object} config  The process configuration to mutate.
- * @param {string} part    The formula part to append.
- */
+import { $ as documentBlueprints, A as replaceData, At as asRecord, B as createRider, C as pendingRoll, D as sourceLabel, E as loadTraitTrees, F as addRider, G as SETTINGS, H as canEdit, I as riderClock, L as useRiders, M as scaledFormula, Mt as asStrings, N as simplifyNumber, O as registerAuraPreviews, Ot as asBoolean, P as resolveModifiers, Q as carrierKind, R as countRest, S as resolveRollTarget, St as getResult, U as openEditor, X as setting, Z as actorToken, _ as guardedAsync, at as listOf, b as recordUsages, c as registerMigrationMenu, d as activationFor, et as documentFromUuid, f as activationOf, g as guarded, h as evaluateEvent, i as createApi, j as resolveForeign, jt as asString, k as modifyFormulaParts, kt as asNumber, lt as MODULE_SCOPE, m as announceApplied, n as foundryTranslator, nt as originRollData, ot as read, p as allowIntents, q as registerSettings, r as createPhraseFormatter, rt as rollDataOf, s as validateIntegrations, st as stringList, t as foundryChoices, tt as isDocument, u as registerLibrary, v as makeRoller, vt as randomId, w as registerPending, x as rememberActivation, y as midiActivation, z as recordUsage } from "./chunks/choices-JhATeK3R.mjs";
+//#region src/runtime/choices.ts
+function sortIntents(intents) {
+	const sorted = {
+		immediate: [],
+		choices: [],
+		reminders: []
+	};
+	const order = /* @__PURE__ */ new Map();
+	const choices = /* @__PURE__ */ new Map();
+	for (const intent of intents) {
+		if (intent.type === "reminder") {
+			sorted.reminders.push(intent);
+			continue;
+		}
+		if (!intent.common.optional) {
+			sorted.immediate.push(intent);
+			continue;
+		}
+		if (!order.has(intent.entry)) order.set(intent.entry, order.size);
+		const key = `${order.get(intent.entry)}:${intent.common.choiceGroup}`;
+		let choice = choices.get(key);
+		if (!choice) {
+			choice = {
+				key,
+				intents: [],
+				cost: readCost({})
+			};
+			choices.set(key, choice);
+			sorted.choices.push(choice);
+		}
+		choice.intents.push(intent);
+		const cost = readCost(intent.common.cost);
+		if (choice.cost.type === "none" && cost.type !== "none") choice.cost = cost;
+	}
+	return sorted;
+}
+var PAYABLE = [
+	"uses",
+	"quantity",
+	"slots",
+	"health",
+	"hitdice",
+	"currency",
+	"inspiration",
+	"effect"
+];
+function readCost(value) {
+	const cost = asRecord(value);
+	const type = asString(cost.type, "none");
+	return {
+		type: PAYABLE.includes(type) ? type : "none",
+		subtype: asString(cost.subtype),
+		min: asString(cost.min),
+		max: asString(cost.max),
+		step: asNumber(cost.step) ?? 1,
+		scales: asBoolean(cost.scales),
+		formula: asString(cost.formula)
+	};
+}
+/** Evaluate min and max (v1 ConsumptionModel#prepareDerivedData). */
+function resolveCost(cost, evaluate) {
+	const number = (formula) => formula.trim() ? evaluate(formula) : null;
+	let min = number(cost.min) ?? 1;
+	let max = number(cost.max);
+	if (max !== null && min > max) [min, max] = [max, min];
+	return {
+		...cost,
+		min,
+		max
+	};
+}
+function slotsFrom(state, min) {
+	return state.slots.filter((slot) => slot.value && slot.max && slot.level && slot.level >= min);
+}
+function hitDiceAvailable(cost, state) {
+	if (!state.hitDice) return 0;
+	return ["smallest", "largest"].includes(cost.subtype) ? state.hitDice.value : state.hitDice.bySize[cost.subtype] ?? 0;
+}
+function valid(cost, state) {
+	const invalidScale = cost.scales && (cost.max ?? Infinity) < cost.min;
+	switch (cost.type) {
+		case "uses": return !invalidScale && !!state.uses?.limited && cost.min > 0;
+		case "quantity": return !invalidScale && state.quantity !== null && cost.min > 0;
+		case "effect": return true;
+		case "health":
+		case "slots": return !invalidScale && cost.min > 0;
+		case "currency": return !invalidScale && state.currencies.includes(cost.subtype) && cost.min > 0;
+		case "inspiration": return true;
+		case "hitdice": return !invalidScale && [
+			"smallest",
+			"largest",
+			...state.hitDieTypes
+		].includes(cost.subtype) && cost.min > 0;
+		default: return false;
+	}
+}
+/** Whether the choice can be offered: nothing to pay, or the minimum can be paid by an owner. */
+function costAvailable(cost, state) {
+	if (cost.type === "none") return true;
+	if (!valid(cost, state) || !state.owner) return false;
+	const hp = state.hp;
+	switch (cost.type) {
+		case "uses": return (state.uses?.value ?? 0) >= cost.min;
+		case "quantity": return (state.quantity ?? 0) >= cost.min;
+		case "effect": return state.effect;
+		case "slots": return slotsFrom(state, cost.min).length > 0;
+		case "health": return !!hp && hp.value + hp.temp >= cost.min;
+		case "currency": return (state.currency?.[cost.subtype] ?? 0) >= cost.min;
+		case "inspiration": return state.actorType === "character" && state.inspiration === true;
+		case "hitdice": return state.actorType === "character" && hitDiceAvailable(cost, state) >= cost.min;
+		default: return false;
+	}
+}
+/** Whether the player picks how much to pay (v1 OptionalSelector#doesBonusScale). */
+function costScales(cost, state) {
+	if (!cost.scales || !valid(cost, state)) return false;
+	if (["effect", "inspiration"].includes(cost.type)) return false;
+	if (["health", "currency"].includes(cost.type)) return cost.step > 0;
+	return true;
+}
+/** The lowest spell slot at or above `min`, preferring pact slots on a tie (v1). */
+function lowestSlot(state, min) {
+	const slots = slotsFrom(state, min);
+	if (!slots.length) return null;
+	const level = Math.min(...slots.map((slot) => slot.level));
+	const lowest = slots.filter((slot) => slot.level === level);
+	return lowest.find((slot) => !slot.key.startsWith("spell")) ?? lowest[0] ?? null;
+}
+function stepped(from, to, step, available, min) {
+	const options = [];
+	for (let amount = from; amount <= to; amount += step) options.push({
+		value: String(amount),
+		amount,
+		scale: Math.floor((amount - min) / step),
+		available
+	});
+	return options;
+}
+/** New `spent` values after spending `amount` hit dice of a size, or the smallest/largest first (v1 buildHitDiceUpdates). */
+function hitDiceSpend(classes, subtype, amount) {
+	const bySize = ["smallest", "largest"].includes(subtype);
+	let eligible = classes.filter((cls) => bySize || cls.denomination === subtype);
+	if (bySize) eligible = [...eligible].sort((left, right) => {
+		const order = left.denomination.localeCompare(right.denomination, "en", { numeric: true });
+		return subtype === "largest" ? -order : order;
+	});
+	const updates = [];
+	let remaining = Math.trunc(amount);
+	for (const cls of eligible) {
+		const available = (remaining > 0 ? cls.levels : 0) - cls.spent;
+		const delta = remaining > 0 ? Math.min(remaining, available) : Math.max(remaining, available);
+		if (!delta) continue;
+		updates.push({
+			id: cls.id,
+			spent: cls.spent + delta
+		});
+		remaining -= delta;
+		if (!remaining) break;
+	}
+	return updates;
+}
+/** The amounts (or slots) the player may pay; a non-scaling cost has one option at the minimum. */
+function costOptions(cost, state) {
+	const min = cost.min;
+	const max = cost.max ?? Infinity;
+	const uses = state.uses;
+	const hp = state.hp;
+	const hpAvailable = hp ? Math.max(0, hp.value) + Math.max(0, hp.temp) : 0;
+	const available = (() => {
+		switch (cost.type) {
+			case "uses": return uses ? `${uses.value}/${uses.max}` : "";
+			case "quantity": return String(state.quantity ?? 0);
+			case "health": return hp ? `${hpAvailable}/${Math.max(0, hp.max) + Math.max(0, hp.tempmax)}` : "";
+			case "currency": return String(state.currency?.[cost.subtype] ?? 0);
+			case "hitdice": return state.hitDice ? ["smallest", "largest"].includes(cost.subtype) ? `${state.hitDice.value}/${state.hitDice.max}` : String(hitDiceAvailable(cost, state)) : "";
+			default: return "";
+		}
+	})();
+	if (!costScales(cost, state)) {
+		if (cost.type === "slots") {
+			const slot = lowestSlot(state, min);
+			return slot ? [{
+				value: slot.key,
+				amount: 1,
+				scale: 0,
+				available: `${slot.value}/${slot.max}`
+			}] : [];
+		}
+		const amount = ["effect", "inspiration"].includes(cost.type) ? 1 : min;
+		return [{
+			value: String(amount),
+			amount,
+			scale: 0,
+			available
+		}];
+	}
+	switch (cost.type) {
+		case "uses":
+		case "quantity": {
+			const have = cost.type === "uses" ? uses?.value ?? 0 : state.quantity ?? 0;
+			return stepped(Math.max(1, min), Math.min(have, max), 1, available, min);
+		}
+		case "slots": return slotsFrom(state, min).sort((a, b) => a.level - b.level || a.key.localeCompare(b.key)).map((slot) => ({
+			value: slot.key,
+			amount: 1,
+			scale: Math.min(slot.level - min, max - 1),
+			available: `${slot.value}/${slot.max}`
+		}));
+		case "health": {
+			const capacity = hp ? Math.max(0, hp.max) + Math.max(0, hp.tempmax) : 0;
+			if (hpAvailable < min) return [];
+			return stepped(min || 1, Math.min(hpAvailable, cost.max ?? capacity), cost.step, available, min);
+		}
+		case "currency": {
+			const have = state.currency?.[cost.subtype] ?? 0;
+			if (have < min) return [];
+			return stepped(min || 1, Math.min(have, max), cost.step, available, min);
+		}
+		case "hitdice": return stepped(min, Math.min(max, hitDiceAvailable(cost, state)), 1, available, min);
+		default: return [];
+	}
+}
+//#endregion
+//#region src/runtime/roll-config.ts
+function isEntry(roll) {
+	return !!roll && typeof roll === "object";
+}
+function entries(config) {
+	return (config.rolls ?? []).filter(isEntry);
+}
+/** Append an additive part to every roll. */
 function appendRollPart(config, part) {
-  for (const roll of config.rolls ?? []) {
-    if (!roll || (typeof roll !== "object")) continue;
-    roll.parts ??= [];
-    roll.parts.push(part);
-  }
+	for (const roll of entries(config)) (roll.parts ??= []).push(part);
 }
-
 /**
- * Add target roll data to every data container used by a dnd5e roll process.
- *
- * dnd5e 5.3 may defer creating an individual roll's data object until after
- * the pre-roll hooks have run. Creating the container here is safe because
- * the system's buildConfig step merges its final roll data into that object.
- *
- * @param {object} config      The process configuration to mutate.
- * @param {object} targetData  Roll data for the targeted actor.
- */
+* Remove dnd5e 5.3 compatibility getters from senses in plain target roll data: reading them
+* logs a deprecation when the roll dialog deep-clones its configuration.
+*/
+function removeLegacySenseAccessors(value, visited = /* @__PURE__ */ new WeakSet()) {
+	if (!value || typeof value !== "object" || visited.has(value)) return;
+	const prototype = Object.getPrototypeOf(value);
+	if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return;
+	visited.add(value);
+	const descriptors = Object.getOwnPropertyDescriptors(value);
+	const ranges = descriptors.ranges;
+	const isSenses = !!ranges && "value" in ranges;
+	for (const [key, descriptor] of Object.entries(descriptors)) if ("value" in descriptor) removeLegacySenseAccessors(descriptor.value, visited);
+	else if (isSenses && descriptor.configurable) delete value[key];
+}
+/** Make `@target` available to every roll (dnd5e merges its own roll data into these containers later). */
 function injectTargetData(config, targetData) {
-  _removeLegacySenseAccessors(targetData);
-  if (config.data && (typeof config.data === "object")) config.data.target = targetData;
-
-  for (const roll of config.rolls ?? []) {
-    if (!roll || (typeof roll !== "object")) continue;
-    roll.data ??= {};
-    roll.data.target = targetData;
-  }
+	removeLegacySenseAccessors(targetData);
+	if (config.data && typeof config.data === "object") config.data.target = targetData;
+	for (const roll of entries(config)) (roll.data ??= {}).target = targetData;
 }
-
-/**
- * Remove dnd5e 5.3 compatibility getters from ephemeral target roll data.
- * Reading those getters emits a deprecation warning when the roll dialog is
- * deep-cloned. The current values remain available under senses.ranges.
- *
- * @param {object} targetData  Target actor roll data to sanitize.
- */
-function _removeLegacySenseAccessors(targetData, visited = new WeakSet()) {
-  if (!targetData || (typeof targetData !== "object") || visited.has(targetData)) return;
-
-  const prototype = Object.getPrototypeOf(targetData);
-  if (!Array.isArray(targetData) && (prototype !== Object.prototype) && (prototype !== null)) return;
-  visited.add(targetData);
-
-  const descriptors = Object.getOwnPropertyDescriptors(targetData);
-  const isSensesData = Object.hasOwn(descriptors, "ranges") && Object.hasOwn(descriptors.ranges, "value");
-  for (const [key, descriptor] of Object.entries(descriptors)) {
-    if (Object.hasOwn(descriptor, "value")) {
-      _removeLegacySenseAccessors(descriptor.value, visited);
-    } else if (isSensesData && descriptor.configurable) {
-      delete targetData[key];
-    }
-  }
+/** A stored number, or the fallback when absent or not a number (0 is kept). */
+function numberOr(value, fallback) {
+	const number = value === void 0 || value === null ? NaN : Number(value);
+	return Number.isFinite(number) ? number : fallback;
 }
-
-/**
- * Adjust critical success and failure thresholds on every configured roll.
- * @param {object} config              The process configuration to mutate.
- * @param {number} criticalSuccess     Amount by which to expand the critical success range.
- * @param {number} criticalFailure     Amount by which to expand the critical failure range.
- * @param {boolean} allowFailureBelowOne  Whether a failure threshold below one is allowed.
- */
-function adjustCriticalRanges(config, criticalSuccess, criticalFailure, allowFailureBelowOne = false) {
-  for (const roll of config.rolls ?? []) {
-    if (!roll || (typeof roll !== "object")) continue;
-    const options = roll.options ??= {};
-    options.criticalSuccess = Math.max(1, (options.criticalSuccess ?? 20) - criticalSuccess);
-    options.criticalFailure = (options.criticalFailure ?? 1) + criticalFailure;
-    if ((options.criticalFailure < 1) && !allowFailureBelowOne) options.criticalFailure = 1;
-  }
+/** Widen the critical range by `success` and the fumble range by `failure` on every roll. */
+function adjustCriticalRanges(config, success, failure, allowFailureBelowOne) {
+	for (const roll of entries(config)) {
+		const options = roll.options ??= {};
+		options.criticalSuccess = Math.max(1, numberOr(options.criticalSuccess, 20) - success);
+		let fumble = numberOr(options.criticalFailure, 1) + failure;
+		if (fumble < 1 && !allowFailureBelowOne) fumble = 1;
+		options.criticalFailure = fumble;
+	}
 }
-
-/**
- * Adjust a saving throw target and, for death saves, its critical success threshold.
- * @param {object} config          The process configuration to mutate.
- * @param {number} targetBonus     Amount by which to reduce the target.
- * @param {number} criticalBonus   Amount by which to expand the death-save critical range.
- * @param {boolean} isDeath        Whether this is a death save.
- */
+/** Lower a save's target by `targetBonus`; for death saves also widen the critical success range. */
 function adjustSavingThrowRanges(config, targetBonus, criticalBonus, isDeath) {
-  if (Number.isFinite(Number(config.target))) config.target = Number(config.target) - targetBonus;
-  if (!isDeath) return;
-
-  for (const roll of config.rolls ?? []) {
-    if (!roll || (typeof roll !== "object")) continue;
-    const options = roll.options ??= {};
-    options.criticalSuccess = Math.max(1, (options.criticalSuccess ?? 20) - criticalBonus);
-    if (Number.isFinite(Number(config.target))) {
-      config.target = Math.min(options.criticalSuccess, config.target);
-    }
-  }
+	if (Number.isFinite(Number(config.target))) config.target = Number(config.target) - targetBonus;
+	if (!isDeath) return;
+	for (const roll of entries(config)) {
+		const options = roll.options ??= {};
+		const critical = Math.max(1, numberOr(options.criticalSuccess, 20) - criticalBonus);
+		options.criticalSuccess = critical;
+		if (Number.isFinite(Number(config.target))) config.target = Math.min(critical, Number(config.target));
+	}
 }
-
-/**
- * @typedef {object} SavingThrowDetails
- * @property {string} [ability]               The ability used for the saving throw.
- * @property {boolean} [isConcentration]      Whether this saving throw is to maintain concentration.
- * @property {boolean} [isDeath]              Whether this is a death saving throw.
- */
-
-/* -------------------------------------------------- */
-/*   Mutators                                         */
-/* -------------------------------------------------- */
-
-/**
- * When you force a saving throw...
- * @param {Activity} activity                           Activity being used.
- * @param {ActivityUseConfiguration} usageConfig        Configuration info for the activation.
- * @param {ActivityMessageConfiguration} messageConfig  Configuration info for the created chat message.
- * @param {ActivityUsageUpdates} updates                Applied usage updates.
- */
-function postActivityConsumption(activity, usageConfig, messageConfig, updates) {
-  if (activity.type !== "save") return;
-
-  const subjects = {
-    activity: activity,
-    item: activity.item,
-    actor: activity.item.actor,
-    target: resolveRollTarget(usageConfig)
-  };
-
-  const rollData = activity.getRollData({deterministic: true});
-
-  // Get bonuses:
-  const bonuses = itemCheck(subjects, "save", {spellLevel: rollData.item.level});
-  if (!bonuses.size) return;
-
-  _addTargetData({data: rollData}, subjects.target, true);
-  const totalBonus = bonuses.all.reduce((acc, bonus) => {
-    return acc + dnd5e.utils.simplifyBonus(bonus.bonuses.bonus, rollData);
-  }, 0);
-
-  activity.save.dc.value += totalBonus;
+function joinFormula(current, addition) {
+	if (!addition) return current;
+	return current ? `${current} + ${addition}` : addition;
 }
-
-/* -------------------------------------------------- */
-
+function typesOf(roll) {
+	const types = roll.options?.types;
+	return Array.isArray(types) ? types : [];
+}
 /**
- * When you make an attack roll...
- * @param {AttackRollProcessConfiguration} config  Configuration data for the pending roll.
- * @param {BasicRollDialogConfiguration} dialog    Presentation data for the roll configuration dialog.
- * @param {BasicRollMessageConfiguration} message  Configuration data for the roll's message.
- */
+* Add a damage bonus: untyped bonuses join the first roll, a single type joins a roll of that
+* type, and anything else becomes its own roll carrying the bonus's types.
+*/
+function appendDamagePart(config, formula, types, rollData) {
+	const rolls = entries(config);
+	const first = rolls[0];
+	let roll;
+	if (!types.length) roll = first;
+	else if (types.length === 1) roll = rolls.find((candidate) => typesOf(candidate).includes(types[0]));
+	if (roll) {
+		(roll.parts ??= []).push(formula);
+		return;
+	}
+	const properties = first?.options?.properties;
+	(config.rolls ??= []).push({
+		data: rollData,
+		parts: [formula],
+		options: {
+			properties: Array.isArray(properties) ? [...properties] : [],
+			type: types[0],
+			types: [...types]
+		}
+	});
+}
+/** Add extra critical dice and critical damage. */
+function addCriticalBonus(config, dice, damage) {
+	const critical = config.critical ??= {};
+	critical.bonusDice = (critical.bonusDice ?? 0) + dice;
+	critical.bonusDamage = joinFormula(critical.bonusDamage ?? "", damage);
+}
+/** Clamp extra critical dice at 0 and drop critical damage that is not a valid formula. */
+function sanitizeCritical(config, validateFormula) {
+	const critical = config.critical ??= {};
+	critical.bonusDice = Math.max(0, critical.bonusDice ?? 0);
+	if (critical.bonusDamage && !validateFormula(critical.bonusDamage)) critical.bonusDamage = "";
+}
+//#endregion
+//#region src/foundry/apply.ts
+/** Roll data of a blueprint whose origin is neither the roller nor the rolled item (v1 _replaceRollDataOfBonuses). */
+function foreignData(intent, ctx) {
+	const info = ctx.sources.get(intent.entry);
+	const origin = info?.origin;
+	if (!info || !origin) return null;
+	if (origin.uuid === ctx.roller.actor.uuid || origin.uuid === ctx.roller.item?.uuid) return null;
+	return originRollData(info.document);
+}
+function formulaOf(intent, key, ctx, options) {
+	const formula = asString(intent.data[key]).trim();
+	if (!formula) return "";
+	if (options.data) return replaceData(formula, options.data);
+	const data = foreignData(intent, ctx);
+	return data ? resolveForeign(formula, data) : formula;
+}
+function numberOf(intent, key, ctx, options) {
+	const formula = formulaOf(intent, key, ctx, options);
+	return formula ? simplifyNumber(formula, options.data ?? ctx.roller.rollData) ?? 0 : 0;
+}
+function modifierKey(intent) {
+	return `${intent.entry.documentUuid}|${intent.blueprintId}|${intent.nodeId}`;
+}
+/**
+* Apply one diceModifiers result to roll parts from `start[rollIndex]` on and, when `critical` is set,
+* to critical damage. A used "first die only" modifier is halted for the rest of the roll.
+*/
+function applyModifiers(config, intent, ctx, tracker, start, critical) {
+	const key = modifierKey(intent);
+	if (tracker.halted.has(key)) return;
+	const info = ctx.sources.get(intent.entry);
+	const originData = info ? originRollData(info.document, true) : {};
+	const spec = resolveModifiers(intent.data, (formula) => simplifyNumber(formula, originData));
+	if (!spec) return;
+	if (!tracker.active.includes(intent)) tracker.active.push(intent);
+	const halt = () => {
+		tracker.halted.add(key);
+		tracker.active = tracker.active.filter((entry) => entry !== intent);
+	};
+	const damage = critical && ctx.event === "damageRoll";
+	for (const [index, roll] of (config.rolls ?? []).entries()) {
+		const parts = roll.parts ??= [];
+		const from = start[index] ?? 0;
+		const slice = parts.slice(from);
+		const stopped = modifyFormulaParts(slice, roll.data ?? ctx.roller.rollData, spec);
+		parts.splice(from, slice.length, ...slice);
+		if (stopped) return halt();
+		const rollCritical = asRecord(roll.options?.critical);
+		if (damage && typeof rollCritical.bonusDamage === "string" && rollCritical.bonusDamage) {
+			const formula = [rollCritical.bonusDamage];
+			const done = modifyFormulaParts(formula, originData, spec);
+			rollCritical.bonusDamage = String(formula[0]);
+			if (done) return halt();
+		}
+	}
+	if (damage && config.critical?.bonusDamage) {
+		const formula = [config.critical.bonusDamage];
+		const done = modifyFormulaParts(formula, originData, spec);
+		config.critical.bonusDamage = String(formula[0]);
+		if (done) halt();
+	}
+}
+/** Apply roll-changing results to a dnd5e process configuration. */
+function applyRollIntents(config, intents, ctx, tracker, options = {}) {
+	let success = 0;
+	let failure = 0;
+	let target = 0;
+	let deathCritical = 0;
+	const firstData = config.rolls?.[0]?.data ?? ctx.roller.rollData;
+	for (const intent of intents) switch (intent.type) {
+		case "rollBonus": {
+			const formula = options.formula?.(intent) ?? formulaOf(intent, "formula", ctx, options);
+			if (!formula) break;
+			if (ctx.event === "damageRoll") appendDamagePart(config, formula, options.damageType ? [options.damageType] : asStrings(intent.data.damageTypes), options.data ?? firstData);
+			else appendRollPart(config, formula);
+			break;
+		}
+		case "critRange":
+			success += numberOf(intent, "critical", ctx, options);
+			failure += numberOf(intent, "fumble", ctx, options);
+			break;
+		case "critDamage":
+			addCriticalBonus(config, numberOf(intent, "dice", ctx, options), formulaOf(intent, "damage", ctx, options));
+			break;
+		case "saveThresholds":
+			target += numberOf(intent, "targetValue", ctx, options);
+			deathCritical += numberOf(intent, "deathSaveCritical", ctx, options);
+	}
+	if (success || failure) adjustCriticalRanges(config, success, failure, setting(SETTINGS.fumbleBelowOne));
+	if (target || deathCritical) adjustSavingThrowRanges(config, target, deathCritical, ctx.roller.details.isDeath === true);
+	for (const intent of intents) if (intent.type === "diceModifiers") applyModifiers(config, intent, ctx, tracker, [], true);
+	if (ctx.event === "damageRoll") sanitizeCritical(config, (formula) => Roll.validate(formula));
+}
+var saveDCs = /* @__PURE__ */ new WeakMap();
+/**
+* Add DC bonuses to a save activity for this use. The bonus is added to the DC the activity had
+* before the previous bonus, so repeated uses without a data refresh do not stack.
+*/
+function applySaveDC(activity, intents, ctx) {
+	const dc = read(activity, "save.dc");
+	if (!dc || typeof dc !== "object") return;
+	const record = dc;
+	const total = intents.filter((intent) => intent.type === "dcBonus").reduce((sum, intent) => sum + numberOf(intent, "formula", ctx, {}), 0);
+	const current = asNumber(record.value) ?? 0;
+	const previous = saveDCs.get(record);
+	const base = previous && previous.applied === current ? previous.original : current;
+	if (!total && base === current) return;
+	record.value = base + total;
+	saveDCs.set(record, {
+		original: base,
+		applied: base + total
+	});
+}
+//#endregion
+//#region src/foundry/consume.ts
+function number$1(value) {
+	return asNumber(value) ?? 0;
+}
+function slotsOf(actor) {
+	return Object.entries(asRecord(read(actor, "system.spells"))).flatMap(([key, slot]) => {
+		const level = asNumber(read(slot, "level"));
+		const value = asNumber(read(slot, "value"));
+		const max = asNumber(read(slot, "max"));
+		return level === null || value === null || max === null ? [] : [{
+			key,
+			level,
+			value,
+			max
+		}];
+	});
+}
+function numbersIn(value) {
+	return Object.fromEntries(Object.entries(asRecord(value)).map(([key, entry]) => [key, number$1(entry)]));
+}
+function effectExists(effect) {
+	const effects = read(effect.parent, "effects");
+	const has = read(effects, "has");
+	return typeof has === "function" && has.call(effects, effect.id) === true;
+}
+/** A character's classes with their hit dice (dnd5e 5.x fields). */
+function classHitDice(actor) {
+	return listOf(read(actor, "system.attributes.hd.classes")).filter(isDocument).map((cls) => ({
+		id: cls.id,
+		denomination: asString(read(cls, "system.hd.denomination")),
+		levels: number$1(read(cls, "system.levels")),
+		spent: number$1(read(cls, "system.hd.spent"))
+	}));
+}
+/** What the roller and the blueprint's carrier can pay right now. */
+function costState(type, actor, info) {
+	const carrier = info.document;
+	const item = carrier.documentName === "Item" ? carrier : null;
+	const payer = [
+		"uses",
+		"quantity",
+		"effect"
+	].includes(type) ? carrier : actor;
+	const hp = read(actor, "system.attributes.hp");
+	const hd = read(actor, "system.attributes.hd");
+	return {
+		owner: payer.isOwner === true,
+		actorType: asString(read(actor, "type")),
+		uses: item ? {
+			value: number$1(read(item, "system.uses.value")),
+			max: number$1(read(item, "system.uses.max")),
+			limited: read(item, "hasLimitedUses") === true
+		} : null,
+		quantity: item && typeof read(item, "system.quantity") === "number" ? number$1(read(item, "system.quantity")) : null,
+		effect: carrier.documentName === "ActiveEffect" && effectExists(carrier),
+		slots: slotsOf(actor),
+		hp: hp ? {
+			value: number$1(read(hp, "value")),
+			temp: number$1(read(hp, "temp")),
+			max: number$1(read(hp, "max")),
+			tempmax: number$1(read(hp, "tempmax"))
+		} : null,
+		currency: numbersIn(read(actor, "system.currency")),
+		hitDice: hd ? {
+			value: number$1(read(hd, "value")),
+			max: number$1(read(hd, "max")),
+			bySize: numbersIn(read(hd, "bySize"))
+		} : null,
+		inspiration: read(actor, "system.attributes.inspiration") === true,
+		currencies: Object.keys(asRecord(CONFIG.DND5E.currencies)),
+		hitDieTypes: stringList(CONFIG.DND5E.hitDieTypes)
+	};
+}
+async function call$2(target, method, ...args) {
+	const fn = read(target, method);
+	if (typeof fn !== "function") throw new Error(`Build-n-Action | ${method} is not available`);
+	return fn.apply(target, args);
+}
+async function confirmDelete(document) {
+	return !!await call$2(document, "deleteDialog");
+}
+/** Pay a choice's cost; false when the player cancelled a confirmation. */
+async function payCost(cost, option, actor, info) {
+	const carrier = info.document;
+	switch (cost.type) {
+		case "none": return true;
+		case "uses": {
+			const spent = number$1(read(carrier, "system.uses.spent")) + option.amount;
+			if (spent >= number$1(read(carrier, "system.uses.max")) && read(carrier, "system.uses.autoDestroy") === true) return confirmDelete(carrier);
+			await carrier.update({ "system.uses.spent": spent });
+			return true;
+		}
+		case "quantity":
+			await carrier.update({ "system.quantity": number$1(read(carrier, "system.quantity")) - option.amount });
+			return true;
+		case "slots":
+			await actor.update({ [`system.spells.${option.value}.value`]: number$1(read(actor, `system.spells.${option.value}.value`)) - 1 });
+			return true;
+		case "health":
+			await call$2(actor, "applyDamage", option.amount);
+			return true;
+		case "effect": return confirmDelete(carrier);
+		case "inspiration":
+			await actor.update({ "system.attributes.inspiration": false });
+			return true;
+		case "currency":
+			await actor.update({ [`system.currency.${cost.subtype}`]: number$1(read(actor, `system.currency.${cost.subtype}`)) - option.amount });
+			return true;
+		case "hitdice":
+			await call$2(actor, "updateEmbeddedDocuments", "Item", hitDiceSpend(classHitDice(actor), cost.subtype, option.amount).map((entry) => ({
+				_id: entry.id,
+				"system.hd.spent": entry.spent
+			})));
+			return true;
+		default: return false;
+	}
+}
+//#endregion
+//#region src/foundry/choice-panel.ts
+var RESOURCE_LABELS = {
+	uses: "DND5E.Uses",
+	quantity: "DND5E.Quantity",
+	health: "DND5E.HitPoints",
+	hitdice: "DND5E.HitDice"
+};
+var provider = foundryChoices();
+function element(tag, className = "", text) {
+	const node = document.createElement(tag);
+	if (className) node.className = className;
+	if (text !== void 0) node.textContent = text;
+	return node;
+}
+function describe(intents, fmt) {
+	return intents.map((intent) => getResult(intent.type)?.phrase(intent.data, fmt) ?? intent.type).filter(Boolean).join("; ");
+}
+function capitalize(text) {
+	return text ? `${text[0]?.toUpperCase()}${text.slice(1)}` : text;
+}
+function optionLabel(cost, option, actor) {
+	if (cost.type === "slots") {
+		const level = asNumber(read(actor, `system.spells.${option.value}.level`)) ?? 0;
+		const leveled = /^spell\d+$/.test(option.value);
+		return game.i18n.format(leveled ? "DND5E.SpellLevelSpell" : `DND5E.SpellLevel${capitalize(option.value)}`, {
+			level: leveled ? game.i18n.localize(`DND5E.SpellLevel${level}`) : level,
+			n: option.available
+		});
+	}
+	const resource = RESOURCE_LABELS[cost.type] ?? (cost.type === "currency" ? asString(read(CONFIG.DND5E.currencies, `${cost.subtype}.label`)) : "");
+	return game.i18n.format("BNA.Panel.Option", {
+		amount: option.amount,
+		resource: game.i18n.localize(resource),
+		available: option.available
+	});
+}
+/** Roll data for a choice: the activity's when the blueprint is on the rolled item, else its origin's; plus @scaling. */
+function choiceData(info, ctx, scale) {
+	const { roller } = ctx;
+	const data = info.kind !== "template" && !!roller.activity && !!info.origin && info.origin.uuid === roller.item?.uuid ? rollDataOf(roller.activity) : originRollData(info.document);
+	data.scaling = new dnd5e.documents.Scaling(scale);
+	return data;
+}
+function applyChoice(pending, choice, info, scale, damageType, app) {
+	const config = read(app, "config");
+	if (!config) return;
+	const { ctx, tracker } = pending;
+	const start = (config.rolls ?? []).map((roll) => (roll.parts ?? []).length);
+	const criticalBefore = config.critical?.bonusDamage ?? "";
+	const earlier = [...tracker.active];
+	const data = choiceData(info, ctx, scale);
+	applyRollIntents(config, choice.intents, ctx, tracker, {
+		data,
+		damageType,
+		formula: (intent) => intent.type === "rollBonus" ? scaledFormula(asString(intent.data.formula), choice.cost.formula, data, scale) : void 0
+	});
+	const criticalChanged = (config.critical?.bonusDamage ?? "") !== criticalBefore;
+	for (const intent of earlier) applyModifiers(config, intent, ctx, tracker, start, criticalChanged);
+	const rebuild = read(app, "rebuild");
+	if (typeof rebuild === "function") rebuild.call(app);
+	announceApplied(choice.intents, pending.context);
+}
+async function onApply(host, choice, info, cost, section, controls) {
+	if (host.applied.has(choice.key)) return;
+	const { button } = controls;
+	const actor = host.ctx.roller.actor;
+	button.disabled = true;
+	try {
+		const state = costState(cost.type, actor, info);
+		const options = costOptions(cost, state);
+		const option = controls.amount ? options.find((entry) => entry.value === controls.amount?.value) : options[0];
+		if (!option || !costAvailable(cost, state)) {
+			ui.notifications.warn(game.i18n.localize("BNA.Panel.CannotPay"));
+			button.disabled = false;
+			return;
+		}
+		if (!await payCost(cost, option, actor, info)) {
+			button.disabled = false;
+			return;
+		}
+		await host.apply(choice, info, option.scale, controls.damageType?.value || void 0);
+		for (const intent of choice.intents) {
+			if (intent.common.limit === "none") continue;
+			recordUsage(actor, intent.blueprintId, intent.nodeId).catch((error) => console.warn("Build-n-Action | could not record a limited use", error));
+		}
+		host.applied.add(choice.key);
+		section.classList.add("is-applied");
+		button.textContent = game.i18n.localize("BNA.Panel.Applied");
+		for (const select of [controls.amount, controls.damageType]) if (select) select.disabled = true;
+	} catch (error) {
+		console.warn("Build-n-Action | could not apply a choice", error);
+		button.disabled = false;
+	}
+}
+function reminderNote(intent, host) {
+	const info = host.ctx.sources.get(intent.entry);
+	const note = element("aside", "bna-note");
+	note.append(element("strong", "", info?.blueprint.name || game.i18n.localize("BNA.Panel.Reminder")), asString(intent.data.text));
+	return note;
+}
+function choiceSection(choice, host, fmt) {
+	const first = choice.intents[0];
+	const info = first ? host.ctx.sources.get(first.entry) : void 0;
+	if (!info) return null;
+	const actor = host.ctx.roller.actor;
+	const originData = originRollData(info.document, true);
+	const cost = resolveCost(choice.cost, (formula) => simplifyNumber(formula, originData));
+	const state = costState(cost.type, actor, info);
+	const options = costOptions(cost, state);
+	if (!costAvailable(cost, state) || !options.length) return null;
+	const applied = host.applied.has(choice.key);
+	const section = element("section", applied ? "bna-choice is-applied" : "bna-choice");
+	section.dataset.key = choice.key;
+	const head = element("div", "bna-choice__head");
+	head.append(element("span", "bna-choice__name", info.blueprint.name || sourceLabel(info)), element("span", "bna-choice__from", sourceLabel(info)));
+	const description = element("div", "bna-choice__description");
+	section.append(head, element("p", "bna-choice__what", describe(choice.intents, fmt)), description);
+	if (info.blueprint.description) foundry.applications.ux.TextEditor.implementation.enrichHTML(info.blueprint.description, {
+		rollData: originData,
+		relativeTo: info.origin
+	}).then((html) => {
+		description.innerHTML = html;
+	}).catch(() => void 0);
+	const row = element("div", "bna-choice__controls");
+	const controls = {
+		button: element("button", "bna-choice__apply"),
+		amount: null,
+		damageType: null
+	};
+	if (costScales(cost, state)) {
+		controls.amount = element("select", "bna-choice__amount");
+		controls.amount.setAttribute("aria-label", game.i18n.localize("BNA.Panel.Amount"));
+		for (const option of options) controls.amount.append(new Option(optionLabel(cost, option, actor), option.value));
+		row.append(controls.amount);
+	}
+	const typed = host.ctx.event === "damageRoll" ? choice.intents.find((intent) => intent.type === "rollBonus" && asStrings(intent.data.damageTypes).length > 1) : void 0;
+	if (typed) {
+		controls.damageType = element("select", "bna-choice__type");
+		controls.damageType.setAttribute("aria-label", game.i18n.localize("BNA.Panel.DamageType"));
+		const labels = provider.choices("damageAndHealingTypes");
+		for (const type of asStrings(typed.data.damageTypes)) controls.damageType.append(new Option(labels.find((label) => label.value === type)?.label ?? type, type));
+		row.append(controls.damageType);
+	}
+	controls.button.type = "button";
+	controls.button.disabled = applied;
+	for (const select of [controls.amount, controls.damageType]) if (select) select.disabled = applied;
+	controls.button.textContent = game.i18n.localize(applied ? "BNA.Panel.Applied" : cost.type === "none" ? "BNA.Panel.Apply" : "BNA.Panel.Spend");
+	controls.button.addEventListener("click", () => {
+		onApply(host, choice, info, cost, section, controls);
+	});
+	row.append(controls.button);
+	section.append(row);
+	return section;
+}
+/** The "Build-n-Action" fieldset with reminders and choices; null when there is nothing to offer. */
+function renderChoices(host, sorted) {
+	const fmt = createPhraseFormatter(foundryTranslator, provider);
+	const panel = element("fieldset", "bna-surface bna-panel");
+	panel.append(element("legend", "", "Build-n-Action"));
+	for (const reminder of sorted.reminders) panel.append(reminderNote(reminder, host));
+	for (const choice of sorted.choices) {
+		const section = choiceSection(choice, host, fmt);
+		if (section) panel.append(section);
+	}
+	return panel.children.length > 1 ? panel : null;
+}
+function renderPanel(app) {
+	const pending = pendingRoll(read(app, `options.${MODULE_SCOPE}.pending`));
+	const root = read(app, "element");
+	if (!pending || !(root instanceof HTMLElement) || root.querySelector(".bna-panel")) return;
+	const panel = renderChoices({
+		ctx: pending.ctx,
+		applied: pending.applied,
+		apply: (choice, info, scale, damageType) => applyChoice(pending, choice, info, scale, damageType, app)
+	}, pending.sorted);
+	if (!panel) return;
+	const anchor = root.querySelector("fieldset[data-application-part=\"configuration\"]");
+	if (anchor) anchor.after(panel);
+	else (root.querySelector(".window-content") ?? root).append(panel);
+}
+function registerChoicePanel() {
+	Hooks.on("renderRollConfigurationDialog", (app) => guarded("roll dialog", () => renderPanel(app)));
+}
+//#endregion
+//#region src/foundry/header.ts
+var ICON = "fa-solid fa-diagram-project";
+/** The documents that carry blueprints and get the control (group actors excluded, as in v1). */
+function carrierOf(application) {
+	const document = read(application, "document");
+	if (!isDocument(document) || !carrierKind(document)) return null;
+	if (document.documentName === "Actor" && read(document, "type") === "group") return null;
+	return canEdit(document) ? document : null;
+}
+function open(document) {
+	openEditor(document).catch((error) => console.error("Build-n-Action | could not open the editor", error));
+}
+function headerControl(document, count) {
+	return {
+		action: "bnaOpenEditor",
+		icon: ICON,
+		label: count ? game.i18n.format("BNA.Header.labelCount", { count }) : game.i18n.localize("BNA.Header.label"),
+		onClick: () => open(document)
+	};
+}
+function addTitleButton(application, document) {
+	const element = read(application, "element");
+	if (!(element instanceof HTMLElement)) return;
+	const header = element.querySelector(".window-header");
+	if (!header || header.querySelector(".bna-header-button")) return;
+	const label = game.i18n.localize("BNA.Header.label");
+	const button = globalThis.document.createElement("button");
+	button.type = "button";
+	button.className = `header-control icon ${ICON} bna-header-button`;
+	button.dataset.tooltip = label;
+	button.setAttribute("aria-label", label);
+	button.addEventListener("click", (event) => {
+		event.preventDefault();
+		open(document);
+	});
+	const toggle = header.querySelector("[data-action='toggleControls']");
+	if (toggle) toggle.before(button);
+	else header.append(button);
+}
+function registerHeaderControls() {
+	Hooks.on("getHeaderControlsApplicationV2", (application, controls) => {
+		const document = carrierOf(application);
+		if (document) controls.unshift(headerControl(document, documentBlueprints(document).blueprints.length));
+	});
+	Hooks.on("renderApplicationV2", (application) => {
+		if (!setting(SETTINGS.headerLabel)) return;
+		const document = carrierOf(application);
+		if (document) addTitleButton(application, document);
+	});
+}
+//#endregion
+//#region src/foundry/preroll.ts
+function runRoll(event, config, dialog, message, roller) {
+	const activation = activationOf(config, message);
+	const evaluation = evaluateEvent(event, roller, ["out"], activation);
+	if (!evaluation?.chain.intents.length) return;
+	const process = config;
+	if (roller.target?.actor) injectTargetData(process, rollDataOf(roller.target.actor));
+	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
+	const ctx = {
+		event,
+		roller,
+		sources: evaluation.collected.sources
+	};
+	const tracker = {
+		active: [],
+		halted: /* @__PURE__ */ new Set()
+	};
+	applyRollIntents(process, sorted.immediate, ctx, tracker);
+	announceApplied(sorted.immediate, evaluation.context);
+	recordUsages(sorted.immediate, roller.actor);
+	const riders = [...new Set(sorted.immediate.flatMap((intent) => ctx.sources.get(intent.entry)?.rider?.id ?? []))];
+	if (riders.length) useRiders(roller.actor, riders).catch((error) => console.warn("Build-n-Action | could not use up riders", error));
+	if (!sorted.choices.length && !sorted.reminders.length || !dialog || typeof dialog !== "object") return;
+	const id = registerPending({
+		ctx,
+		sorted,
+		tracker,
+		applied: /* @__PURE__ */ new Set(),
+		context: evaluation.context
+	});
+	const holder = dialog;
+	const options = asRecord(holder.options);
+	holder.options = options;
+	options[MODULE_SCOPE] = { pending: id };
+	if (sorted.choices.length) holder.configure = true;
+}
+function itemOf(activity) {
+	const item = read(activity, "item");
+	return isDocument(item) ? item : null;
+}
+function actorOf(document) {
+	const actor = read(document, "actor");
+	return isDocument(actor) ? actor : null;
+}
+function subjectActor(config) {
+	const subject = read(config, "subject");
+	return isDocument(subject) && subject.documentName === "Actor" ? subject : null;
+}
+function activityRoll(event, config, dialog, message) {
+	const activity = read(config, "subject");
+	const item = itemOf(activity);
+	const actor = actorOf(item);
+	if (!item || !actor) return;
+	if (event === "attackRoll") rememberActivation(asString(read(activity, "uuid")), activationOf(config, message));
+	const target = resolveRollTarget(config, event === "damageRoll");
+	runRoll(event, config, dialog, message, makeRoller(actor, item, activity, target, { attackMode: asString(read(config, "attackMode")) || null }));
+}
 function preRollAttack(config, dialog, message) {
-  const item = config.subject?.item;
-  if (!item) return;
-
-  const subjects = {
-    activity: config.subject,
-    item: item,
-    actor: item.actor,
-    target: resolveRollTarget(config)
-  };
-  // get bonuses:
-  const rollData = config.subject.getRollData();
-  const spellLevel = rollData.item.level;
-  const bonuses = itemCheck(subjects, "attack", {spellLevel});
-  if (!bonuses.size) return;
-  _addTargetData(config, subjects.target);
-  requireOptionalRollDialog(dialog, bonuses);
-
-  // Gather up all bonuses.
-  const mods = {criticalSuccess: 0, criticalFailure: 0};
-  for (const bonus of bonuses.nonoptional) {
-    if (bonus.hasAdditiveBonus) {
-      appendRollPart(config, bonus.bonuses.bonus);
-    }
-    if (bonus.hasPropertyBonuses) {
-      mods.criticalSuccess += dnd5e.utils.simplifyBonus(bonus.bonuses.criticalRange, rollData);
-      mods.criticalFailure += dnd5e.utils.simplifyBonus(bonus.bonuses.fumbleRange, rollData);
-    }
-  }
-
-  const id = registry.register({
-    ...subjects,
-    bonuses: bonuses,
-    // Attack rolls do not yet preserve dice modifiers for later optional bonuses.
-    modifiers: new foundry.utils.Collection(),
-    spellLevel: spellLevel,
-    configurations: {config, dialog, message}
-  });
-
-  // Add parts.
-  foundry.utils.setProperty(dialog, `options.${MODULE.ID}.registry`, id);
-
-  adjustCriticalRanges(config, mods.criticalSuccess, mods.criticalFailure,
-    game.settings.get(MODULE.ID, SETTINGS.FUMBLE));
+	guarded("attack", () => activityRoll("attackRoll", config, dialog, message));
 }
-
-/* -------------------------------------------------- */
-
-/**
- * When you make a damage roll...
- * @param {DamageRollProcessConfiguration} config  Configuration data for the pending roll.
- * @param {BasicRollDialogConfiguration} dialog    Presentation data for the roll configuration dialog.
- * @param {BasicRollMessageConfiguration} message  Configuration data for the roll's message.
- */
 function preRollDamage(config, dialog, message) {
-  const item = config.subject?.item;
-  if (!item) return;
-
-  // get bonus:
-  const spellLevel = config.subject.getRollData().item.level;
-  const attackMode = config.attackMode ?? null;
-
-  const subjects = {
-    activity: config.subject,
-    item: item,
-    actor: item.actor,
-    target: resolveRollTarget(config, {preferHitTargets: true})
-  };
-  const bonuses = itemCheck(subjects, "damage", {spellLevel, attackMode});
-  if (!bonuses.size) return;
-  _addTargetData(config, subjects.target);
-  requireOptionalRollDialog(dialog, bonuses);
-
-  // Used in the optional selector to determine which bonuses have and still should apply dice modifications.
-  const modifiers = new foundry.utils.Collection();
-
-  const id = registry.register({
-    ...subjects,
-    spellLevel: spellLevel,
-    bonuses: bonuses,
-    modifiers: modifiers,
-    configurations: {config, dialog, message},
-    attackMode: attackMode
-  });
-  foundry.utils.setProperty(dialog, `options.${MODULE.ID}.registry`, id);
-
-  applyImmediateDamageBonuses(config, bonuses);
-  applyDamageDiceModifiers(config, bonuses, modifiers);
-  sanitizeCriticalBonuses(config);
+	guarded("damage", () => activityRoll("damageRoll", config, dialog, message));
 }
-
-/* -------------------------------------------------- */
-
-/**
- * When you roll a saving throw.
- * @param {SavingThrowRollProcessConfiguration} config  Configuration data for the pending roll.
- * @param {BasicRollDialogConfiguration} dialog         Presentation data for the roll configuration dialog.
- * @param {BasicRollMessageConfiguration} message       Configuration data for the roll's message.
- */
 function preRollSavingThrow(config, dialog, message) {
-  const actor = config.subject;
-  if (!actor) return;
-  const details = {
-    ability: config.ability,
-    isConcentration: config.isConcentration ?? config.hookNames?.includes("concentration") ?? false,
-    isDeath: config.hookNames?.includes("deathSave") ?? false
-  };
-
-  const subjects = {actor, target: resolveRollTarget(config)};
-  const bonuses = throwCheck(subjects, details);
-  if (!bonuses.size) return;
-  _addTargetData(config, subjects.target);
-  requireOptionalRollDialog(dialog, bonuses);
-
-  // Gather up all bonuses.
-  const accum = {targetValue: 0, critical: 0};
-  for (const bonus of bonuses.nonoptional) {
-    if (bonus.hasAdditiveBonus) {
-      appendRollPart(config, bonus.bonuses.bonus);
-    }
-    const rollData = config.rolls[0]?.data ?? actor.getRollData();
-    accum.targetValue += dnd5e.utils.simplifyBonus(bonus.bonuses.targetValue, rollData);
-    accum.critical += dnd5e.utils.simplifyBonus(bonus.bonuses.deathSaveCritical, rollData);
-  }
-
-  const id = registry.register({
-    actor: actor,
-    bonuses: bonuses,
-    // Saving throws do not yet preserve dice modifiers for later optional bonuses.
-    modifiers: new foundry.utils.Collection(),
-    details: details,
-    configurations: {config, dialog, message}
-  });
-
-  foundry.utils.setProperty(dialog, `options.${MODULE.ID}.registry`, id);
-
-  // Add modifiers to raise/lower the target value and critical threshold.
-  adjustSavingThrowRanges(config, accum.targetValue, accum.critical, details.isDeath);
+	guarded("saving throw", () => {
+		const actor = subjectActor(config);
+		if (!actor) return;
+		const hookNames = stringList(read(config, "hookNames"));
+		runRoll("savingThrow", config, dialog, message, makeRoller(actor, null, null, resolveRollTarget(config, false), {
+			saveAbility: asString(read(config, "ability")) || null,
+			isConcentration: read(config, "isConcentration") === true || hookNames.includes("concentration"),
+			isDeath: hookNames.includes("deathSave")
+		}));
+	});
 }
-
-/* -------------------------------------------------- */
-
-/**
- * When you roll an ability, skill, or tool check.
- * @param {AbilityCheckRollProcessConfiguration} config  Configuration data for the pending roll.
- * @param {BasicRollDialogConfiguration} dialog          Presentation data for the roll configuration dialog.
- * @param {BasicRollMessageConfiguration} message        Configuration data for the roll's message.
- */
 function preRollAbilityCheck(config, dialog, message) {
-  const actor = config.subject;
-  if (!actor) return;
-  const subjects = {
-    actor: actor,
-    item: config.item,
-    target: resolveRollTarget(config)
-  };
-  const details = {
-    abilityId: config.ability,
-    skillId: config.skill,
-    toolId: config.tool
-  };
-  const bonuses = testCheck(subjects, details);
-  if (!bonuses.size) return;
-  _addTargetData(config, subjects.target);
-  requireOptionalRollDialog(dialog, bonuses);
-
-  for (const bonus of bonuses.nonoptional) {
-    if (bonus.hasAdditiveBonus) {
-      appendRollPart(config, bonus.bonuses.bonus);
-    }
-  }
-
-  const id = registry.register({
-    ...subjects,
-    bonuses: bonuses,
-    // Ability checks do not yet preserve dice modifiers for later optional bonuses.
-    modifiers: new foundry.utils.Collection(),
-    details: details,
-    configurations: {config, dialog, message}
-  });
-
-  foundry.utils.setProperty(dialog, `options.${MODULE.ID}.registry`, id);
+	guarded("ability check", () => {
+		const actor = subjectActor(config);
+		if (!actor) return;
+		const item = read(config, "item");
+		runRoll("abilityCheck", config, dialog, message, makeRoller(actor, isDocument(item) ? item : null, null, resolveRollTarget(config, false), {
+			abilityId: asString(read(config, "ability")) || null,
+			skillId: asString(read(config, "skill")) || null,
+			toolId: asString(read(config, "tool")) || null
+		}));
+	});
 }
-
-/* -------------------------------------------------- */
-
-/**
- * When you roll a hit die...
- * @param {HitDieRollProcessConfiguration} config  Configuration information for the roll.
- * @param {BasicRollDialogConfiguration} dialog    Configuration for the roll dialog.
- * @param {BasicRollMessageConfiguration} message  Configuration for the roll message.
- */
 function preRollHitDie(config, dialog, message) {
-  const actor = config.subject;
-  if (!actor) return;
-  const subjects = {actor, target: resolveRollTarget(config)};
-  const bonuses = hitDieCheck(subjects);
-  if (!bonuses.size) return;
-  _addTargetData(config, subjects.target);
-  requireOptionalRollDialog(dialog, bonuses);
-
-  const modifiers = new foundry.utils.Collection();
-  const id = registry.register({
-    actor: actor,
-    bonuses: bonuses,
-    modifiers: modifiers,
-    configurations: {config, dialog, message}
-  });
-  foundry.utils.setProperty(dialog, `options.${MODULE.ID}.registry`, id);
-
-  for (const bonus of bonuses.nonoptional) {
-    if (bonus.hasAdditiveBonus) {
-      appendRollPart(config, bonus.bonuses.bonus);
-    }
-  }
-
-  // Add die modifiers.
-  for (const bonus of bonuses.nonoptional) {
-    if (!bonus.hasDiceModifiers) continue;
-    for (const {parts, data} of config.rolls) {
-      if (bonus._halted) break;
-      const halted = bonus.bonuses.modifiers.modifyParts(parts, data);
-      if (halted) bonus._halted = true;
-    }
-    if (!bonus._halted) modifiers.set(bonus.uuid, bonus);
-  }
-
+	guarded("hit die", () => {
+		const actor = subjectActor(config);
+		if (!actor) return;
+		runRoll("hitDie", config, dialog, message, makeRoller(actor, null, null, resolveRollTarget(config, false), {}));
+	});
 }
-
-/* -------------------------------------------------- */
-
-/**
- * Inject buildNAction data on templates created by items.
- * @param {Activity} activity       Activity for which the template is being placed.
- * @param {object} templateData     Data used to create the new template.
- */
+function postActivityConsumption(activity, usageConfig) {
+	guarded("save DC", () => {
+		if (read(activity, "type") !== "save") return;
+		const item = itemOf(activity);
+		const actor = actorOf(item);
+		if (!item || !actor) return;
+		const roller = makeRoller(actor, item, activity, resolveRollTarget(usageConfig, false), {}, true);
+		const evaluation = evaluateEvent("saveDC", roller);
+		const intents = evaluation ? allowIntents(evaluation.chain.intents, evaluation.context) : [];
+		applySaveDC(activity, intents, {
+			event: "saveDC",
+			roller,
+			sources: evaluation?.collected.sources ?? /* @__PURE__ */ new Map()
+		});
+		if (evaluation) announceApplied(intents, evaluation.context);
+		recordUsages(intents, actor);
+	});
+}
+function usesTemplateReach(blueprint) {
+	return blueprint.nodes.some((node) => node.kind === "event" && asString(asRecord(node.data.reach).mode) === "template");
+}
+/** Copy the item's template-reach blueprints (and the placer's disposition) onto the new template. */
 function preCreateActivityTemplate(activity, templateData) {
-  const item = activity.item;
-  if (!item?.isEmbedded) return;
-  const [tokenDocument] = item.actor.isToken ? [item.actor.token] : item.actor.getActiveTokens(false, true);
-  const disp = tokenDocument?.disposition ?? item.actor.prototypeToken.disposition;
-
-  const bonusData = getCollection(item).reduce((acc, bonus) => {
-    if (bonus.aura.isTemplate) acc.push(bonus.toObject());
-    return acc;
-  }, []);
-  if (foundry.utils.isEmpty(bonusData)) return;
-  foundry.utils.setProperty(templateData, `flags.${MODULE.ID}`, {
-    bonuses: bonusData,
-    templateDisposition: disp
-  });
+	guarded("template", () => {
+		const item = itemOf(activity);
+		const actor = actorOf(item);
+		if (!item || !actor || !templateData || typeof templateData !== "object") return;
+		const blueprints = documentBlueprints(item).blueprints.filter(usesTemplateReach);
+		if (!blueprints.length) return;
+		const getActiveTokens = read(actor, "getActiveTokens");
+		const token = read(actor, "isToken") === true ? read(actor, "token") : typeof getActiveTokens === "function" ? listOf(getActiveTokens.call(actor, false, true))[0] : null;
+		const disposition = asNumber(read(token, "disposition")) ?? asNumber(read(actor, "prototypeToken.disposition"));
+		const data = templateData;
+		const flags = asRecord(data.flags);
+		data.flags = flags;
+		flags[MODULE_SCOPE] = {
+			...asRecord(flags[MODULE_SCOPE]),
+			blueprints: structuredClone(blueprints),
+			templateDisposition: disposition
+		};
+	});
 }
-
-/* -------------------------------------------------- */
-
-/**
- * Add the target's roll data to the actor's roll data.
- * @param {object} config               The roll config for this roll. **will be mutated**
- * @param {Token5e|null} target         The authoritative target for this roll.
- * @param {boolean} [deterministic]     Whether to force flat values for properties that could be a die or flat term.
- */
-function _addTargetData(config, target, deterministic = false) {
-  if (target?.actor) {
-    const targetData = target.actor.getRollData({deterministic});
-    injectTargetData(config, targetData);
-  }
+function registerPreRollHooks() {
+	Hooks.on("dnd5e.preRollAttack", preRollAttack);
+	Hooks.on("dnd5e.preRollDamage", preRollDamage);
+	Hooks.on("dnd5e.preRollSavingThrow", preRollSavingThrow);
+	Hooks.on("dnd5e.preRollAbilityCheck", preRollAbilityCheck);
+	Hooks.on("dnd5e.preRollHitDie", preRollHitDie);
+	Hooks.on("dnd5e.postActivityConsumption", postActivityConsumption);
+	Hooks.on("dnd5e.preCreateActivityTemplate", preCreateActivityTemplate);
+	Hooks.on("dnd5e.restCompleted", (actor, result) => {
+		countRest(actor, result).catch((error) => console.warn("Build-n-Action | could not count a rest", error));
+	});
 }
-
-/* -------------------------------------------------- */
-
-var mutators = {
-  postActivityConsumption,
-  preCreateActivityTemplate,
-  preRollAbilityCheck,
-  preRollAttack,
-  preRollDamage,
-  preRollHitDie,
-  preRollSavingThrow
-};
-
-/**
- * Normalize a selectable consumption amount and its resulting bonus scale.
- *
- * @param {object} options
- * @param {boolean} options.scales
- * @param {string|number} options.scaleValue
- * @param {number} options.minimum
- * @param {number} [options.step]
- * @returns {{value: number, scale: number}}
- */
-function calculateConsumptionScale({scales, scaleValue, minimum, step = 1}) {
-  const value = Number.parseInt(scales ? scaleValue : minimum);
-  const scale = scales ? Math.floor((value - minimum) / step) : 0;
-  return {value, scale};
+//#endregion
+//#region src/runtime/outcomes.ts
+/** Pins of an attack against one target: a critical always hits, a fumble always misses. */
+function attackPins(result) {
+	if (result.isFumble) return ["miss", "fumble"];
+	if (result.isCritical) return ["hit", "crit"];
+	if (result.total === null || result.targetAc === null) return [];
+	return result.total >= result.targetAc ? ["hit"] : ["miss"];
 }
-
-/**
- * Calculate the document update for item-use or quantity consumption.
- *
- * @param {"uses"|"quantity"} type
- * @param {Item5e} item
- * @param {number} value
- * @returns {{property: string, newValue: number}}
- */
-function calculateItemConsumption(type, item, value) {
-  if (type === "uses") {
-    return {
-      property: "system.uses.spent",
-      newValue: item.system.uses.spent + value
-    };
-  }
-  return {
-    property: "system.quantity",
-    newValue: item.system.quantity - value
-  };
+/** Pins when Midi QOL has decided whether the attack hit this target. */
+function midiAttackPins(hit, isCritical, isFumble) {
+	const pins = [hit ? "hit" : "miss"];
+	if (hit && isCritical) pins.push("crit");
+	if (isFumble) pins.push("fumble");
+	return pins;
 }
-
-/**
- * Allocate hit-die consumption across eligible classes.
- *
- * @param {Item5e[]} classes
- * @param {string} subtype
- * @param {number} amount
- * @returns {object[]}
- */
-function buildHitDiceUpdates(classes, subtype, amount) {
-  const denominator = ["smallest", "largest"].includes(subtype) ? null : subtype;
-  let eligible = classes.filter(cls => !denominator || (cls.system.hitDice === denominator));
-  if (["smallest", "largest"].includes(subtype)) {
-    eligible = [...eligible].sort((left, right) => {
-      const order = left.system.hitDice.localeCompare(right.system.hitDice, "en", {numeric: true});
-      return subtype === "largest" ? -order : order;
-    });
-  }
-
-  const updates = [];
-  let remaining = Number.parseInt(amount);
-  for (const cls of eligible) {
-    const available = ((remaining > 0) ? cls.system.levels : 0) - cls.system.hitDiceUsed;
-    const delta = (remaining > 0) ? Math.min(remaining, available) : Math.max(remaining, available);
-    if (!delta) continue;
-    updates.push({_id: cls.id, "system.hitDiceUsed": cls.system.hitDiceUsed + delta});
-    remaining -= delta;
-    if (!remaining) break;
-  }
-  return updates;
+function savePins(success) {
+	return [success ? "succeeded" : "failed"];
 }
-
-class OptionalSelector {
-  /**
-   * @constructor
-   * @param {string} id     Id for the registry.
-   */
-  constructor(id) {
-    const registered = registry.get(id);
-    this.#registry = registered;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The optional bonuses.
-     * @type {Collection<ContextualBonus>}
-     */
-    this.optionals = registered.bonuses.optionals;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The bonuses that just serve as reminders
-     * @type {Collection<ContextualBonus>}
-     */
-    this.reminders = registered.bonuses.reminders;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The actor performing the roll.
-     * @type {Actor5e}
-     */
-    this.actor = registered.actor;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The item being used.
-     * @type {Item5e|void}
-     */
-    this.item = registered.item;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The activity being used.
-     * @type {Activity|void}
-     */
-    this.activity = registered.activity;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The spell level of any item being rolled.
-     * @type {number}
-     */
-    this.level = registered.spellLevel;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * Placeholder variable for the appended content.
-     * @type {HTMLElement}
-     */
-    this.form = null;
-
-    /* -------------------------------------------------- */
-
-    /**
-     * The dialog being appended to.
-     * @type {Dialog}
-     */
-    this.dialog = registered.dialog;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-     * The retrieved registry.
-     * @type {object}
-     */
-  #registry = null;
-
-  /* -------------------------------------------------- */
-
-  /** @override */
-  get template() {
-    return `modules/${MODULE.ID}/templates/subapplications/optional-selector.hbs`;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * The situational bonus field to append bonuses to.
-   * @type {HTMLElement}
-   */
-  get field() {
-    return this.dialog.element[0]?.querySelector?.("[name=bonus]") ?? null;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Custom helper method for retrieving all the data for the template.
-   * @returns {Promise<object>}
-   */
-  async getData() {
-    const bonuses = [];
-    for (const bonus of this.optionals) {
-
-      // For bonuses that consume, skip them if they are invalid.
-      if (bonus.consume.enabled) {
-        const valid = this.testMinimumConsumption(bonus);
-        if (!valid) continue;
-      }
-
-      const data = {
-        tooltip: this._getTooltip(bonus),
-        buildNAction: bonus,
-        name: bonus.name.replaceAll("'", "\\'"),
-        label: `BUILD_N_ACTION.OptionalSelector.Label${bonus.consume.enabled ? "Consume" : "Apply"}`,
-        description: await foundry.applications.ux.TextEditor.implementation.enrichHTML(bonus.description, {
-          rollData: bonus.getRollData(), relativeTo: bonus.origin
-        })
-      };
-      if (bonus.consume.enabled) {
-        const type = ["uses", "quantity"].includes(bonus.consume.type) ? "item" : bonus.consume.type;
-        data.scales = this.doesBonusScale(bonus);
-        data.action = data.scales ? `consume-${type}-scale` : `consume-${type}`;
-        data.options = data.scales ? this._constructScalingOptions(bonus) : null;
-
-        data.scaleValue = new foundry.data.fields.StringField({required: true, choices: data.options});
-        data.scaleDataset = {select: "scaleValue"};
-      } else {
-        data.action = "consume-none";
-      }
-
-      // Has multiple damage types
-      if (bonus.bonuses.damageType?.size > 1) {
-        const choices = {};
-        for (const type of bonus.bonuses.damageType) {
-          const label = CONFIG.DND5E.damageTypes[type].label;
-          if (label) choices[type] = label;
-        }
-        data.damageTypes = new foundry.data.fields.StringField({required: true, choices: choices});
-        data.damageTypeDataset = {select: "damageType"};
-      }
-
-      bonuses.push(data);
-    }
-
-    const reminders = [];
-    for (const reminder of this.reminders) {
-      reminders.push({
-        uuid: reminder.uuid,
-        name: reminder.name.replaceAll("'", "\\'"),
-        description: await foundry.applications.ux.TextEditor.implementation.enrichHTML(reminder.description, {
-          rollData: reminder.getRollData(), relativeTo: reminder.origin
-        })
-      });
-    }
-
-    return {bonuses, reminders};
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Does the bonus scale?
-   * @param {ContextualBonus} bonus     A bonus to test.
-   * @returns {boolean}         Whether it is set up to scale.
-   */
-  doesBonusScale(bonus) {
-    if (!bonus.consume.scales || !bonus.consume.isValidConsumption) return false;
-
-    // Cannot scale.
-    if (["effect", "inspiration"].includes(bonus.consume.type)) return false;
-
-    // Requires step.
-    if (["health", "currency"].includes(bonus.consume.type)) return bonus.consume.value.step > 0;
-
-    // The rest scale easily.
-    return true;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Helper method to activate listeners on the optional bonuses' buttons.
-   * @param {HTMLElement} html     The entire list of html injected onto the dialog.
-   */
-  activateListeners(html) {
-    html.querySelectorAll("[data-action^='consume']").forEach(n => {
-      n.addEventListener("click", this._onApplyOption.bind(this));
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Custom rendering method.
-   * @returns {Promise}
-   */
-  async render() {
-    const isV2 = !!this.dialog.element?.classList?.contains("dnd5e2");
-    const root = isV2 ? this.dialog.element : this.dialog.element?.[0];
-
-    // Applying an optional bonus rebuilds the dialog, which re-fires the render hook.
-    // The injected element survives that rebuild and records which optionals were already
-    // applied, so injecting a second copy would stack duplicate blocks and let the same
-    // bonus be applied - and its resource consumed - again on every rebuild.
-    if (root?.querySelector(`.${MODULE.ID}.optionals`)) return;
-
-    this.form = document.createElement(isV2 ? "FIELDSET" : "DIV");
-
-    if (isV2) this.form.insertAdjacentHTML("beforeend", `<legend>${MODULE.NAME}</legend>`);
-    this.form.classList.add(MODULE.ID, "optionals");
-
-    const data = await this.getData();
-    if (!data.bonuses.length && !data.reminders.length) return;
-    data.isV2 = isV2;
-    this.form.insertAdjacentHTML(
-      "beforeend",
-      await foundry.applications.handlebars.renderTemplate(this.template, data)
-    );
-    this.activateListeners(this.form);
-
-    if (isV2) {
-      const group = root.querySelector("fieldset[data-application-part=configuration]");
-      group.insertAdjacentElement("afterend", this.form);
-    } else {
-      const group = root.querySelector(".dialog-content > form");
-      group.append(this.form);
-      this.dialog.setPosition({height: "auto"});
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get a tooltip for an optional bonus' origin.
-   * @param {ContextualBonus} bonus     The buildNAction.
-   * @returns {string}          A localized string.
-   */
-  _getTooltip(bonus) {
-    let name;
-    const docName = bonus.parent.constructor.documentName;
-    if (bonus.parent instanceof MeasuredTemplateDocument) {
-      name = game.i18n.localize(`DOCUMENT.${docName}`);
-    } else {
-      name = `${bonus.parent.name} (${game.i18n.localize(`DOCUMENT.${docName}`)})`;
-    }
-    return game.i18n.format("BUILD_N_ACTION.OriginName", {name});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Display a warning about lack of limited uses, quantity, spell slots, or missing effect.
-   * @param {string} type     The consumption type of the buildNAction.
-   */
-  _displayConsumptionWarning(type) {
-    ui.notifications.warn(`BUILD_N_ACTION.Warning.Consuming.${type.capitalize()}Unavailable`, {localize: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Construct options for a scaling bonus.
-   * @param {ContextualBonus} bonus     The bonus.
-   * @returns {string}          The string of select options.
-   */
-  _constructScalingOptions(bonus) {
-    switch (bonus.consume.type) {
-      case "uses":
-      case "quantity":
-        return this._constructItemOptions(bonus);
-      case "slots":
-        return this._constructSlotOptions(bonus);
-      case "health":
-        return this._constructHealthOptions(bonus);
-      case "currency":
-        return this._constructCurrencyOptions(bonus);
-      case "hitdice":
-        return this._constructHitDiceOptions(bonus);
-      default:
-        return null;
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  _constructItemOptions(bonus) {
-    const isUses = bonus.consume.type === "uses";
-    const item = bonus.item;
-    const available = isUses ? item.system.uses.value : item.system.quantity;
-    const capacity = isUses ? item.system.uses.max : item.system.quantity;
-    if (available <= 0) return {};
-    const min = bonus.consume.value.min || 1;
-    const max = bonus.consume.value.max || Infinity;
-    return Array.fromRange(available, 1).reduce((options, n) => {
-      if (!n.between(min, max)) return options;
-      options[n] = game.i18n.format("BUILD_N_ACTION.ConsumptionOption", {
-        value: n,
-        label: game.i18n.format(isUses ? "DND5E.Uses" : "DND5E.Quantity"),
-        max: isUses ? `${available}/${capacity}` : available
-      });
-      return options;
-    }, {});
-  }
-
-  /* -------------------------------------------------- */
-
-  _constructSlotOptions(bonus) {
-    // The option value is the spell property key, such as "spell3" or "pact".
-    const entries = Object.entries(this.actor.system.spells).reduce((options, [key, slot]) => {
-      if (!slot.value || !slot.max || !slot.level || (slot.level < (bonus.consume.value.min || 1))) {
-        return options;
-      }
-      // dnd5e labels a leveled slot with DND5E.SpellLevelSpell and a pact slot with
-      // DND5E.SpellLevelPact; there is no "...Slot" key, so that suffix rendered raw.
-      const isLeveled = /spell[0-9]+/.test(key);
-      options[key] = game.i18n.format(`DND5E.SpellLevel${isLeveled ? "Spell" : key.capitalize()}`, {
-        level: isLeveled ? game.i18n.localize(`DND5E.SpellLevel${slot.level}`) : slot.level,
-        n: `${slot.value}/${slot.max}`
-      });
-      return options;
-    }, {});
-    return dnd5e.utils.sortObjectEntries(entries);
-  }
-
-  /* -------------------------------------------------- */
-
-  _constructHealthOptions(bonus) {
-    const value = bonus.consume.value;
-    const hp = this.actor.system.attributes.hp;
-    const available = Math.max(0, hp.value) + Math.max(0, hp.temp);
-    const capacity = Math.max(0, hp.max) + Math.max(0, hp.tempmax);
-    if ((available < value.min) || !(value.step > 0)) return {};
-    const options = {};
-    for (let i = value.min || 1; i <= Math.min(available, value.max || capacity); i += value.step) {
-      options[i] = game.i18n.format("BUILD_N_ACTION.ConsumptionOption", {
-        value: i,
-        label: game.i18n.localize("DND5E.HitPoints"),
-        max: `${available}/${capacity}`
-      });
-    }
-    return options;
-  }
-
-  /* -------------------------------------------------- */
-
-  _constructCurrencyOptions(bonus) {
-    const value = bonus.consume.value;
-    const subtype = bonus.consume.subtype;
-    const available = this.actor.system.currency[subtype];
-    if ((available < value.min) || !(value.step > 0)) return {};
-    const options = {};
-    for (let i = value.min || 1; i <= Math.min(available, value.max || Infinity); i += value.step) {
-      options[i] = game.i18n.format("BUILD_N_ACTION.ConsumptionOption", {
-        value: i,
-        label: CONFIG.DND5E.currencies[subtype].label,
-        max: available
-      });
-    }
-    return options;
-  }
-
-  /* -------------------------------------------------- */
-
-  _constructHitDiceOptions(bonus) {
-    const value = bonus.consume.value;
-    const subtype = bonus.consume.subtype;
-    const hd = this.actor.system.attributes.hd;
-    const isSizeSelector = ["largest", "smallest"].includes(subtype);
-    const available = isSizeSelector ? hd.value : hd.bySize[subtype];
-    const max = Math.min(value.max || Infinity, available);
-    const label = isSizeSelector
-      ? game.i18n.localize(`DND5E.ConsumeHitDice${subtype.capitalize()}`)
-      : `${game.i18n.localize("DND5E.HitDice")} (${subtype})`;
-    return Array.fromRange(max + 1 - value.min, value.min).reduce((options, n) => {
-      options[n] = game.i18n.format("BUILD_N_ACTION.ConsumptionOption", {
-        value: n,
-        label,
-        max: isSizeSelector ? `${hd.value}/${hd.max}` : available
-      });
-      return options;
-    }, {});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Is consumption valid and allowed?
-   * @param {ContextualBonus} bonus
-   * @returns {boolean}
-   */
-  testMinimumConsumption(bonus) {
-    const target = ["uses", "quantity", "effect"].includes(bonus.consume.type) ? bonus.parent : this.actor;
-    return bonus.consume.canActorConsume(this.actor) && bonus.consume.canBeConsumed(target);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Apply an optional bonus. Depending on the bonus, consume a document or property and scale the applied value.
-   * @param {Event} event     The initiating click event.
-   */
-  async _onApplyOption(event) {
-    const button = event.currentTarget;
-    button.disabled = true;
-    const container = button.closest(".optional");
-    const bonus = this.optionals.get(container.dataset.bonusUuid);
-    const context = {
-      bonus,
-      button,
-      damageType: this.#getDamageType(bonus, container),
-      maximum: bonus.consume.value.max || Infinity,
-      minimum: Number.parseInt(bonus.consume.value.min || 1),
-      scales: button.dataset.action.endsWith("-scale"),
-      scaleValue: container.querySelector("[data-select=scaleValue]")?.value
-    };
-    const type = (button.dataset.action === "consume-none") ? "none" : bonus.consume.type;
-    const handlers = {
-      uses: this.#consumeItem.bind(this),
-      quantity: this.#consumeItem.bind(this),
-      slots: this.#consumeSpellSlot.bind(this),
-      health: this.#consumeHealth.bind(this),
-      effect: this.#consumeEffect.bind(this),
-      inspiration: this.#consumeInspiration.bind(this),
-      currency: this.#consumeCurrency.bind(this),
-      hitdice: this.#consumeHitDice.bind(this)
-    };
-    await (handlers[type] ?? this.#consumeNothing.bind(this))({...context, type});
-  }
-
-  #getDamageType(bonus, container) {
-    if (bonus.type !== "damage") return undefined;
-    const selected = container.querySelector("[data-select=damageType]")?.value;
-    return selected || bonus.bonuses.damageType.first();
-  }
-
-  async #consumeItem(context) {
-    const {bonus, button, minimum, scales, scaleValue, type} = context;
-    const value = Number.parseInt(scales ? scaleValue : minimum);
-    const {property, newValue} = calculateItemConsumption(type, bonus.item, value);
-    if ((newValue === 0) && (type === "uses") && bonus.item.system.uses.autoDestroy) {
-      if (!await bonus.item.deleteDialog()) {
-        button.disabled = false;
-        return;
-      }
-    } else {
-      await bonus.item.update({[property]: newValue});
-    }
-    this.#finishConsumption(context, bonus.item, scales ? value - minimum : 0);
-  }
-
-  async #consumeSpellSlot(context) {
-    const {bonus, maximum, minimum, scales, scaleValue} = context;
-    const key = scales ? scaleValue : this._getLowestValidSpellSlotProperty(bonus);
-    const spell = this.actor.system.spells[key];
-    const scale = scales ? Math.min(spell.level - minimum, maximum - 1) : 0;
-    await this.actor.update({[`system.spells.${key}.value`]: spell.value - 1});
-    this.#finishConsumption(context, this.actor, scale);
-  }
-
-  async #consumeHealth(context) {
-    const {value, scale} = calculateConsumptionScale({
-      scales: context.scales,
-      scaleValue: context.scaleValue,
-      minimum: context.minimum,
-      step: context.bonus.consume.value.step
-    });
-    await this.actor.applyDamage(value);
-    this.#finishConsumption(context, this.actor, scale);
-  }
-
-  async #consumeEffect(context) {
-    if (!await context.bonus.effect.deleteDialog()) {
-      context.button.disabled = false;
-      return;
-    }
-    this.#finishConsumption(context, context.bonus.effect, 0);
-  }
-
-  async #consumeInspiration(context) {
-    await this.actor.update({"system.attributes.inspiration": false});
-    this.#finishConsumption(context, this.actor, 0);
-  }
-
-  async #consumeCurrency(context) {
-    const {bonus} = context;
-    const {value, scale} = calculateConsumptionScale({
-      scales: context.scales,
-      scaleValue: context.scaleValue,
-      minimum: context.minimum,
-      step: bonus.consume.value.step
-    });
-    const currency = this.actor.system.currency[bonus.consume.subtype];
-    await this.actor.update({[`system.currency.${bonus.consume.subtype}`]: currency - value});
-    this.#finishConsumption(context, this.actor, scale);
-  }
-
-  async #consumeHitDice(context) {
-    const value = Number.parseInt(context.scales ? context.scaleValue : context.minimum);
-    const updates = buildHitDiceUpdates(
-      Object.values(this.actor.classes),
-      context.bonus.consume.subtype,
-      value
-    );
-    await this.actor.updateEmbeddedDocuments("Item", updates);
-    this.#finishConsumption(context, this.actor, context.scales ? value - context.minimum : 0);
-  }
-
-  async #consumeNothing(context) {
-    this.#finishConsumption(context, null, 0);
-  }
-
-  #finishConsumption(context, consumer, scale) {
-    const config = {bonus: this._scaleOptionalBonus(context.bonus, scale)};
-    const apply = this.callHook(context.bonus, consumer, config);
-    this._appendToField({
-      buildNAction: context.bonus,
-      target: context.button,
-      bonus: config.bonus,
-      apply,
-      damageType: context.damageType,
-      scale
-    });
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Return an upscaled bonus given a base and a number to multiply with. If 'scale' is 0, the default bonus is returned
-   * and no scaling is performed. Evaluating roll data properties is necessary here, otherwise scaling will not work. It is
-   * also needed for bonuses that do not scale, since they may be affected by dice modifiers.
-   * @param {ContextualBonus} bonus     The buildNAction.
-   * @param {number} scale      The number to upscale by multiplicatively.
-   * @returns {string}          The upscaled bonus, simplified, and with the base attached.
-   */
-  _scaleOptionalBonus(bonus, scale) {
-    const bonusFormula = scale ? (bonus.consume.formula || bonus.bonuses.bonus) : bonus.bonuses.bonus;
-    const data = this._getRollData(bonus, scale);
-    const roll = new CONFIG.Dice.DamageRoll(bonusFormula, data);
-    if (!scale) return roll.formula;
-    const formula = roll.alter(scale, 0, {multiplyNumeric: true}).formula;
-    const base = Roll.replaceFormulaData(bonus.bonuses.bonus, data);
-    return dnd5e.dice.simplifyRollFormula(`${base} + ${formula}`, {preserveFlavor: true});
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Appends a bonus to the situational bonus field. If the field is empty, don't add a leading sign.
-   * On the new roll configuration dialog, simply append to a roll's parts rather than paste into the field.
-   * @param {object} config                   Appending configuration data.
-   * @param {ContextualBonus} config.buildNAction          The ContextualBonus.
-   * @param {HTMLElement} config.target       The target of the initiating click event.
-   * @param {string} [config.bonus]           The bonus to add (not required if the type supports modifiers).
-   * @param {boolean} [config.apply]          Whether the bonus should be applied.
-   * @param {string} [config.damageType]      A selected damage type (required if a damage bonus).
-   * @param {number} [scale]                  Upscaling property.
-   */
-  _appendToField({buildNAction, target, bonus, apply = true, damageType, scale = 0}) {
-    if (!apply) return;
-    this.#applyPropertyModifications(buildNAction, scale);
-    this.#applyAdditiveBonus(buildNAction, bonus, damageType, scale);
-    this.#applyDiceModifications(buildNAction, scale);
-    this.dialog.rebuild?.();
-    target.closest(".optional").classList.toggle("active", true);
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Apply property modifications such as critical threshold.
-   * @param {ContextualBonus} bonus       The bonus being applied.
-   * @param {number} [scale]      Upscaling property.
-   */
-  #applyPropertyModifications(bonus, scale) {
-    const config = this.dialog.config;
-    const rollData = this._getRollData(bonus, scale);
-
-    switch (bonus.type) {
-      case "attack": {
-        const critical = dnd5e.utils.simplifyBonus(bonus.bonuses.criticalRange, rollData);
-        const fumble = dnd5e.utils.simplifyBonus(bonus.bonuses.fumbleRange, rollData);
-        adjustCriticalRanges(config, critical, fumble, game.settings.get(MODULE.ID, SETTINGS.FUMBLE));
-        break;
-      }
-      case "damage":
-        if (!config.critical) config.critical = {};
-        if (bonus.bonuses.criticalBonusDamage) {
-          const addition = Roll.replaceFormulaData(bonus.bonuses.criticalBonusDamage, rollData);
-          config.critical.bonusDamage = config.critical.bonusDamage ?
-            `${config.critical.bonusDamage} + ${addition}` :
-            addition;
-        }
-        if (bonus.bonuses.criticalBonusDice) {
-          const addition = Roll.create(bonus.bonuses.criticalBonusDice, rollData).evaluateSync({strict: false}).total;
-          config.critical.bonusDice = config.critical.bonusDice ? config.critical.bonusDice + addition : addition;
-        }
-        break;
-      case "throw": {
-        const target = dnd5e.utils.simplifyBonus(bonus.bonuses.targetValue, rollData);
-        const critical = dnd5e.utils.simplifyBonus(bonus.bonuses.deathSaveCritical, rollData);
-        adjustSavingThrowRanges(config, target, critical, this.#registry.details?.isDeath);
-        break;
-      }
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Apply the additive bonus of a buildNAction when it is toggled active.
-   * @param {ContextualBonus} buildNAction         The bonus being toggled active.
-   * @param {string} bonus            The additive bonus.
-   * @param {string} [damageType]     A selected damage type (required if damage bonus).
-   * @param {number} [scale]          Upscaling property.
-   */
-  #applyAdditiveBonus(buildNAction, bonus, damageType, scale) {
-    if (!buildNAction.hasAdditiveBonus) return;
-
-    // Legacy roll dialogs expose an input field instead of config.rolls.
-    const field = this.field;
-
-    if (field) {
-      if (!field.value.trim()) field.value = bonus;
-      else field.value = `${field.value.trim()} + ${bonus}`;
-      return;
-    }
-
-    const roll = this.dialog.config.rolls.find(config => {
-      if (!damageType) return true;
-      const types = config.options.types;
-      return (types.length === 1) && (types[0] === damageType);
-    });
-
-    if (roll) roll.parts.push(bonus);
-    else {
-      this.dialog.config.rolls.push({
-        data: this._getRollData(buildNAction, scale),
-        parts: [bonus],
-        options: {
-          properties: [...this.dialog.config.rolls[0].options.properties ?? []],
-          type: damageType,
-          types: [damageType]
-        }
-      });
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Apply dice modifiers to all parts in the roll config.
-   * @param {ContextualBonus} buildNAction     A new bonus being toggled active.
-   * @param {number} [scale]      Upscaling property.
-   */
-  #applyDiceModifications(buildNAction, scale) {
-    // Store for later if other additive bonuses get added.
-    if (buildNAction.hasDiceModifiers) this.#registry.modifiers.set(buildNAction.uuid, buildNAction);
-
-    for (const bonus of this.#registry.modifiers) {
-      const rollData = this._getRollData(bonus, scale);
-      for (const {parts, data, options} of this.dialog.config.rolls) {
-        if (bonus._halted) break;
-        const halted = bonus.bonuses.modifiers.modifyParts(parts, data ?? rollData);
-        if (halted) bonus._halted = true;
-
-        // Modify critical bonus damage.
-        if ((buildNAction.type === "damage") && !bonus._halted && options.critical?.bonusDamage) {
-          const parts = [options.critical.bonusDamage];
-          const halted = bonus.bonuses.modifiers.modifyParts(parts, rollData);
-          if (halted) bonus._halted = true;
-          options.critical.bonusDamage = parts[0];
-        }
-      }
-
-      // Modify critical bonus damage.
-      if ((buildNAction.type === "damage") && !bonus._halted && this.dialog.config.critical?.bonusDamage) {
-        const parts = [this.dialog.config.critical.bonusDamage];
-        const halted = bonus.bonuses.modifiers.modifyParts(parts, rollData);
-        if (halted) bonus._halted = true;
-        this.dialog.config.critical.bonusDamage = parts[0];
-      }
-
-      if (bonus._halted) this.#registry.modifiers.delete(bonus.uuid);
-    }
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Get the attribute key for the lowest available and valid spell slot. If the
-   * lowest level is both a spell slot and a different kind of slot, prefer the
-   * alternative. At this stage, an appropriate key is guaranteed to exist.
-   * @param {ContextualBonus} bonus     The bonus used to determine the minimum spell level required.
-   * @returns {string}          The attribute key.
-   */
-  _getLowestValidSpellSlotProperty(bonus) {
-    const spells = this.actor.system.spells;
-    const min = bonus.consume.value.min || 1;
-
-    let lowest = Infinity;
-    const pairs = Object.entries(spells).reduce((acc, [k, v]) => {
-      if (!v.value || !v.max || !v.level || (v.level < min)) return acc;
-      let set = acc.get(v.level);
-      if (!set) {
-        acc.set(v.level, new Set());
-        set = acc.get(v.level);
-      }
-      set.add(k);
-
-      lowest = Math.min(lowest, v.level);
-
-      return acc;
-    }, new Map());
-
-    const keys = pairs.get(lowest);
-
-    if (keys.size === 1) return keys.first();
-    for (const k of keys) if (k.startsWith("spell")) keys.delete(k);
-    return keys.first();
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * Construct the roll data for upscaling a bonus to ensure we use the roll data from the correct source.
-   * This is because it may be an outside source, such as from an aura, or a granted effect, or it may be
-   * a previously placed measured template aura using a different item level.
-   * @param {ContextualBonus} bonus       The buildNAction.
-   * @param {number} [scale]      Upscaling property.
-   * @returns {object}            The roll data.
-   */
-  _getRollData(bonus, scale = 0) {
-    const src = bonus.origin;
-    if (!bonus.template && this.activity && (src.uuid === this.activity.item.uuid)) return this.activity.getRollData();
-    const rollData = src.getRollData();
-    rollData.scaling = new dnd5e.documents.Scaling(scale);
-    return rollData;
-  }
-
-  /* -------------------------------------------------- */
-
-  /**
-   * A hook that is called after an actor, item, or effect is updated or deleted, but before any bonuses are applied.
-   * @param {ContextualBonus} buildNAction                             The buildNAction that holds the optional bonus to apply.
-   * @param {Actor5e|Item5e} roller                       The actor or item performing a roll or usage.
-   * @param {Actor5e|Item5e|ActiveEffect5e} [target]      The actor or item that was updated or deleted, if any.
-   * @param {object} config
-   * @param {string} config.bonus                         The bonus that will be applied.
-   * @returns {boolean}                                   Explicitly return false to cancel the application of the bonus.
-   */
-  callHook(buildNAction, target, config) {
-    const roller = this.item ?? this.actor;
-    const apply = Hooks.call(`${MODULE.ID}.applyOptionalBonus`, buildNAction, roller, target, config);
-    return apply !== false;
-  }
+/** `dealt` for positive damage; `dropped` as well when the target ends at 0 HP. */
+function damagePins(hpDamage, newHp) {
+	if (!(hpDamage > 0)) return [];
+	return newHp !== null && newHp <= 0 ? ["dealt", "dropped"] : ["dealt"];
 }
-
-/** Apply personal visual preferences without a reload or changes to world data. */
-function applyInterfacePreferences({settings = game.settings, body = globalThis.document?.body} = {}) {
-  if (!body) return;
-  body.dataset.bnaEffects = settings.get(MODULE.ID, SETTINGS.EFFECTS) ? "on" : "off";
-  body.dataset.bnaMotion = settings.get(MODULE.ID, SETTINGS.MOTION) ? "on" : "off";
+/** `success` or `failure` for a check with a DC; nothing when the DC is unknown. */
+function checkPins(total, dc) {
+	if (total === null || dc === null) return [];
+	return [total >= dc ? "success" : "failure"];
 }
-
-/** Document types whose open sheets expose Build-n-Action header controls. */
-const DOCUMENT_TYPES = new Set(["Actor", "Item", "ActiveEffect", "Region"]);
-
-/**
- * Re-render open document applications after a header-control setting changes.
- */
-function refreshDocumentApplications() {
-  const applications = new Set(Object.values(globalThis.ui?.windows ?? {}));
-  for (const application of globalThis.foundry?.applications?.instances?.values?.() ?? []) {
-    applications.add(application);
-  }
-
-  const ApplicationV2 = globalThis.foundry?.applications?.api?.ApplicationV2;
-  for (const application of applications) {
-    if (!DOCUMENT_TYPES.has(application.document?.documentName)) continue;
-    if (ApplicationV2 && (application instanceof ApplicationV2)) application.render({force: true});
-    else application.render(true);
-  }
+//#endregion
+//#region src/runtime/operations.ts
+var OPERATION_KINDS = [
+	"status",
+	"copyEffect",
+	"removeEffects",
+	"resource",
+	"rider"
+];
+var RESOURCES = [
+	"uses",
+	"slots",
+	"hp",
+	"tempHp",
+	"hitDice",
+	"currency"
+];
+function recipient(data, fallback, ctx) {
+	return asString(data.who, fallback) === "target" ? ctx.target : ctx.self;
 }
-
-/**
- * Apply aura display settings to every aura currently tracked on the canvas.
- */
-function refreshAuras() {
-  refreshTokenAuras();
+/** The change an applyEffect, removeEffect or resource result makes; null when there is nothing to do. */
+function planOperation(type, data, ctx) {
+	switch (type) {
+		case "applyEffect": {
+			const actor = recipient(data, "target", ctx);
+			if (!actor) return null;
+			if (asString(data.source, "status") === "itemEffect") {
+				const effectId = asString(data.effectId);
+				if (!effectId || !ctx.carrierItem) return null;
+				return {
+					kind: "copyEffect",
+					actor,
+					effect: `${ctx.carrierItem}.ActiveEffect.${effectId}`,
+					origin: ctx.origin
+				};
+			}
+			const status = asString(data.status);
+			return status ? {
+				kind: "status",
+				actor,
+				status,
+				active: true
+			} : null;
+		}
+		case "removeEffect": {
+			const actor = recipient(data, "self", ctx);
+			if (!actor) return null;
+			if (asString(data.match, "status") === "name") {
+				const name = asString(data.name).trim();
+				return name ? {
+					kind: "removeEffects",
+					actor,
+					name
+				} : null;
+			}
+			const status = asString(data.status);
+			return status ? {
+				kind: "status",
+				actor,
+				status,
+				active: false
+			} : null;
+		}
+		case "resource": {
+			const actor = recipient(data, "self", ctx);
+			const resource = asString(data.resource, "uses");
+			const amount = Math.trunc(ctx.amount);
+			if (!actor || !RESOURCES.includes(resource) || !amount) return null;
+			if (resource === "uses" && !ctx.carrierItem) return null;
+			return {
+				kind: "resource",
+				actor,
+				item: resource === "uses" ? ctx.carrierItem : null,
+				resource,
+				delta: asString(data.action, "spend") === "restore" ? amount : -amount,
+				slot: asString(data.slotLevel),
+				currency: asString(data.currency, "gp")
+			};
+		}
+		default: return null;
+	}
 }
-
-/**
- * Prompt connected clients to reload after changing startup-only sheet hooks.
- * @returns {Promise<void>}
- */
-function reloadWorld() {
-  return foundry.applications.settings.SettingsConfig.reloadConfirm({world: true});
+/** New `spent` after `delta` uses become available (negative spends). */
+function usesSpent(spent, max, delta) {
+	return Math.min(max, Math.max(0, spent - delta));
 }
-
-/**
- * Register one world-scoped boolean setting.
- * @param {ClientSettings} settings
- * @param {string} key
- * @param {object} config
- */
-function registerBooleanSetting(settings, key, config) {
-  settings.register(MODULE.ID, key, {
-    scope: "world",
-    config: true,
-    type: Boolean,
-    ...config
-  });
+function slotValue(value, max, delta) {
+	return Math.min(max, Math.max(0, value + delta));
 }
-
-/**
- * Register all module settings using the Foundry V14 SettingConfig contract.
- * Injectable callbacks keep registration independently testable.
- *
- * @param {object} [options]
- * @param {ClientSettings} [options.settings]
- * @param {Function} [options.refreshDocuments]
- * @param {Function} [options.refreshAuraDisplays]
- * @param {Function} [options.reload]
- */
-function registerSettings({
-  settings = game.settings,
-  refreshDocuments = refreshDocumentApplications,
-  refreshAuraDisplays = refreshAuras,
-  reload = reloadWorld,
-  refreshInterface = () => applyInterfacePreferences({settings})
-} = {}) {
-  for (const [key, prefix] of [[SETTINGS.EFFECTS, "Effects"], [SETTINGS.MOTION, "Motion"]]) {
-    registerBooleanSetting(settings, key, {
-      scope: "client", default: true,
-      name: `BUILD_N_ACTION.Blueprint.${prefix}Name`, hint: `BUILD_N_ACTION.Blueprint.${prefix}Hint`,
-      onChange: refreshInterface
-    });
-  }
-  registerBooleanSetting(settings, SETTINGS.PLAYERS, {
-    name: "BUILD_N_ACTION.SettingsShowBuilderForPlayersName",
-    hint: "BUILD_N_ACTION.SettingsShowBuilderForPlayersHint",
-    default: true,
-    onChange: value => {
-      refreshDocuments(value);
-      if (settings.get?.(MODULE.ID, SETTINGS.SHEET_TAB)) return reload();
-    }
-  });
-
-  registerBooleanSetting(settings, SETTINGS.LABEL, {
-    name: "BUILD_N_ACTION.SettingsDisplayLabelName",
-    hint: "BUILD_N_ACTION.SettingsDisplayLabelHint",
-    default: false,
-    onChange: refreshDocuments
-  });
-
-  registerBooleanSetting(settings, SETTINGS.SCRIPT, {
-    name: "BUILD_N_ACTION.SettingsDisableCustomScriptFilterName",
-    hint: "BUILD_N_ACTION.SettingsDisableCustomScriptFilterHint",
-    default: false
-  });
-
-  registerBooleanSetting(settings, SETTINGS.AURA, {
-    name: "BUILD_N_ACTION.SettingsShowAuraRangesName",
-    hint: "BUILD_N_ACTION.SettingsShowAuraRangesHint",
-    default: false,
-    onChange: refreshAuraDisplays
-  });
-
-  registerBooleanSetting(settings, SETTINGS.RADIUS, {
-    name: "BUILD_N_ACTION.SettingsPadAuraRadius",
-    hint: "BUILD_N_ACTION.SettingsPadAuraRadiusHint",
-    default: true,
-    onChange: refreshAuraDisplays
-  });
-
-  registerBooleanSetting(settings, SETTINGS.FUMBLE, {
-    name: "BUILD_N_ACTION.SettingsAllowFumbleNegationName",
-    hint: "BUILD_N_ACTION.SettingsAllowFumbleNegationHint",
-    default: false
-  });
-
-  registerBooleanSetting(settings, SETTINGS.SHEET_TAB, {
-    name: "BUILD_N_ACTION.SettingsShowSheetTab",
-    hint: "BUILD_N_ACTION.SettingsShowSheetTabHint",
-    default: false,
-    onChange: reload
-  });
+/** The requested slot, or the lowest slot that can be spent (delta < 0) or refilled (delta > 0). */
+function pickSlot(slots, wanted, delta) {
+	if (wanted) return slots.some((slot) => slot.key === wanted) ? wanted : null;
+	return slots.filter((slot) => slot.max > 0 && (delta < 0 ? slot.value > 0 : slot.value < slot.max)).sort((a, b) => a.level - b.level || a.key.localeCompare(b.key))[0]?.key ?? null;
 }
-
-// Build the module-owned public API. The package API is canonical; the global
-// is provided for macros and deliberately has no legacy aliases.
-const buildNActionApi = {
-  ...api,
-  getIntegrationStatus,
-  abstract: {
-    DataModels: models.ContextualBonus,
-    DataFields: {
-      fields: fields,
-      models: models
-    },
-    TYPES: Object.keys(models.ContextualBonus),
-    applications: applications
-  },
-  filters: {...filters}
-};
-Object.defineProperty(buildNActionApi, "trees", {get: getProficiencyTrees});
-configureApplicationFactories(applications);
-globalThis.BuildNAction = buildNActionApi;
-globalThis.buildNAction = buildNActionApi;
-
-/* -------------------------------------------------- */
-
-/**
- * Render the optional bonus selector on a roll dialog.
- * @param {Dialog} dialog     The dialog being rendered.
- */
-async function _renderDialog(dialog) {
-  const m = dialog.options[MODULE.ID];
-  if (!m) return;
-  const r = registry.get(m.registry);
-  if (!r) return;
-  r.dialog = dialog;
-  new OptionalSelector(m.registry).render();
+/** Temporary hit points do not stack: restoring keeps the higher value; spending removes them. */
+function tempHp(current, delta) {
+	return delta > 0 ? Math.max(current, delta) : Math.max(0, current + delta);
 }
-
-/* -------------------------------------------------- */
-
-/**
- * On-drop handler for the hotbar.
- * @param {Hotbar} bar                The hotbar application.
- * @param {object} dropData           The drop data.
- * @param {string} dropData.type      The type of the dropped document.
- * @param {string} dropData.uuid      The uuid of the dropped document.
- * @param {number} slot               The slot on the hotbar where it was dropped.
- */
-async function _onHotbarDrop(bar, {type, uuid}, slot) {
-  if (type !== "ContextualBonus") return;
-  const bonus = await buildNActionApi.fromUuid(uuid);
-  const data = {
-    img: bonus.img,
-    command: `buildNAction.hotbarToggle("${uuid}");`,
-    name: `${game.i18n.localize("BUILD_N_ACTION.ToggleBonus")}: ${bonus.name}`,
-    type: CONST.MACRO_TYPES.SCRIPT
-  };
-  const macro = game.macros.find(m => {
-    return Object.entries(data).every(([k, v]) => m[k] === v) && m.isAuthor;
-  }) ?? await Macro.implementation.create(data);
-  return game.user.assignHotbarMacro(macro, slot);
+function currencyValue(value, delta) {
+	return Math.max(0, value + delta);
 }
-
-/* -------------------------------------------------- */
-
-/** Setup the global 'trees' for proficiency searching. */
-async function setupTree() {
-  const trees = {};
-  for (const k of ["languages", "weapon", "armor", "tool", "skills"]) {
-    trees[k] = await dnd5e.documents.Trait.choices(k);
-  }
-  setProficiencyTrees(trees);
+//#endregion
+//#region src/foundry/operations.ts
+function number(value) {
+	return asNumber(value) ?? 0;
 }
-
-/* -------------------------------------------------- */
-
-// General setup.
-Hooks.once("init", registerSettings);
-Hooks.once("ready", () => applyInterfacePreferences());
-Hooks.once("init", enricherSetup);
-Hooks.once("init", () => game.modules.get(MODULE.ID).api = buildNActionApi);
-Hooks.on("hotbarDrop", _onHotbarDrop);
-Hooks.once("setup", () => characterSheetTabSetup());
-
-// Any application injections.
-Hooks.on("getActiveEffectConfigHeaderButtons", (...T) => injections.HeaderButton.inject(...T));
-Hooks.on("getActorSheetHeaderButtons", (...T) => injections.HeaderButton.inject(...T));
-Hooks.on("getDialogHeaderButtons", (...T) => injections.HeaderButtonDialog.inject(...T));
-Hooks.on("getItemSheetHeaderButtons", (...T) => injections.HeaderButton.inject(...T));
-Hooks.on("getHeaderControlsApplicationV2", (application, controls) => {
-  injections.HeaderButton.injectV2(application, controls);
-  injections.HeaderButtonDialog.injectV2(application, controls);
+async function call$1(target, method, ...args) {
+	const fn = read(target, method);
+	if (typeof fn !== "function") throw new Error(`Build-n-Action | ${method} is not available`);
+	return fn.apply(target, args);
+}
+async function documentAt(uuid) {
+	if (!uuid) return null;
+	const found = await fromUuid(uuid);
+	return isDocument(found) ? found : null;
+}
+/** Whether this user may make the change without the GM. */
+function canRunLocally(op) {
+	if (!documentFromUuid(op.actor)?.isOwner) return false;
+	if (op.kind === "resource" && op.item) return documentFromUuid(op.item)?.isOwner === true;
+	return true;
+}
+async function applyResource(actor, op) {
+	switch (op.resource) {
+		case "uses": {
+			const item = await documentAt(op.item ?? "");
+			if (!item) return;
+			await item.update({ "system.uses.spent": usesSpent(number(read(item, "system.uses.spent")), number(read(item, "system.uses.max")), op.delta) });
+			return;
+		}
+		case "slots": {
+			const slots = slotsOf(actor);
+			const key = pickSlot(slots, op.slot, op.delta);
+			const slot = slots.find((entry) => entry.key === key);
+			if (!slot) return;
+			await actor.update({ [`system.spells.${slot.key}.value`]: slotValue(slot.value, slot.max, op.delta) });
+			return;
+		}
+		case "hp":
+			await call$1(actor, "applyDamage", -op.delta);
+			return;
+		case "tempHp":
+			await actor.update({ "system.attributes.hp.temp": tempHp(number(read(actor, "system.attributes.hp.temp")), op.delta) });
+			return;
+		case "hitDice": {
+			const updates = hitDiceSpend(classHitDice(actor), op.delta < 0 ? "smallest" : "largest", -op.delta).map((entry) => ({
+				_id: entry.id,
+				"system.hd.spent": entry.spent
+			}));
+			if (updates.length) await call$1(actor, "updateEmbeddedDocuments", "Item", updates);
+			return;
+		}
+		case "currency":
+			await actor.update({ [`system.currency.${op.currency}`]: currencyValue(number(read(actor, `system.currency.${op.currency}`)), op.delta) });
+			return;
+	}
+}
+/** Make one change; throws when the documents are missing. */
+async function executeOperation(op) {
+	const actor = await documentAt(op.actor);
+	if (!actor) throw new Error(`Build-n-Action | no actor ${op.actor}`);
+	switch (op.kind) {
+		case "status":
+			await call$1(actor, "toggleStatusEffect", op.status, { active: op.active });
+			return;
+		case "copyEffect": {
+			const effect = await documentAt(op.effect);
+			if (!effect) throw new Error(`Build-n-Action | no effect ${op.effect}`);
+			const data = asRecord(await call$1(effect, "toObject"));
+			delete data._id;
+			Object.assign(data, {
+				origin: op.origin,
+				transfer: false,
+				disabled: false
+			});
+			await call$1(actor, "createEmbeddedDocuments", "ActiveEffect", [data]);
+			return;
+		}
+		case "removeEffects": {
+			const ids = listOf(read(actor, "effects")).filter(isDocument).filter((effect) => effect.name === op.name).map((effect) => effect.id);
+			if (ids.length) await call$1(actor, "deleteEmbeddedDocuments", "ActiveEffect", ids);
+			return;
+		}
+		case "resource":
+			await applyResource(actor, op);
+			return;
+		case "rider":
+			await addRider(actor, op.rider);
+			return;
+	}
+}
+//#endregion
+//#region src/foundry/socket.ts
+var CHANNEL = `module.${MODULE_SCOPE}`;
+var TIMEOUT_MS = 15e3;
+var waiting = /* @__PURE__ */ new Map();
+function isOperation(value) {
+	return OPERATION_KINDS.includes(asString(read(value, "kind"))) && typeof read(value, "actor") === "string";
+}
+async function onMessage(message) {
+	const type = read(message, "type");
+	const id = asString(read(message, "id"));
+	if (type === "reply") {
+		if (read(message, "recipient") !== game.user.id) return;
+		waiting.get(id)?.({
+			ok: read(message, "ok") === true,
+			error: asString(read(message, "error")) || null
+		});
+		return;
+	}
+	if (type !== "operations" || !game.user.isGM || read(message, "gm") !== game.user.id) return;
+	let error = null;
+	for (const op of listOf(read(message, "operations")).filter(isOperation)) try {
+		await executeOperation(op);
+	} catch (failure) {
+		error = failure instanceof Error ? failure.message : String(failure);
+		console.warn("Build-n-Action | a requested change failed", op, failure);
+	}
+	game.socket.emit(CHANNEL, {
+		type: "reply",
+		id,
+		recipient: read(message, "sender"),
+		ok: error === null,
+		error
+	});
+}
+function registerSocket() {
+	game.socket.on(CHANNEL, (message) => {
+		onMessage(message);
+	});
+}
+/** Make changes: locally where allowed, through the active GM otherwise. False when something was skipped. */
+async function performOperations(operations) {
+	const remote = [];
+	let ok = true;
+	for (const op of operations) {
+		if (!canRunLocally(op)) {
+			remote.push(op);
+			continue;
+		}
+		try {
+			await executeOperation(op);
+		} catch (error) {
+			ok = false;
+			console.warn("Build-n-Action | a change failed", op, error);
+		}
+	}
+	if (!remote.length) return ok;
+	const gm = game.users.activeGM;
+	if (!gm) {
+		ui.notifications.warn(game.i18n.localize("BNA.Runtime.NoGM"));
+		return false;
+	}
+	const id = randomId();
+	const reply = new Promise((resolve) => {
+		const timer = setTimeout(() => {
+			waiting.delete(id);
+			resolve(null);
+		}, TIMEOUT_MS);
+		waiting.set(id, (answer) => {
+			clearTimeout(timer);
+			waiting.delete(id);
+			resolve(answer);
+		});
+	});
+	game.socket.emit(CHANNEL, {
+		type: "operations",
+		id,
+		sender: game.user.id,
+		gm: gm.id,
+		operations: remote
+	});
+	const answer = await reply;
+	if (!answer?.ok) {
+		console.warn("Build-n-Action | the GM could not make all changes", answer?.error ?? "no reply");
+		ui.notifications.warn(game.i18n.localize("BNA.Runtime.RemoteFailed"));
+		return false;
+	}
+	return ok;
+}
+//#endregion
+//#region src/foundry/reactions.ts
+/** Formula fields of roll results that a rider carries; resolved when the rider is made. */
+var RIDER_FORMULAS = [
+	"formula",
+	"damage",
+	"dice",
+	"critical",
+	"fumble",
+	"targetValue",
+	"deathSaveCritical"
+];
+function riderData(intent, data, options) {
+	const effect = asRecord(intent.data.effect);
+	const fields = { ...asRecord(effect.data) };
+	for (const key of RIDER_FORMULAS) {
+		const value = asString(fields[key]).trim();
+		if (value) fields[key] = resolveForeign(value, data);
+	}
+	if (asString(effect.type) === "rollBonus" && options.scale) fields.formula = scaledFormula(asString(asRecord(effect.data).formula), options.costFormula ?? "", data, options.scale);
+	return {
+		...intent.data,
+		effect: {
+			type: asString(effect.type),
+			data: fields
+		}
+	};
+}
+/** Turn reaction results into operations (riders, effects, resources) and perform them. */
+async function applyReactionIntents(intents, ctx, activation, options = {}) {
+	const operations = [];
+	const self = ctx.roller.actor;
+	const target = ctx.roller.target?.actor ?? null;
+	for (const intent of intents) {
+		const info = ctx.sources.get(intent.entry);
+		if (!info) continue;
+		const data = options.data ?? originRollData(info.document);
+		const origin = info.origin?.uuid ?? info.document.uuid;
+		if (intent.type === "rider") {
+			if (asString(intent.data.scope) !== "nextRoll" && !activation) continue;
+			const recipient = asString(intent.data.scope) === "nextRoll" && asString(intent.data.who, "self") === "target" ? target : self;
+			if (!recipient) continue;
+			const rider = createRider(riderData(intent, data, options), {
+				id: randomId(),
+				activation,
+				clock: riderClock(recipient),
+				source: {
+					name: info.blueprint.name,
+					origin,
+					blueprintId: intent.blueprintId,
+					nodeId: intent.nodeId
+				}
+			});
+			if (rider) operations.push({
+				kind: "rider",
+				actor: recipient.uuid,
+				rider
+			});
+			continue;
+		}
+		const amountFormula = asString(intent.data.amount).trim() || "1";
+		const amount = intent.type === "resource" ? simplifyNumber(resolveForeign(amountFormula, data), data) ?? 0 : 0;
+		const op = planOperation(intent.type, intent.data, {
+			self: self.uuid,
+			target: target?.uuid ?? null,
+			carrierItem: info.carrierItem?.uuid ?? null,
+			origin,
+			amount
+		});
+		if (op) operations.push(op);
+	}
+	if (operations.length) await performOperations(operations);
+}
+async function promptChoices(host, choices, actor) {
+	const panel = renderChoices(host, {
+		choices,
+		reminders: []
+	});
+	if (!panel) return;
+	await foundry.applications.api.DialogV2.wait({
+		window: {
+			title: game.i18n.format("BNA.Reaction.Title", { name: actor.name }),
+			icon: "fa-solid fa-diagram-project"
+		},
+		position: { width: 420 },
+		content: "<div class=\"bna-reaction\"></div>",
+		buttons: [{
+			action: "done",
+			label: game.i18n.localize("BNA.Reaction.Done"),
+			default: true
+		}],
+		rejectClose: false,
+		render: (_event, dialog) => {
+			const element = asRecord(dialog).element;
+			if (element instanceof HTMLElement) element.querySelector(".bna-reaction")?.append(panel);
+		}
+	});
+}
+/** Run blueprints reacting to an outcome: immediate results now, optional ones through a prompt. */
+async function runReaction(input) {
+	if (!input.pins.length) return;
+	const roller = makeRoller(input.actor, input.item, input.activity, input.target, { ...input.details ?? {} });
+	const evaluation = evaluateEvent(input.event, roller, input.pins, input.activation);
+	if (!evaluation?.chain.intents.length) return;
+	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
+	const ctx = {
+		event: input.event,
+		roller,
+		sources: evaluation.collected.sources
+	};
+	await applyReactionIntents(sorted.immediate, ctx, input.activation);
+	announceApplied(sorted.immediate, evaluation.context);
+	recordUsages(sorted.immediate, roller.actor);
+	if (!sorted.choices.length) return;
+	await promptChoices({
+		ctx,
+		applied: /* @__PURE__ */ new Set(),
+		apply: async (choice, info, scale) => {
+			await applyReactionIntents(choice.intents, ctx, input.activation, {
+				data: choiceData(info, ctx, scale),
+				scale,
+				costFormula: choice.cost.formula
+			});
+			announceApplied(choice.intents, evaluation.context);
+		}
+	}, sorted.choices, input.actor);
+}
+//#endregion
+//#region src/foundry/reaction-hooks.ts
+var MEMORY_MS = 6e5;
+var handled = /* @__PURE__ */ new Map();
+/** True the first time a reaction key is seen (within ten minutes). */
+function firstTime(key) {
+	const now = Date.now();
+	for (const [seen, time] of handled) if (now - time > MEMORY_MS) handled.delete(seen);
+	if (handled.has(key)) return false;
+	handled.set(key, now);
+	return true;
+}
+function call(target, method, ...args) {
+	const fn = read(target, method);
+	return typeof fn === "function" ? fn.apply(target, args) : void 0;
+}
+/** A token placeable from a placeable, a token document or a token UUID. */
+function tokenOf(value) {
+	if (!value) return null;
+	if (typeof value === "string") return read(documentFromUuid(value), "object") ?? null;
+	if (read(value, "document") && read(value, "center")) return value;
+	return read(value, "object") ?? null;
+}
+function tokens(value) {
+	return listOf(value).map(tokenOf).filter((token) => !!token);
+}
+function attackerOfActivity(activity) {
+	const item = read(activity, "item");
+	const actor = read(item, "actor");
+	return isDocument(item) && isDocument(actor) ? {
+		actor,
+		item,
+		activity
+	} : null;
+}
+function attackerOfWorkflow(workflow) {
+	const actor = read(workflow, "actor");
+	const item = read(workflow, "item");
+	if (!isDocument(actor)) return null;
+	return {
+		actor,
+		item: isDocument(item) ? item : null,
+		activity: read(workflow, "activity") ?? null
+	};
+}
+/** Whether Midi QOL decides hits itself (its "Auto check hits" setting); otherwise totals are compared with AC here. */
+function midiChecksHits() {
+	const settings = call(read(globalThis, "MidiQOL"), "configSettings");
+	return asString(read(settings, "autoCheckHit"), "none") !== "none";
+}
+function targetAc(target) {
+	return call(read(target.actor, "statuses"), "has", "coverTotal") === true ? null : asNumber(read(target.actor, "system.attributes.ac.value"));
+}
+async function midiAttack(workflow) {
+	const attacker = attackerOfWorkflow(workflow);
+	if (!attacker) return;
+	const activation = midiActivation(workflow);
+	const isCritical = read(workflow, "isCritical") === true;
+	const isFumble = read(workflow, "isFumble") === true;
+	const hits = /* @__PURE__ */ new Set([...tokens(read(workflow, "hitTargets")), ...tokens(read(workflow, "hitTargetsEC"))]);
+	const targets = tokens(read(workflow, "targets"));
+	if (!targets.length) {
+		if (!firstTime(`afterAttack|${activation}|-`)) return;
+		await runReaction({
+			...attacker,
+			event: "afterAttack",
+			pins: attackPins({
+				total: null,
+				targetAc: null,
+				isCritical,
+				isFumble
+			}),
+			target: null,
+			activation
+		});
+		return;
+	}
+	const checked = midiChecksHits();
+	const total = asNumber(read(workflow, "attackTotal")) ?? asNumber(read(workflow, "attackRoll.total"));
+	for (const target of targets) {
+		if (!firstTime(`afterAttack|${activation}|${target.document.uuid}`)) continue;
+		const pins = checked ? midiAttackPins(hits.has(target), isCritical, isFumble) : attackPins({
+			total,
+			targetAc: targetAc(target),
+			isCritical,
+			isFumble
+		});
+		await runReaction({
+			...attacker,
+			event: "afterAttack",
+			pins,
+			target,
+			activation
+		});
+	}
+}
+async function midiSaves(workflow) {
+	const attacker = attackerOfWorkflow(workflow);
+	if (!attacker) return;
+	const activation = midiActivation(workflow);
+	const saved = new Set(tokens(read(workflow, "saves")));
+	const failed = tokens(read(workflow, "failedSaves"));
+	for (const target of /* @__PURE__ */ new Set([...saved, ...failed])) {
+		if (!firstTime(`afterTargetSave|${activation}|${target.document.uuid}`)) continue;
+		await runReaction({
+			...attacker,
+			event: "afterTargetSave",
+			pins: savePins(saved.has(target)),
+			target,
+			activation
+		});
+	}
+}
+async function midiDamage(workflow) {
+	const attacker = attackerOfWorkflow(workflow);
+	if (!attacker) return;
+	const activation = midiActivation(workflow);
+	for (const entry of listOf(read(workflow, "damageList"))) {
+		const actorUuid = asString(read(entry, "actorUuid"));
+		const actor = documentFromUuid(actorUuid);
+		const target = tokenOf(asString(read(entry, "targetUuid"))) ?? (actor ? actorToken(actor) : null);
+		if (!firstTime(`afterDamage|${activation}|${target?.document.uuid ?? actorUuid}`)) continue;
+		const pins = damagePins(asNumber(read(entry, "hpDamage")) ?? 0, asNumber(read(entry, "newHP")));
+		await runReaction({
+			...attacker,
+			event: "afterDamage",
+			pins,
+			target,
+			activation
+		});
+	}
+}
+async function dndAttack(rolls, data) {
+	const activity = read(data, "subject");
+	const attacker = attackerOfActivity(activity);
+	const roll = listOf(rolls)[0];
+	if (!attacker || !roll) return;
+	const total = asNumber(read(roll, "total"));
+	const isCritical = read(roll, "isCritical") === true;
+	const isFumble = read(roll, "isFumble") === true;
+	const activation = activationFor(asString(read(activity, "uuid")));
+	const targets = [...game.user.targets];
+	if (!targets.length) {
+		await runReaction({
+			...attacker,
+			event: "afterAttack",
+			pins: attackPins({
+				total,
+				targetAc: null,
+				isCritical,
+				isFumble
+			}),
+			target: null,
+			activation
+		});
+		return;
+	}
+	for (const target of targets) await runReaction({
+		...attacker,
+		event: "afterAttack",
+		pins: attackPins({
+			total,
+			targetAc: targetAc(target),
+			isCritical,
+			isFumble
+		}),
+		target,
+		activation
+	});
+}
+function speakerToken(message) {
+	const scene = game.scenes.get(asString(read(message, "speaker.scene")));
+	const token = tokenOf(call(read(scene, "tokens"), "get", asString(read(message, "speaker.token"))));
+	if (token) return token;
+	const actor = call(message, "getAssociatedActor");
+	return isDocument(actor) ? actorToken(actor) : null;
+}
+async function dndSave(message) {
+	if (asString(read(message, "flags.dnd5e.roll.type")) !== "save") return;
+	const originId = asString(read(message, "flags.dnd5e.originatingMessage"));
+	const origin = originId ? game.messages.get(originId) : null;
+	const activity = call(origin, "getAssociatedActivity");
+	if (read(activity, "type") !== "save") return;
+	const attacker = attackerOfActivity(activity);
+	if (!attacker) return;
+	const author = read(origin, "author");
+	if ((read(author, "active") === true ? asString(read(author, "id")) : game.users.activeGM?.id ?? "") !== game.user.id) return;
+	const roll = listOf(read(message, "rolls"))[0];
+	const total = asNumber(read(roll, "total"));
+	const dc = asNumber(read(roll, "options.target"));
+	if (total === null || dc === null) return;
+	if (!firstTime(`afterTargetSave|${asString(read(message, "id"))}`)) return;
+	await runReaction({
+		...attacker,
+		event: "afterTargetSave",
+		pins: savePins(total >= dc),
+		target: speakerToken(message),
+		activation: `message:${originId}`
+	});
+}
+async function dndDamage(actor, amount, options) {
+	const damageMessage = read(options, "originatingMessage");
+	const attacker = attackerOfActivity(call(damageMessage, "getAssociatedActivity"));
+	if (!attacker || !isDocument(actor)) return;
+	const messageId = asString(read(damageMessage, "id"));
+	if (!firstTime(`afterDamage|${messageId}|${actor.uuid}`)) return;
+	const origin = asString(read(damageMessage, "flags.dnd5e.originatingMessage")) || messageId;
+	const pins = damagePins(asNumber(amount) ?? 0, asNumber(read(actor, "system.attributes.hp.value")));
+	await runReaction({
+		...attacker,
+		event: "afterDamage",
+		pins,
+		target: actorToken(actor),
+		activation: `message:${origin}`
+	});
+}
+async function dndCheck(rolls, data) {
+	const actor = read(data, "subject");
+	const roll = listOf(rolls)[0];
+	if (!isDocument(actor) || !roll) return;
+	const pins = checkPins(asNumber(read(roll, "total")), asNumber(read(roll, "options.target")));
+	if (!pins.length) return;
+	await runReaction({
+		event: "afterCheck",
+		pins,
+		actor,
+		item: null,
+		activity: null,
+		target: null,
+		activation: null,
+		details: {
+			abilityId: asString(read(data, "ability")) || null,
+			skillId: asString(read(data, "skill")) || null,
+			toolId: asString(read(data, "tool")) || null
+		}
+	});
+}
+/** Listen for roll outcomes: Midi's workflow when Midi is active, plain dnd5e otherwise; checks always from dnd5e. */
+function registerReactionHooks() {
+	if (game.modules.get("midi-qol")?.active === true) {
+		Hooks.on("midi-qol.AttackRollComplete", (workflow) => guardedAsync("after attack", () => midiAttack(workflow)));
+		Hooks.on("midi-qol.postCheckSaves", (workflow) => guardedAsync("after save", () => midiSaves(workflow)));
+		Hooks.on("midi-qol.RollComplete", (workflow) => guardedAsync("after damage", () => midiDamage(workflow)));
+	} else {
+		Hooks.on("dnd5e.rollAttackV2", (rolls, data) => {
+			guardedAsync("after attack", () => dndAttack(rolls, data));
+		});
+		Hooks.on("createChatMessage", (message) => {
+			guardedAsync("after save", () => dndSave(message));
+		});
+		Hooks.on("dnd5e.applyDamage", (actor, amount, options) => {
+			guardedAsync("after damage", () => dndDamage(actor, amount, options));
+		});
+	}
+	for (const hook of [
+		"dnd5e.rollAbilityCheck",
+		"dnd5e.rollSkill",
+		"dnd5e.rollToolCheck"
+	]) Hooks.on(hook, (rolls, data) => {
+		guardedAsync("after check", () => dndCheck(rolls, data));
+	});
+}
+//#endregion
+//#region src/module.ts
+var api = createApi();
+Object.assign(globalThis, {
+	BuildNAction: api,
+	buildNAction: api
 });
-Hooks.on("renderDialog", _renderDialog);
-Hooks.on("renderRollConfigurationDialog", _renderDialog);
-Hooks.on("refreshToken", token => {
-  for (const aura of applications.TokenAura.values()) {
-    if ((aura.target === token) || (aura.token === token.document)) aura.refresh();
-  }
+Hooks.once("init", () => {
+	registerSettings();
+	registerLibrary();
+	registerMigrationMenu();
+	registerHeaderControls();
+	const module = game.modules.get(MODULE_SCOPE);
+	if (module) module.api = api;
 });
-Hooks.on("deleteToken", tokenDocument => {
-  for (const aura of applications.TokenAura.values()) {
-    if (aura.token === tokenDocument) aura.destroy({fadeOut: false});
-  }
+Hooks.once("ready", () => {
+	registerAuraPreviews();
+	registerSocket();
+	validateIntegrations();
+	registerPreRollHooks();
+	registerChoicePanel();
+	registerReactionHooks();
+	loadTraitTrees().catch((error) => console.warn("Build-n-Action | could not load language and tool trees", error));
+	Hooks.callAll(`${MODULE_SCOPE}.ready`, api);
 });
-Hooks.on("canvasTearDown", () => applications.TokenAura.clear());
+//#endregion
 
-// Roll hooks. Delay these to let other modules modify behaviour first.
-Hooks.once("ready", function() {
-  validateIntegrations();
-  Hooks.callAll(`${MODULE.ID}.preInitializeRollHooks`);
-
-  Hooks.on("dnd5e.postActivityConsumption", mutators.postActivityConsumption);
-  Hooks.on("dnd5e.preRollAbilityCheck", mutators.preRollAbilityCheck);
-  Hooks.on("dnd5e.preRollAttack", mutators.preRollAttack);
-  Hooks.on("dnd5e.preRollDamage", mutators.preRollDamage);
-  Hooks.on("dnd5e.preRollHitDie", mutators.preRollHitDie);
-  Hooks.on("dnd5e.preRollSavingThrow", mutators.preRollSavingThrow);
-  Hooks.on("dnd5e.preCreateActivityTemplate", mutators.preCreateActivityTemplate);
-
-  Hooks.callAll(`${MODULE.ID}.initializeRollHooks`);
-  Hooks.callAll(`${MODULE.ID}.ready`, buildNActionApi, getIntegrationStatus());
-});
-
-Hooks.once("init", function() {
-  const hook = game.modules.get("babele")?.active && (game.babele?.initialized === false) ? "babele.ready" : "ready";
-  Hooks.once(hook, () => setupTree());
-});
-
-Hooks.once("i18nInit", function() {
-  for (const model of Object.values(models.ContextualBonus)) {
-    Localization.localizeDataModel(model);
-  }
-
-  const localizeObject = object => {
-    for (const [k, v] of Object.entries(object)) {
-      object[k] = game.i18n.localize(v);
-    }
-  };
-
-  localizeObject(MODULE.ATTACK_MODES_CHOICES);
-  localizeObject(MODULE.CONSUMPTION_TYPES);
-  localizeObject(MODULE.DISPOSITION_TYPES);
-  localizeObject(MODULE.HEALTH_PERCENTAGES_CHOICES);
-  localizeObject(MODULE.MODIFIER_MODES);
-  localizeObject(MODULE.SPELL_COMPONENT_CHOICES);
-  localizeObject(MODULE.TOKEN_SIZES_CHOICES);
-});
+//# sourceMappingURL=module.mjs.map
