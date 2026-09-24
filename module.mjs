@@ -1,4 +1,4 @@
-import { $ as documentBlueprints, A as replaceData, At as asRecord, B as createRider, C as pendingRoll, D as sourceLabel, E as loadTraitTrees, F as addRider, G as SETTINGS, H as canEdit, I as riderClock, L as useRiders, M as scaledFormula, Mt as asStrings, N as simplifyNumber, O as registerAuraPreviews, Ot as asBoolean, P as resolveModifiers, Q as carrierKind, R as countRest, S as resolveRollTarget, St as getResult, U as openEditor, X as setting, Z as actorToken, _ as guardedAsync, at as listOf, b as recordUsages, c as registerMigrationMenu, d as activationFor, et as documentFromUuid, f as activationOf, g as guarded, h as evaluateEvent, i as createApi, j as resolveForeign, jt as asString, k as modifyFormulaParts, kt as asNumber, lt as MODULE_SCOPE, m as announceApplied, n as foundryTranslator, nt as originRollData, ot as read, p as allowIntents, q as registerSettings, r as createPhraseFormatter, rt as rollDataOf, s as validateIntegrations, st as stringList, t as foundryChoices, tt as isDocument, u as registerLibrary, v as makeRoller, vt as randomId, w as registerPending, x as rememberActivation, y as midiActivation, z as recordUsage } from "./chunks/choices-JhATeK3R.mjs";
+import { $ as documentBlueprints, A as replaceData, At as asNumber, B as createRider, C as pendingRoll, Ct as getResult, D as sourceLabel, E as loadTraitTrees, F as addRider, G as SETTINGS, H as canEdit, I as riderClock, L as useRiders, M as scaledFormula, Mt as asString, N as simplifyNumber, Nt as asStrings, O as registerAuraPreviews, P as resolveModifiers, Q as carrierKind, R as countRest, S as resolveRollTarget, U as openEditor, X as setting, Z as actorToken, _ as guardedAsync, b as recordUsages, c as registerMigrationMenu, ct as stringList, d as activationFor, et as documentFromUuid, f as activationOf, g as guarded, h as evaluateEvent, i as createApi, it as rollDataOf, j as resolveForeign, jt as asRecord, k as modifyFormulaParts, kt as asBoolean, m as announceApplied, n as foundryTranslator, nt as isSuppressed, ot as listOf, p as allowIntents, q as registerSettings, r as createPhraseFormatter, rt as originRollData, s as validateIntegrations, st as read, t as foundryChoices, tt as isDocument, u as registerLibrary, ut as MODULE_SCOPE, v as makeRoller, w as registerPending, x as rememberActivation, y as midiActivation, yt as randomId, z as recordUsage } from "./chunks/choices-WcfOhCdd.mjs";
 //#region src/runtime/choices.ts
 function sortIntents(intents) {
 	const sorted = {
@@ -744,6 +744,8 @@ function registerChoicePanel() {
 //#endregion
 //#region src/foundry/header.ts
 var ICON = "fa-solid fa-diagram-project";
+/** Colours the icon while a blueprint on the document works, as v1 marked documents with bonuses. */
+var ACTIVE_MARKER = "bna-active-marker";
 /** The documents that carry blueprints and get the control (group actors excluded, as in v1). */
 function carrierOf(application) {
 	const document = read(application, "document");
@@ -754,10 +756,18 @@ function carrierOf(application) {
 function open(document) {
 	openEditor(document).catch((error) => console.error("Build-n-Action | could not open the editor", error));
 }
-function headerControl(document, count) {
+/** The document's blueprints, and whether one of them works now (enabled, on a carrier that is not switched off). */
+function blueprintState(document) {
+	const { blueprints } = documentBlueprints(document);
+	return {
+		count: blueprints.length,
+		active: !isSuppressed(document) && blueprints.some((blueprint) => blueprint.enabled)
+	};
+}
+function headerControl(document, count, active) {
 	return {
 		action: "bnaOpenEditor",
-		icon: ICON,
+		icon: active ? `${ICON} ${ACTIVE_MARKER}` : ICON,
 		label: count ? game.i18n.format("BNA.Header.labelCount", { count }) : game.i18n.localize("BNA.Header.label"),
 		onClick: () => open(document)
 	};
@@ -766,11 +776,17 @@ function addTitleButton(application, document) {
 	const element = read(application, "element");
 	if (!(element instanceof HTMLElement)) return;
 	const header = element.querySelector(".window-header");
-	if (!header || header.querySelector(".bna-header-button")) return;
+	if (!header) return;
+	const existing = header.querySelector(".bna-header-button");
+	if (existing) {
+		existing.classList.toggle(ACTIVE_MARKER, blueprintState(document).active);
+		return;
+	}
 	const label = game.i18n.localize("BNA.Header.label");
 	const button = globalThis.document.createElement("button");
 	button.type = "button";
 	button.className = `header-control icon ${ICON} bna-header-button`;
+	button.classList.toggle(ACTIVE_MARKER, blueprintState(document).active);
 	button.dataset.tooltip = label;
 	button.setAttribute("aria-label", label);
 	button.addEventListener("click", (event) => {
@@ -784,7 +800,9 @@ function addTitleButton(application, document) {
 function registerHeaderControls() {
 	Hooks.on("getHeaderControlsApplicationV2", (application, controls) => {
 		const document = carrierOf(application);
-		if (document) controls.unshift(headerControl(document, documentBlueprints(document).blueprints.length));
+		if (!document) return;
+		const { count, active } = blueprintState(document);
+		controls.unshift(headerControl(document, count, active));
 	});
 	Hooks.on("renderApplicationV2", (application) => {
 		if (!setting(SETTINGS.headerLabel)) return;
