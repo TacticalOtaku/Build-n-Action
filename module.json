@@ -2,7 +2,7 @@
   "id": "build-n-action",
   "title": "Build-n-Action",
   "description": "Blueprints: When → If → Then graphs that change rolls and react to their outcome.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "authors": [
     {
       "name": "TacticalOtaku"
@@ -66,6 +66,6 @@
   ],
   "url": "https://github.com/TacticalOtaku/Build-n-Action",
   "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
-  "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.0.0/build-n-action-v2.0.0.zip",
+  "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.0.1/build-n-action-v2.0.1.zip",
   "socket": true
 }

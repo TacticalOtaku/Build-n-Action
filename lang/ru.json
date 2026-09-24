@@ -1223,10 +1223,10 @@
       "packs": "Также обработать компендиумы",
       "locked": "заблокирован; разблокируется на время",
       "scan": "Сканировать",
-      "scanSummary": "Документов с бонусами v1: {documents}. Сконвертируется: {converted}, не читается: {failed}.",
-      "doneSummary": "Обработано документов: {documents}. Сконвертировано: {converted}, оставлено как было: {failed}, ошибок: {errors}.",
-      "nothing": "Бонусов v1 для конвертации не осталось.",
-      "entry": "{type}: сконвертировано {converted}, не читается {failed}",
+      "scanSummary": "Документов к обновлению: {documents}. Сконвертируется бонусов v1: {converted}, исправится blueprints: {repaired}, не читается: {failed}.",
+      "doneSummary": "Обновлено документов: {documents}. Сконвертировано: {converted}, исправлено: {repaired}, оставлено как было: {failed}, ошибок: {errors}.",
+      "nothing": "Нечего конвертировать или исправлять.",
+      "entry": "{type}: сконвертировано {converted}, исправлено {repaired}, не читается {failed}",
       "entryError": "Не мигрирован: {error}",
       "back": "Назад",
       "run": "Мигрировать",
@@ -1260,8 +1260,8 @@
         "hint": "Игроки открывают редактор blueprints на документах, которыми владеют. ГМ может править всегда."
       },
       "headerLabel": {
-        "name": "Кнопка Blueprints в заголовке окна",
-        "hint": "Кроме пункта в меню шапки листа, показывать кнопку Blueprints прямо в заголовке окна."
+        "name": "Кнопка Build-n-Action в заголовке окна",
+        "hint": "Кроме пункта в меню шапки листа, показывать кнопку Build-n-Action прямо в заголовке окна."
       },
       "migration": {
         "name": "Миграция мира",
@@ -1301,8 +1301,8 @@
       "noPermission": "Вам нельзя править blueprints этого документа."
     },
     "Header": {
-      "label": "Blueprints",
-      "labelCount": "Blueprints ({count})"
+      "label": "Build-n-Action",
+      "labelCount": "Build-n-Action ({count})"
     },
     "Preset": {
       "bless": {

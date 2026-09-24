@@ -270,4 +270,10 @@ body.theme-dark .bna-surface,
   margin: 0;
   color: var(--bna-muted);
 }
+
+/* A header icon whose document has a working blueprint (v1 marked documents with bonuses the same way). */
+.bna-active-marker {
+  color: #6ccbae;
+  filter: drop-shadow(0 0 3px rgb(108 203 174 / 90%));
+}
 /*$vite$:1*/

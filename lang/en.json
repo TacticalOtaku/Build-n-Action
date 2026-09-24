@@ -1223,10 +1223,10 @@
       "packs": "Also include these compendiums",
       "locked": "locked; unlocked for the run",
       "scan": "Scan",
-      "scanSummary": "Found {documents} document(s) with v1 bonuses: {converted} will convert, {failed} cannot be read.",
-      "doneSummary": "Migrated {documents} document(s): {converted} bonus(es) converted, {failed} left as they were, {errors} error(s).",
-      "nothing": "No v1 bonuses left to convert.",
-      "entry": "{type}: {converted} converted, {failed} not readable",
+      "scanSummary": "Found {documents} document(s) to update: {converted} v1 bonus(es) will convert, {repaired} migrated blueprint(s) will be repaired, {failed} cannot be read.",
+      "doneSummary": "Updated {documents} document(s): {converted} bonus(es) converted, {repaired} blueprint(s) repaired, {failed} left as they were, {errors} error(s).",
+      "nothing": "Nothing left to convert or repair.",
+      "entry": "{type}: {converted} converted, {repaired} repaired, {failed} not readable",
       "entryError": "Not migrated: {error}",
       "back": "Back",
       "run": "Migrate now",
@@ -1260,8 +1260,8 @@
         "hint": "Players can open the blueprint editor on documents they own. The GM can always edit."
       },
       "headerLabel": {
-        "name": "Show the Blueprints button in the title bar",
-        "hint": "Besides the entry in each sheet's header menu, show a Blueprints button in the window's title bar."
+        "name": "Show the Build-n-Action button in the title bar",
+        "hint": "Besides the entry in each sheet's header menu, show a Build-n-Action button in the window's title bar."
       },
       "migration": {
         "name": "Migrate the world",
@@ -1301,8 +1301,8 @@
       "noPermission": "You cannot edit blueprints on this document."
     },
     "Header": {
-      "label": "Blueprints",
-      "labelCount": "Blueprints ({count})"
+      "label": "Build-n-Action",
+      "labelCount": "Build-n-Action ({count})"
     },
     "Preset": {
       "bless": {
