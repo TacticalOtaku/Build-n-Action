@@ -9,7 +9,8 @@
       "Event": {
         "pre": "Before a roll",
         "post": "After a roll",
-        "signal": "Signals"
+        "signal": "Signals",
+        "trigger": "No roll"
       },
       "Check": {
         "item": "Item",
@@ -76,13 +77,17 @@
       "failure": {
         "Label": "Failure",
         "Hint": "The check fell short of its DC."
+      },
+      "then": {
+        "Label": "And then",
+        "Hint": "Continues once this result has been applied."
       }
     },
     "Connect": {
       "missingNode": "One of these nodes no longer exists.",
       "selfLoop": "A node cannot connect to itself.",
       "intoEvent": "Events start a chain; nothing can lead into them.",
-      "fromResult": "Results end a chain; send a signal to continue elsewhere.",
+      "fromResult": "This result has no outputs. Turn on “And then” in its settings to continue from it.",
       "unknownPin": "This output does not exist on the node.",
       "duplicate": "These pins are already connected.",
       "cycle": "This wire would create a loop."
@@ -104,6 +109,16 @@
         "round": "once per round",
         "shortRest": "once per short rest",
         "longRest": "once per long rest"
+      },
+      "Then": "; and then {then}",
+      "ThenIf": "; and then, if {guards}, {then}",
+      "Outcome": {
+        "succeeded": "; on a success, {then}",
+        "failed": "; on a failure, {then}"
+      },
+      "OutcomeIf": {
+        "succeeded": "; on a success, if {guards}, {then}",
+        "failed": "; on a failure, if {guards}, {then}"
       }
     },
     "Reach": {
@@ -120,6 +135,11 @@
         },
         "region": {
           "any": "a creature in this region"
+        },
+        "regionTokens": {
+          "any": "a creature",
+          "friendly": "a friendly creature",
+          "hostile": "a hostile creature"
         }
       }
     },
@@ -227,6 +247,49 @@
         "GT": ">",
         "LE": "≤",
         "GE": "≥"
+      },
+      "regionTokens": {
+        "any": "Any token",
+        "friendly": "Friendly tokens",
+        "hostile": "Hostile tokens"
+      },
+      "saveWho": {
+        "target": "The target",
+        "self": "Me",
+        "aura": "Creatures in my aura"
+      },
+      "saveDcMode": {
+        "formula": "Number or formula",
+        "spell": "My spell save DC"
+      },
+      "rollMode": {
+        "normal": "Normal",
+        "advantage": "Advantage",
+        "disadvantage": "Disadvantage"
+      },
+      "counterScope": {
+        "actor": "Shared on the actor",
+        "blueprint": "Only this blueprint"
+      },
+      "counterAction": {
+        "add": "Add",
+        "subtract": "Subtract",
+        "set": "Set",
+        "reset": "Reset"
+      },
+      "counterOperator": {
+        "EQ": "=",
+        "NE": "≠",
+        "LT": "<",
+        "LE": "≤",
+        "GT": ">",
+        "GE": "≥"
+      },
+      "counterReset": {
+        "manual": "By hand",
+        "shortRest": "Short or long rest",
+        "longRest": "Long rest",
+        "turnStart": "Start of my turn"
       }
     },
     "Field": {
@@ -332,6 +395,29 @@
       "limit": {
         "label": "At most",
         "hint": "The result does not apply again within the period."
+      },
+      "conditionThisItem": {
+        "label": "Only rolls with this item",
+        "hint": "The condition passes only for rolls made with the item that carries this blueprint, whatever the checks below say."
+      },
+      "regionTokens": {
+        "label": "Which tokens",
+        "hint": "Tokens that set this off, by their disposition."
+      },
+      "turnReach": {
+        "label": "Whose turn",
+        "hint": "Whose turn sets this off: mine, or the turn of a creature in my aura."
+      },
+      "turnReachMode": {
+        "hint": "Me only, or creatures in my aura."
+      },
+      "then": {
+        "label": "“And then” output",
+        "hint": "Continue the chain once this result has been applied: the player chose it, its limit allowed it and no module stopped it."
+      },
+      "counterScope": {
+        "label": "Kind",
+        "hint": "Shared by the actor's blueprints, or private to this one."
       }
     },
     "Event": {
@@ -474,6 +560,78 @@
         "Summary": "When another blueprint sends a signal with this name.",
         "Help": "Signals let one blueprint trigger another. The receiver sees the same roll and targets as the sender. Example: a \"smite\" signal shared by several items.",
         "Phrase": "when the signal “{name}” arrives"
+      },
+      "turnStart": {
+        "Label": "Turn start",
+        "Summary": "When a turn starts in combat.",
+        "Help": "Fires once per turn, on the GM's side. Use results that do not change a roll: effects, resources, reminders, a bonus to a later roll. Example: regenerate 10 hit points at the start of my turn.",
+        "Phrase": {
+          "out": {
+            "Self": "when I start my turn",
+            "Other": "when {who} starts its turn"
+          }
+        }
+      },
+      "turnEnd": {
+        "Label": "Turn end",
+        "Summary": "When a turn ends in combat.",
+        "Help": "Fires once per turn, on the GM's side. Example: at the end of my turn, poison damage.",
+        "Phrase": {
+          "out": {
+            "Self": "when I end my turn",
+            "Other": "when {who} ends its turn"
+          }
+        }
+      },
+      "regionEnter": {
+        "Label": "Enters the region",
+        "Summary": "When a token enters this region.",
+        "Help": "Only on regions. The creature that entered is \"me\" for checks and results. Example: a hostile creature entering the cloud is poisoned.",
+        "Phrase": {
+          "out": {
+            "Self": "when I enter this region",
+            "Other": "when {who} enters this region"
+          }
+        }
+      },
+      "regionExit": {
+        "Label": "Leaves the region",
+        "Summary": "When a token leaves this region.",
+        "Help": "Only on regions. Example: remove the effect the region gave on entering.",
+        "Phrase": {
+          "out": {
+            "Self": "when I leave this region",
+            "Other": "when {who} leaves this region"
+          }
+        }
+      },
+      "shortRest": {
+        "Label": "Short rest",
+        "Summary": "After a short rest.",
+        "Help": "Not fired by a long rest; wire both events when both should count.",
+        "Phrase": {
+          "out": {
+            "Self": "when I finish a short rest",
+            "Other": "when {who} finishes a short rest"
+          }
+        }
+      },
+      "longRest": {
+        "Label": "Long rest",
+        "Summary": "After a long rest.",
+        "Help": "Example: restore a use of a feature, or remove an effect.",
+        "Phrase": {
+          "out": {
+            "Self": "when I finish a long rest",
+            "Other": "when {who} finishes a long rest"
+          }
+        }
+      },
+      "afterResult": {
+        "Label": "And then"
+      },
+      "demandedSave": {
+        "Label": "Demanded save"
       }
     },
     "Check": {
@@ -748,6 +906,22 @@
           "script": "Script",
           "scriptHint": "Available variables: actor, item, activity, target, details."
         }
+      },
+      "counter": {
+        "Label": "Counter",
+        "Summary": "Compare a counter with a number.",
+        "Help": "An unknown counter counts as its initial value (0).",
+        "Field": {
+          "name": "Counter",
+          "nameHint": "Its name; capitals and spaces do not matter.",
+          "whose": "Whose",
+          "operator": "Comparison",
+          "value": "Value"
+        },
+        "Phrase": {
+          "self": "my counter “{name}” {operator} {value}",
+          "target": "the target's counter “{name}” {operator} {value}"
+        }
       }
     },
     "Result": {
@@ -863,7 +1037,7 @@
       },
       "reminder": {
         "Label": "Reminder",
-        "Summary": "Show a note in the roll dialog.",
+        "Summary": "Show a note: in the roll dialog, or in chat where there is none.",
         "Help": "Nothing is applied automatically. Example: \"You have advantage against being charmed.\"",
         "Phrase": "remind: “{text}”",
         "Field": {
@@ -952,6 +1126,58 @@
           "nameHint": "Must match the receiver exactly.",
           "scope": "Reaches",
           "scopeHint": "Blueprints on my whole actor, or only on this document."
+        }
+      },
+      "demandSave": {
+        "Label": "Demand a saving throw",
+        "Summary": "Make the target, me or my aura roll a save; continue on success or failure.",
+        "Help": "The owner rolls in their own dialog; after 30 seconds, or without a connected owner, the GM rolls. Example: on a hit, a Constitution save against poison.",
+        "Field": {
+          "ability": "Ability",
+          "dcMode": "DC",
+          "dcModeHint": "A number or formula, or my spell save DC.",
+          "dc": "DC formula",
+          "dcHint": "For example 13 or 8 + @prof + @abilities.con.mod.",
+          "who": "Who saves",
+          "advantage": "Roll with"
+        },
+        "Phrase": {
+          "target": "the target makes a {ability} saving throw, {dc}",
+          "self": "I make a {ability} saving throw, {dc}",
+          "aura": "creatures in my aura ({range} ft) make a {ability} saving throw, {dc}"
+        },
+        "With": {
+          "advantage": "{text}, with advantage",
+          "disadvantage": "{text}, with disadvantage"
+        },
+        "DcFormula": "DC {formula}",
+        "DcSpell": "my spell save DC"
+      },
+      "counter": {
+        "Label": "Change counter",
+        "Summary": "Add to, subtract from, set or reset a named counter.",
+        "Help": "Counters are numbers on an actor: rage charges, curse stacks, hits in a row. Use them in checks and in formulas as @counters.name.",
+        "Field": {
+          "name": "Counter",
+          "nameHint": "Its name; capitals and spaces do not matter.",
+          "action": "Action",
+          "amount": "Amount",
+          "amountHint": "A number or formula, rounded down.",
+          "who": "Whose counter"
+        },
+        "Phrase": {
+          "self": {
+            "add": "add {amount} to my counter “{name}”",
+            "subtract": "subtract {amount} from my counter “{name}”",
+            "set": "set my counter “{name}” to {amount}",
+            "reset": "reset my counter “{name}”"
+          },
+          "target": {
+            "add": "add {amount} to the target's counter “{name}”",
+            "subtract": "subtract {amount} from the target's counter “{name}”",
+            "set": "set the target's counter “{name}” to {amount}",
+            "reset": "reset the target's counter “{name}”"
+          }
         }
       }
     },
@@ -1138,7 +1364,12 @@
         "noEvents": "Add an event to test this blueprint.",
         "failed": "The test could not run: {message}",
         "noteSuppressed": "The carrier is switched off (an unequipped item or an inactive effect), so this blueprint is ignored in play.",
-        "noteNoToken": "The actor has no token on this scene, so auras, templates and regions cannot reach it."
+        "noteNoToken": "The actor has no token on this scene, so auras, templates and regions cannot reach it.",
+        "noteTrigger": "In play this runs on the GM's side: at a turn in combat, when a token enters or leaves the region, or after a rest.",
+        "noteChosen": "Steps after “And then” on a player's choice are shown as if the player chose it.",
+        "counters": "Counter values",
+        "onScene": "On the scene",
+        "otherActors": "Other actors"
       },
       "Formula": {
         "suggestions": "Roll data",
@@ -1175,6 +1406,26 @@
         "import": "Import JSON…",
         "imported": "Imported {count} blueprint(s).",
         "importFailed": "This file is not JSON. Choose a file exported from Build-n-Action."
+      },
+      "Counters": {
+        "title": "Counters",
+        "none": "none used",
+        "reset": "Reset “{name}”",
+        "setup": "Set up counters",
+        "setupShort": "Set up",
+        "shared": "Shared on the actor",
+        "own": "Only this blueprint",
+        "addShared": "Add a shared counter",
+        "addOwn": "Add a counter to this blueprint",
+        "noOwner": "This blueprint has no owning actor, so it has no shared counters.",
+        "name": "Name",
+        "min": "Min",
+        "max": "Max",
+        "initial": "Start",
+        "resetOn": "Resets",
+        "remove": "Remove “{name}”",
+        "cancel": "Cancel",
+        "save": "Save"
       }
     },
     "Reason": {
@@ -1210,7 +1461,11 @@
       "contradiction": "This check contradicts an earlier check of the same kind, so the condition can never pass.",
       "signal-unmatched": "No blueprint here both sends and receives the signal “{name}”.",
       "cost-without-optional": "A cost needs “Ask the player” turned on.",
-      "migrated": "Converted from the previous version. Check that it works as expected."
+      "migrated": "Converted from the previous version. Check that it works as expected.",
+      "item-tick-off-item": "This blueprint is not on an item, so “Only rolls with this item” has no effect here.",
+      "optional-on-trigger": "There is no roll dialog to ask in here, so this result applies at once and its cost is not paid.",
+      "region-event-off-region": "This event only fires on a region; this blueprint is not on one.",
+      "counter-unknown": "No counter “{name}” is set up; it works with default settings."
     },
     "Migration": {
       "Warning": {
@@ -1369,6 +1624,16 @@
     },
     "Effects": {
       "moved": "“{name}” now lives on a new effect. Set its conditions and durations in the window that opened."
+    },
+    "RegionBehavior": {
+      "label": "Build-n-Action: this region's blueprints",
+      "hint": "Runs this region's blueprints when tokens enter or leave it. Build-n-Action adds and removes it for you as the region's blueprints need it."
+    },
+    "Save": {
+      "Title": "Saving throw: {name}",
+      "Prompt": "{ability} saving throw, DC {dc} — demanded by “{source}” ({owner}).",
+      "Roll": "Roll",
+      "TakenByGM": "The GM rolled this saving throw."
     }
   }
 }

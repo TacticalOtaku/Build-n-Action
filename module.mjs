@@ -1,227 +1,4 @@
-import { $ as documentBlueprints, A as replaceData, At as asNumber, B as createRider, C as pendingRoll, Ct as getResult, D as sourceLabel, E as loadTraitTrees, F as addRider, G as SETTINGS, H as canEdit, I as riderClock, L as useRiders, M as scaledFormula, Mt as asString, N as simplifyNumber, Nt as asStrings, O as registerAuraPreviews, P as resolveModifiers, Q as carrierKind, R as countRest, S as resolveRollTarget, U as openEditor, X as setting, Z as actorToken, _ as guardedAsync, b as recordUsages, c as registerMigrationMenu, ct as stringList, d as activationFor, et as documentFromUuid, f as activationOf, g as guarded, h as evaluateEvent, i as createApi, it as rollDataOf, j as resolveForeign, jt as asRecord, k as modifyFormulaParts, kt as asBoolean, m as announceApplied, n as foundryTranslator, nt as isSuppressed, ot as listOf, p as allowIntents, q as registerSettings, r as createPhraseFormatter, rt as originRollData, s as validateIntegrations, st as read, t as foundryChoices, tt as isDocument, u as registerLibrary, ut as MODULE_SCOPE, v as makeRoller, w as registerPending, x as rememberActivation, y as midiActivation, yt as randomId, z as recordUsage } from "./chunks/choices-WcfOhCdd.mjs";
-//#region src/runtime/choices.ts
-function sortIntents(intents) {
-	const sorted = {
-		immediate: [],
-		choices: [],
-		reminders: []
-	};
-	const order = /* @__PURE__ */ new Map();
-	const choices = /* @__PURE__ */ new Map();
-	for (const intent of intents) {
-		if (intent.type === "reminder") {
-			sorted.reminders.push(intent);
-			continue;
-		}
-		if (!intent.common.optional) {
-			sorted.immediate.push(intent);
-			continue;
-		}
-		if (!order.has(intent.entry)) order.set(intent.entry, order.size);
-		const key = `${order.get(intent.entry)}:${intent.common.choiceGroup}`;
-		let choice = choices.get(key);
-		if (!choice) {
-			choice = {
-				key,
-				intents: [],
-				cost: readCost({})
-			};
-			choices.set(key, choice);
-			sorted.choices.push(choice);
-		}
-		choice.intents.push(intent);
-		const cost = readCost(intent.common.cost);
-		if (choice.cost.type === "none" && cost.type !== "none") choice.cost = cost;
-	}
-	return sorted;
-}
-var PAYABLE = [
-	"uses",
-	"quantity",
-	"slots",
-	"health",
-	"hitdice",
-	"currency",
-	"inspiration",
-	"effect"
-];
-function readCost(value) {
-	const cost = asRecord(value);
-	const type = asString(cost.type, "none");
-	return {
-		type: PAYABLE.includes(type) ? type : "none",
-		subtype: asString(cost.subtype),
-		min: asString(cost.min),
-		max: asString(cost.max),
-		step: asNumber(cost.step) ?? 1,
-		scales: asBoolean(cost.scales),
-		formula: asString(cost.formula)
-	};
-}
-/** Evaluate min and max (v1 ConsumptionModel#prepareDerivedData). */
-function resolveCost(cost, evaluate) {
-	const number = (formula) => formula.trim() ? evaluate(formula) : null;
-	let min = number(cost.min) ?? 1;
-	let max = number(cost.max);
-	if (max !== null && min > max) [min, max] = [max, min];
-	return {
-		...cost,
-		min,
-		max
-	};
-}
-function slotsFrom(state, min) {
-	return state.slots.filter((slot) => slot.value && slot.max && slot.level && slot.level >= min);
-}
-function hitDiceAvailable(cost, state) {
-	if (!state.hitDice) return 0;
-	return ["smallest", "largest"].includes(cost.subtype) ? state.hitDice.value : state.hitDice.bySize[cost.subtype] ?? 0;
-}
-function valid(cost, state) {
-	const invalidScale = cost.scales && (cost.max ?? Infinity) < cost.min;
-	switch (cost.type) {
-		case "uses": return !invalidScale && !!state.uses?.limited && cost.min > 0;
-		case "quantity": return !invalidScale && state.quantity !== null && cost.min > 0;
-		case "effect": return true;
-		case "health":
-		case "slots": return !invalidScale && cost.min > 0;
-		case "currency": return !invalidScale && state.currencies.includes(cost.subtype) && cost.min > 0;
-		case "inspiration": return true;
-		case "hitdice": return !invalidScale && [
-			"smallest",
-			"largest",
-			...state.hitDieTypes
-		].includes(cost.subtype) && cost.min > 0;
-		default: return false;
-	}
-}
-/** Whether the choice can be offered: nothing to pay, or the minimum can be paid by an owner. */
-function costAvailable(cost, state) {
-	if (cost.type === "none") return true;
-	if (!valid(cost, state) || !state.owner) return false;
-	const hp = state.hp;
-	switch (cost.type) {
-		case "uses": return (state.uses?.value ?? 0) >= cost.min;
-		case "quantity": return (state.quantity ?? 0) >= cost.min;
-		case "effect": return state.effect;
-		case "slots": return slotsFrom(state, cost.min).length > 0;
-		case "health": return !!hp && hp.value + hp.temp >= cost.min;
-		case "currency": return (state.currency?.[cost.subtype] ?? 0) >= cost.min;
-		case "inspiration": return state.actorType === "character" && state.inspiration === true;
-		case "hitdice": return state.actorType === "character" && hitDiceAvailable(cost, state) >= cost.min;
-		default: return false;
-	}
-}
-/** Whether the player picks how much to pay (v1 OptionalSelector#doesBonusScale). */
-function costScales(cost, state) {
-	if (!cost.scales || !valid(cost, state)) return false;
-	if (["effect", "inspiration"].includes(cost.type)) return false;
-	if (["health", "currency"].includes(cost.type)) return cost.step > 0;
-	return true;
-}
-/** The lowest spell slot at or above `min`, preferring pact slots on a tie (v1). */
-function lowestSlot(state, min) {
-	const slots = slotsFrom(state, min);
-	if (!slots.length) return null;
-	const level = Math.min(...slots.map((slot) => slot.level));
-	const lowest = slots.filter((slot) => slot.level === level);
-	return lowest.find((slot) => !slot.key.startsWith("spell")) ?? lowest[0] ?? null;
-}
-function stepped(from, to, step, available, min) {
-	const options = [];
-	for (let amount = from; amount <= to; amount += step) options.push({
-		value: String(amount),
-		amount,
-		scale: Math.floor((amount - min) / step),
-		available
-	});
-	return options;
-}
-/** New `spent` values after spending `amount` hit dice of a size, or the smallest/largest first (v1 buildHitDiceUpdates). */
-function hitDiceSpend(classes, subtype, amount) {
-	const bySize = ["smallest", "largest"].includes(subtype);
-	let eligible = classes.filter((cls) => bySize || cls.denomination === subtype);
-	if (bySize) eligible = [...eligible].sort((left, right) => {
-		const order = left.denomination.localeCompare(right.denomination, "en", { numeric: true });
-		return subtype === "largest" ? -order : order;
-	});
-	const updates = [];
-	let remaining = Math.trunc(amount);
-	for (const cls of eligible) {
-		const available = (remaining > 0 ? cls.levels : 0) - cls.spent;
-		const delta = remaining > 0 ? Math.min(remaining, available) : Math.max(remaining, available);
-		if (!delta) continue;
-		updates.push({
-			id: cls.id,
-			spent: cls.spent + delta
-		});
-		remaining -= delta;
-		if (!remaining) break;
-	}
-	return updates;
-}
-/** The amounts (or slots) the player may pay; a non-scaling cost has one option at the minimum. */
-function costOptions(cost, state) {
-	const min = cost.min;
-	const max = cost.max ?? Infinity;
-	const uses = state.uses;
-	const hp = state.hp;
-	const hpAvailable = hp ? Math.max(0, hp.value) + Math.max(0, hp.temp) : 0;
-	const available = (() => {
-		switch (cost.type) {
-			case "uses": return uses ? `${uses.value}/${uses.max}` : "";
-			case "quantity": return String(state.quantity ?? 0);
-			case "health": return hp ? `${hpAvailable}/${Math.max(0, hp.max) + Math.max(0, hp.tempmax)}` : "";
-			case "currency": return String(state.currency?.[cost.subtype] ?? 0);
-			case "hitdice": return state.hitDice ? ["smallest", "largest"].includes(cost.subtype) ? `${state.hitDice.value}/${state.hitDice.max}` : String(hitDiceAvailable(cost, state)) : "";
-			default: return "";
-		}
-	})();
-	if (!costScales(cost, state)) {
-		if (cost.type === "slots") {
-			const slot = lowestSlot(state, min);
-			return slot ? [{
-				value: slot.key,
-				amount: 1,
-				scale: 0,
-				available: `${slot.value}/${slot.max}`
-			}] : [];
-		}
-		const amount = ["effect", "inspiration"].includes(cost.type) ? 1 : min;
-		return [{
-			value: String(amount),
-			amount,
-			scale: 0,
-			available
-		}];
-	}
-	switch (cost.type) {
-		case "uses":
-		case "quantity": {
-			const have = cost.type === "uses" ? uses?.value ?? 0 : state.quantity ?? 0;
-			return stepped(Math.max(1, min), Math.min(have, max), 1, available, min);
-		}
-		case "slots": return slotsFrom(state, min).sort((a, b) => a.level - b.level || a.key.localeCompare(b.key)).map((slot) => ({
-			value: slot.key,
-			amount: 1,
-			scale: Math.min(slot.level - min, max - 1),
-			available: `${slot.value}/${slot.max}`
-		}));
-		case "health": {
-			const capacity = hp ? Math.max(0, hp.max) + Math.max(0, hp.tempmax) : 0;
-			if (hpAvailable < min) return [];
-			return stepped(min || 1, Math.min(hpAvailable, cost.max ?? capacity), cost.step, available, min);
-		}
-		case "currency": {
-			const have = state.currency?.[cost.subtype] ?? 0;
-			if (have < min) return [];
-			return stepped(min || 1, Math.min(have, max), cost.step, available, min);
-		}
-		case "hitdice": return stepped(min, Math.min(max, hitDiceAvailable(cost, state)), 1, available, min);
-		default: return [];
-	}
-}
-//#endregion
+import { $ as resolveCost, A as traitTrees, At as rollDataOf, B as resetCounters, C as pendingRoll, Dt as isDocument, E as takeAfterRoll, Et as documentFromUuid, F as resolveForeign, G as sendTrigger, Gt as randomId, H as performOperations, I as scaledFormula, It as MODULE_SCOPE, J as costState, K as setSaveReceiver, L as simplifyNumber, M as registerAuraPreviews, Mt as listOf, N as modifyFormulaParts, Nt as read, O as loadTraitTrees, Ot as isSuppressed, P as replaceData, Pt as stringList, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as actorToken, T as rememberAfterRoll, Tt as documentBlueprints, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Xt as getResult, Y as payCost, Z as costOptions, _ as guardedAsync, an as counterDef, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterValue, ct as buildRollFacts, d as activationFor, dn as asRecord, et as sortIntents, f as activationOf, fn as asString, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as touchesBlueprints, k as sourceLabel, kt as originRollData, ln as nextCounterValue, m as announceApplied, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterKey, ot as createRider, p as allowIntents, pn as asStrings, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterName, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as asNumber, v as makeRoller, vt as registerSettings, w as registerPending, wt as carrierKind, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-Cr14sVkw.mjs";
 //#region src/runtime/roll-config.ts
 function isEntry(roll) {
 	return !!roll && typeof roll === "object";
@@ -440,124 +217,6 @@ function applySaveDC(activity, intents, ctx) {
 	});
 }
 //#endregion
-//#region src/foundry/consume.ts
-function number$1(value) {
-	return asNumber(value) ?? 0;
-}
-function slotsOf(actor) {
-	return Object.entries(asRecord(read(actor, "system.spells"))).flatMap(([key, slot]) => {
-		const level = asNumber(read(slot, "level"));
-		const value = asNumber(read(slot, "value"));
-		const max = asNumber(read(slot, "max"));
-		return level === null || value === null || max === null ? [] : [{
-			key,
-			level,
-			value,
-			max
-		}];
-	});
-}
-function numbersIn(value) {
-	return Object.fromEntries(Object.entries(asRecord(value)).map(([key, entry]) => [key, number$1(entry)]));
-}
-function effectExists(effect) {
-	const effects = read(effect.parent, "effects");
-	const has = read(effects, "has");
-	return typeof has === "function" && has.call(effects, effect.id) === true;
-}
-/** A character's classes with their hit dice (dnd5e 5.x fields). */
-function classHitDice(actor) {
-	return listOf(read(actor, "system.attributes.hd.classes")).filter(isDocument).map((cls) => ({
-		id: cls.id,
-		denomination: asString(read(cls, "system.hd.denomination")),
-		levels: number$1(read(cls, "system.levels")),
-		spent: number$1(read(cls, "system.hd.spent"))
-	}));
-}
-/** What the roller and the blueprint's carrier can pay right now. */
-function costState(type, actor, info) {
-	const carrier = info.document;
-	const item = carrier.documentName === "Item" ? carrier : null;
-	const payer = [
-		"uses",
-		"quantity",
-		"effect"
-	].includes(type) ? carrier : actor;
-	const hp = read(actor, "system.attributes.hp");
-	const hd = read(actor, "system.attributes.hd");
-	return {
-		owner: payer.isOwner === true,
-		actorType: asString(read(actor, "type")),
-		uses: item ? {
-			value: number$1(read(item, "system.uses.value")),
-			max: number$1(read(item, "system.uses.max")),
-			limited: read(item, "hasLimitedUses") === true
-		} : null,
-		quantity: item && typeof read(item, "system.quantity") === "number" ? number$1(read(item, "system.quantity")) : null,
-		effect: carrier.documentName === "ActiveEffect" && effectExists(carrier),
-		slots: slotsOf(actor),
-		hp: hp ? {
-			value: number$1(read(hp, "value")),
-			temp: number$1(read(hp, "temp")),
-			max: number$1(read(hp, "max")),
-			tempmax: number$1(read(hp, "tempmax"))
-		} : null,
-		currency: numbersIn(read(actor, "system.currency")),
-		hitDice: hd ? {
-			value: number$1(read(hd, "value")),
-			max: number$1(read(hd, "max")),
-			bySize: numbersIn(read(hd, "bySize"))
-		} : null,
-		inspiration: read(actor, "system.attributes.inspiration") === true,
-		currencies: Object.keys(asRecord(CONFIG.DND5E.currencies)),
-		hitDieTypes: stringList(CONFIG.DND5E.hitDieTypes)
-	};
-}
-async function call$2(target, method, ...args) {
-	const fn = read(target, method);
-	if (typeof fn !== "function") throw new Error(`Build-n-Action | ${method} is not available`);
-	return fn.apply(target, args);
-}
-async function confirmDelete(document) {
-	return !!await call$2(document, "deleteDialog");
-}
-/** Pay a choice's cost; false when the player cancelled a confirmation. */
-async function payCost(cost, option, actor, info) {
-	const carrier = info.document;
-	switch (cost.type) {
-		case "none": return true;
-		case "uses": {
-			const spent = number$1(read(carrier, "system.uses.spent")) + option.amount;
-			if (spent >= number$1(read(carrier, "system.uses.max")) && read(carrier, "system.uses.autoDestroy") === true) return confirmDelete(carrier);
-			await carrier.update({ "system.uses.spent": spent });
-			return true;
-		}
-		case "quantity":
-			await carrier.update({ "system.quantity": number$1(read(carrier, "system.quantity")) - option.amount });
-			return true;
-		case "slots":
-			await actor.update({ [`system.spells.${option.value}.value`]: number$1(read(actor, `system.spells.${option.value}.value`)) - 1 });
-			return true;
-		case "health":
-			await call$2(actor, "applyDamage", option.amount);
-			return true;
-		case "effect": return confirmDelete(carrier);
-		case "inspiration":
-			await actor.update({ "system.attributes.inspiration": false });
-			return true;
-		case "currency":
-			await actor.update({ [`system.currency.${cost.subtype}`]: number$1(read(actor, `system.currency.${cost.subtype}`)) - option.amount });
-			return true;
-		case "hitdice":
-			await call$2(actor, "updateEmbeddedDocuments", "Item", hitDiceSpend(classHitDice(actor), cost.subtype, option.amount).map((entry) => ({
-				_id: entry.id,
-				"system.hd.spent": entry.spent
-			})));
-			return true;
-		default: return false;
-	}
-}
-//#endregion
 //#region src/foundry/choice-panel.ts
 var RESOURCE_LABELS = {
 	uses: "DND5E.Uses",
@@ -619,6 +278,7 @@ function applyChoice(pending, choice, info, scale, damageType, app) {
 	const rebuild = read(app, "rebuild");
 	if (typeof rebuild === "function") rebuild.call(app);
 	announceApplied(choice.intents, pending.context);
+	pending.chosen.push(...choice.intents);
 }
 async function onApply(host, choice, info, cost, section, controls) {
 	if (host.applied.has(choice.key)) return;
@@ -811,11 +471,614 @@ function registerHeaderControls() {
 	});
 }
 //#endregion
+//#region src/runtime/continuations.ts
+/**
+* Applied results whose "And then" output leads somewhere, each with the key that lets its continuation
+* run exactly once: the run (activation or evaluation), the target, the blueprint and the node.
+*/
+function continuationStarts(intents, run, target) {
+	return intents.filter((intent) => intent.common.then && intent.entry.compiled.continuationsOf(intent.nodeId).length > 0).map((intent) => ({
+		intent,
+		key: `${run}|${target ?? "-"}|${intent.blueprintId}|${intent.nodeId}`
+	}));
+}
+/** Whether applying this result starts more of the chain later: its "And then", or the save it demands. */
+function startsLater(intent) {
+	return intent.common.then || intent.type === "demandSave";
+}
+//#endregion
+//#region src/runtime/counters.ts
+/** The change a "Change counter" result makes, with its final value; `store` is the recipient's counters. */
+function planCounter(data, ctx, store) {
+	const name = counterName(asString(data.name));
+	const actor = asString(data.who, "self") === "target" ? ctx.target : ctx.self;
+	if (!name || !actor) return null;
+	const scope = asString(data.scope) === "blueprint" ? "blueprint" : "actor";
+	const def = counterDef(store, scope, name, ctx.blueprint);
+	const current = counterValue(store, scope, name, ctx.blueprint);
+	const value = nextCounterValue(current, asString(data.action, "add"), ctx.amount, def);
+	return {
+		kind: "counter",
+		actor,
+		key: counterKey(scope, name, ctx.blueprint.id),
+		value
+	};
+}
+//#endregion
+//#region src/runtime/saves.ts
+/** How long the GM waits for a player's save before rolling it. */
+var SAVE_WAIT_MS = 3e4;
+/** The player who rolls: an active non-GM owner, preferring the one whose character it is; null lets the GM roll. */
+function pickSaveUser(users) {
+	const owners = users.filter((user) => user.active && !user.isGM && user.owner);
+	return (owners.find((user) => user.character) ?? owners[0])?.id ?? null;
+}
+/** Requests that wait for an answer by id, or resolve to null after a timeout. */
+function createWaiter() {
+	const pending = /* @__PURE__ */ new Map();
+	return {
+		wait: (id, ms) => new Promise((resolve) => {
+			const timer = setTimeout(() => {
+				pending.delete(id);
+				resolve(null);
+			}, ms);
+			pending.set(id, (value) => {
+				clearTimeout(timer);
+				pending.delete(id);
+				resolve(value);
+			});
+		}),
+		answer: (id, value) => {
+			const settle = pending.get(id);
+			if (!settle) return false;
+			settle(value);
+			return true;
+		}
+	};
+}
+/** One demanded save per run, blueprint, node and saver. */
+function saveKey(run, blueprintId, nodeId, actorUuid) {
+	return `${run}|${blueprintId}|${nodeId}|${actorUuid}`;
+}
+/** The DC formula of a demand-save result: its own, or the blueprint owner's spell DC. */
+function saveDcFormula(data) {
+	if (asString(data.dcMode) === "spell") return "@attributes.spell.dc";
+	return asString(data.dc).trim() || "10";
+}
+function outcomePin(success) {
+	return success ? "succeeded" : "failed";
+}
+//#endregion
+//#region src/runtime/triggers.ts
+function forward(previous, current) {
+	const [roundBefore, turnBefore] = [previous.round ?? 0, previous.turn ?? -1];
+	const [roundAfter, turnAfter] = [current.round ?? 0, current.turn ?? -1];
+	return roundAfter > roundBefore || roundAfter === roundBefore && turnAfter > turnBefore;
+}
+/**
+* The turn events of one combatTurnChange: the previous turn ends and the current one starts, only when combat
+* moved forward. Turns skipped on the way do not fire; going back fires nothing.
+*/
+function turnTransitions(previous, current) {
+	if (!current || !forward(previous ?? {
+		round: 0,
+		turn: null,
+		combatantId: null
+	}, current)) return [];
+	const transitions = [];
+	if (previous?.combatantId && (previous.round ?? 0) > 0) transitions.push({
+		event: "turnEnd",
+		combatantId: previous.combatantId,
+		round: previous.round ?? 0,
+		turn: previous.turn ?? 0
+	});
+	if (current.combatantId && (current.round ?? 0) > 0) transitions.push({
+		event: "turnStart",
+		combatantId: current.combatantId,
+		round: current.round ?? 0,
+		turn: current.turn ?? 0
+	});
+	return transitions;
+}
+/** The event for a dnd5e rest type ("short" or "long"). */
+function restEvent(type) {
+	if (type === "short") return "shortRest";
+	if (type === "long") return "longRest";
+	return null;
+}
+/** A gate that lets each key through once while it is remembered (`ttlMs`). */
+function createOnce(ttlMs) {
+	const seen = /* @__PURE__ */ new Map();
+	return (key, now = Date.now()) => {
+		for (const [known, at] of seen) if (now - at > ttlMs) seen.delete(known);
+		if (seen.has(key)) return false;
+		seen.set(key, now);
+		return true;
+	};
+}
+var REGION_EVENTS = /* @__PURE__ */ new Set(["regionEnter", "regionExit"]);
+/** Whether a region's blueprints need the module's region behavior to hear tokens entering or leaving. */
+function needsRegionBehavior(blueprints) {
+	return blueprints.some((blueprint) => blueprint.nodes.some((node) => node.kind === "event" && REGION_EVENTS.has(node.type)));
+}
+//#endregion
+//#region src/foundry/chat.ts
+/** Owners and GMs, who see a reminder from a blueprint that has no roll dialog to show it in. */
+function reminderRecipients(actor) {
+	return [...game.users].filter((user) => user.isGM || (actor.testUserPermission?.(user, "OWNER") ?? false)).map((user) => user.id);
+}
+/** Whisper reminders to the roller's owners and the GMs; triggers and continuations have no roll dialog to show them in. */
+async function whisperReminders(reminders, ctx) {
+	for (const intent of reminders) {
+		const text = asString(intent.data.text).trim();
+		if (!text) continue;
+		const name = ctx.sources.get(intent.entry)?.blueprint.name ?? "";
+		await ChatMessage.implementation.create({
+			content: `<p><strong>${foundry.utils.escapeHTML(name)}</strong></p><p>${foundry.utils.escapeHTML(text)}</p>`,
+			whisper: reminderRecipients(ctx.roller.actor),
+			speaker: ChatMessage.implementation.getSpeaker({ actor: ctx.roller.actor })
+		});
+	}
+}
+//#endregion
+//#region src/foundry/saves.ts
+/** The asking client outwaits the GM: two player waits (the prompt, then the roll dialog) and the GM's own roll. */
+var ASKER_WAIT_MS = 2 * SAVE_WAIT_MS + 2e4;
+var results = createWaiter();
+var answers = createWaiter();
+var prompts = /* @__PURE__ */ new Map();
+/** On the GM: requests whose player pressed "Roll" and is in the roll dialog. */
+var rolling = /* @__PURE__ */ new Set();
+/** On the player: requests being rolled here. */
+var rollingHere = /* @__PURE__ */ new Set();
+var warnedNoGM$1 = false;
+function isActiveGM$1() {
+	return game.users.activeGM?.id === game.user.id;
+}
+function outcomeOf(rolls, by) {
+	const roll = listOf(rolls)[0];
+	const total = asNumber(read(roll, "total"));
+	if (!roll || total === null) return null;
+	return {
+		success: read(roll, "isSuccess") === true,
+		total,
+		by
+	};
+}
+async function rollSave(actor, request, configure) {
+	const roll = read(actor, "rollSavingThrow");
+	if (typeof roll !== "function") return null;
+	return outcomeOf(await roll.call(actor, {
+		ability: request.ability,
+		target: request.dc,
+		advantage: request.advantage === "advantage",
+		disadvantage: request.advantage === "disadvantage"
+	}, { configure }, {}), configure ? "player" : "gm");
+}
+/** On the GM: ask the owning player and wait, else roll without a dialog. */
+async function coordinate(request) {
+	const actor = documentFromUuid(request.actorUuid);
+	if (!actor) return null;
+	const player = pickSaveUser([...game.users].map((user) => ({
+		id: user.id,
+		isGM: user.isGM,
+		active: user.active,
+		owner: actor.testUserPermission?.(user, "OWNER") ?? false,
+		character: user.character?.uuid === actor.uuid
+	})));
+	if (player) {
+		const id = randomId();
+		sendSaveMessage({
+			type: "saveAsk",
+			id,
+			user: player,
+			request
+		});
+		let answer = await answers.wait(id, SAVE_WAIT_MS);
+		if (answer === null && rolling.has(id)) answer = await answers.wait(id, SAVE_WAIT_MS);
+		rolling.delete(id);
+		if (answer && answer !== "declined") return answer;
+		sendSaveMessage({
+			type: "saveCancel",
+			id,
+			user: player
+		});
+	}
+	return rollSave(actor, request, false);
+}
+/** Ask for a demanded save from any client; null when it could not be rolled (no GM, no actor, a cancelled roll). */
+async function requestSave(request) {
+	if (isActiveGM$1()) return coordinate(request);
+	const gm = game.users.activeGM;
+	if (!gm) {
+		if (!warnedNoGM$1) console.warn("Build-n-Action | no GM is connected, so demanded saving throws are not rolled.");
+		warnedNoGM$1 = true;
+		return null;
+	}
+	const id = randomId();
+	sendSaveMessage({
+		type: "saveRequest",
+		id,
+		gm: gm.id,
+		sender: game.user.id,
+		request
+	});
+	return await results.wait(id, ASKER_WAIT_MS) ?? null;
+}
+/** On the player: a prompt naming the save and who demands it, then the normal dnd5e dialog. */
+async function promptPlayer(id, request) {
+	const actor = documentFromUuid(request.actorUuid);
+	if (!actor) return;
+	const ability = asString(read(CONFIG.DND5E.abilities, `${request.ability}.label`)) || request.ability;
+	const text = game.i18n.format("BNA.Save.Prompt", {
+		ability,
+		dc: request.dc,
+		source: request.source,
+		owner: request.owner
+	});
+	const action = await foundry.applications.api.DialogV2.wait({
+		window: {
+			title: game.i18n.format("BNA.Save.Title", { name: actor.name }),
+			icon: "fa-solid fa-shield-halved"
+		},
+		content: `<p>${foundry.utils.escapeHTML(text)}</p>`,
+		buttons: [{
+			action: "roll",
+			label: game.i18n.localize("BNA.Save.Roll"),
+			default: true
+		}],
+		rejectClose: false,
+		render: (_event, dialog) => {
+			prompts.set(id, () => {
+				const close = read(dialog, "close");
+				if (typeof close === "function") close.call(dialog);
+			});
+		}
+	});
+	prompts.delete(id);
+	let outcome = null;
+	if (action === "roll") {
+		sendSaveMessage({
+			type: "saveRolling",
+			id
+		});
+		rollingHere.add(id);
+		outcome = await rollSave(actor, request, true);
+		rollingHere.delete(id);
+	}
+	sendSaveMessage({
+		type: "saveAnswer",
+		id,
+		outcome: outcome ?? "declined"
+	});
+}
+function isRequest(value) {
+	return typeof read(value, "actorUuid") === "string" && typeof read(value, "ability") === "string" && typeof read(value, "dc") === "number";
+}
+function asOutcome(value) {
+	return value && typeof value === "object" && typeof read(value, "total") === "number" ? value : null;
+}
+function receive(message) {
+	const type = read(message, "type");
+	const id = asString(read(message, "id"));
+	const request = read(message, "request");
+	if (type === "saveRequest" && isActiveGM$1() && read(message, "gm") === game.user.id && isRequest(request)) coordinate(request).then((outcome) => sendSaveMessage({
+		type: "saveResult",
+		id,
+		recipient: read(message, "sender"),
+		outcome
+	}));
+	else if (type === "saveResult" && read(message, "recipient") === game.user.id) results.answer(id, asOutcome(read(message, "outcome")));
+	else if (type === "saveAsk" && read(message, "user") === game.user.id && isRequest(request)) promptPlayer(id, request);
+	else if (type === "saveRolling" && isActiveGM$1()) rolling.add(id);
+	else if (type === "saveAnswer" && isActiveGM$1()) answers.answer(id, asOutcome(read(message, "outcome")) ?? "declined");
+	else if (type === "saveCancel" && read(message, "user") === game.user.id && (prompts.has(id) || rollingHere.has(id))) {
+		prompts.get(id)?.();
+		prompts.delete(id);
+		ui.notifications.info(game.i18n.localize("BNA.Save.TakenByGM"));
+	}
+}
+function registerSaves() {
+	setSaveReceiver(receive);
+}
+//#endregion
+//#region src/foundry/reactions.ts
+/** Formula fields of roll results that a rider carries; resolved when the rider is made. */
+var RIDER_FORMULAS = [
+	"formula",
+	"damage",
+	"dice",
+	"critical",
+	"fumble",
+	"targetValue",
+	"deathSaveCritical"
+];
+function riderData(intent, data, options) {
+	const effect = asRecord(intent.data.effect);
+	const fields = { ...asRecord(effect.data) };
+	for (const key of RIDER_FORMULAS) {
+		const value = asString(fields[key]).trim();
+		if (value) fields[key] = resolveForeign(value, data);
+	}
+	if (asString(effect.type) === "rollBonus" && options.scale) fields.formula = scaledFormula(asString(asRecord(effect.data).formula), options.costFormula ?? "", data, options.scale);
+	return {
+		...intent.data,
+		effect: {
+			type: asString(effect.type),
+			data: fields
+		}
+	};
+}
+/** Turn reaction results into operations (riders, effects, resources) and perform them; returns the intents that applied. */
+async function applyReactionIntents(intents, ctx, activation, options = {}) {
+	const operations = [];
+	const applied = [];
+	const self = ctx.roller.actor;
+	const target = ctx.roller.target?.actor ?? null;
+	for (const intent of intents) {
+		const info = ctx.sources.get(intent.entry);
+		if (!info) continue;
+		const data = options.data ?? originRollData(info.document);
+		const origin = info.origin?.uuid ?? info.document.uuid;
+		if (intent.type === "demandSave") {
+			applied.push(intent);
+			continue;
+		}
+		if (intent.type === "counter") {
+			const toTarget = asString(intent.data.who, "self") === "target";
+			const me = info.owner ?? self;
+			const amountFormula = asString(intent.data.amount).trim() || "1";
+			const op = planCounter(intent.data, {
+				self: me.uuid,
+				target: target?.uuid ?? null,
+				blueprint: info.blueprint,
+				amount: simplifyNumber(resolveForeign(amountFormula, data), data) ?? 0
+			}, counterStore(toTarget ? target : me));
+			if (op) {
+				operations.push(op);
+				applied.push(intent);
+			}
+			continue;
+		}
+		if (intent.type === "rider") {
+			if (asString(intent.data.scope) !== "nextRoll" && !activation) continue;
+			const recipient = asString(intent.data.scope) === "nextRoll" && asString(intent.data.who, "self") === "target" ? target : self;
+			if (!recipient) continue;
+			const rider = createRider(riderData(intent, data, options), {
+				id: randomId(),
+				activation,
+				clock: riderClock(recipient),
+				source: {
+					name: info.blueprint.name,
+					origin,
+					blueprintId: intent.blueprintId,
+					nodeId: intent.nodeId
+				}
+			});
+			if (rider) {
+				operations.push({
+					kind: "rider",
+					actor: recipient.uuid,
+					rider
+				});
+				applied.push(intent);
+			}
+			continue;
+		}
+		const amountFormula = asString(intent.data.amount).trim() || "1";
+		const amount = intent.type === "resource" ? simplifyNumber(resolveForeign(amountFormula, data), data) ?? 0 : 0;
+		const op = planOperation(intent.type, intent.data, {
+			self: self.uuid,
+			target: target?.uuid ?? null,
+			carrierItem: info.carrierItem?.uuid ?? null,
+			origin,
+			amount
+		});
+		if (op) {
+			operations.push(op);
+			applied.push(intent);
+		}
+	}
+	if (!operations.length) return applied;
+	return await performOperations(operations) ? applied : applied.filter((intent) => intent.type === "demandSave");
+}
+/** A result's continuation runs once per application (ten-minute memory). */
+var continued = createOnce(6e5);
+/**
+* Follow "And then" from results that were really applied: evaluate each continuation with the original
+* facts, apply it at once (there is no roll dialog to ask in), whisper its reminders, and go on from what
+* it applied, up to MAX_SIGNAL_DEPTH levels.
+*/
+async function runContinuations(applied, depth = 0) {
+	if (depth >= 8) return;
+	const { ctx, context, activation } = applied;
+	const entries = [...ctx.sources.keys()];
+	for (const intent of applied.intents) if (intent.type === "demandSave") guardedAsync("demanded save", () => runDemandedSave(intent, applied, depth));
+	for (const { intent, key } of continuationStarts(applied.intents, applied.run, ctx.roller.target?.document.uuid ?? null)) {
+		if (!continued(key)) continue;
+		const chain = runWithSignals(entries, {
+			event: "afterResult",
+			pins: ["then"],
+			from: intent.nodeId
+		}, context.facts, { starters: [intent.entry] });
+		const sorted = sortIntents(allowIntents(resolveCounterIntents(chain.intents, ctx.sources, ctx.roller), context));
+		const done = await applyReactionIntents([...sorted.immediate, ...sorted.choices.flatMap((choice) => choice.intents)], ctx, activation);
+		await whisperReminders(sorted.reminders, ctx);
+		announceApplied([...done, ...sorted.reminders], context);
+		recordUsages(done, ctx.roller.actor);
+		await runContinuations({
+			...applied,
+			intents: [
+				...done,
+				...sorted.reminders,
+				...chain.sent
+			]
+		}, depth + 1);
+	}
+}
+/** A demanded save's key memory: one save per run, blueprint, node and saver (ten minutes). */
+var demanded = createOnce(6e5);
+/** Who a demand-save result asks: the target, me, or the creatures in my aura (by disposition). */
+function saversFor(intent, ctx, data) {
+	const who = asString(intent.data.who, "target");
+	const me = ctx.roller.token;
+	if (who === "self") return me ? [me] : [];
+	if (who !== "aura") return ctx.roller.target ? [ctx.roller.target] : [];
+	if (!me || !canvas.ready) return [];
+	const range = simplifyNumber(resolveForeign(asString(intent.data.range).trim() || "10", data), data) ?? 0;
+	const pad = !canvas.grid.isGridless || setting(SETTINGS.padAuraRadius);
+	const wanted = asString(intent.data.disposition, "-1");
+	const mine = asNumber(read(me.document, "disposition"));
+	return canvas.tokens.placeables.filter((token) => {
+		if (!token.actor) return false;
+		if (token === me) return intent.data.includeSelf === true;
+		return matchDisposition(wanted, mine, asNumber(read(token.document, "disposition"))) && withinAura(me, token, range, [], pad);
+	});
+}
+/** Roll one demanded save per saver, then continue down its "Succeeded" or "Failed" branch with the saver as the target. */
+async function runDemandedSave(intent, applied, depth) {
+	const { ctx, context } = applied;
+	const info = ctx.sources.get(intent.entry);
+	if (!info) return;
+	const data = originRollData(info.document);
+	const dc = simplifyNumber(resolveForeign(saveDcFormula(intent.data), data), data);
+	if (dc === null) return;
+	const entries = [...ctx.sources.keys()];
+	await Promise.all(saversFor(intent, ctx, data).map(async (saver) => {
+		const actor = saver.actor;
+		if (!actor || !demanded(saveKey(applied.run, intent.blueprintId, intent.nodeId, actor.uuid))) return;
+		const outcome = await requestSave({
+			actorUuid: actor.uuid,
+			ability: asString(intent.data.ability, "con"),
+			dc,
+			advantage: asString(intent.data.advantage, "normal"),
+			source: info.blueprint.name,
+			owner: info.owner?.name ?? ctx.roller.actor.name
+		});
+		if (!outcome || !intent.entry.compiled.continuationsOf(intent.nodeId).length) return;
+		const roller = {
+			...ctx.roller,
+			target: saver
+		};
+		const facts = buildRollFacts({
+			event: context.event,
+			actor: roller.actor,
+			token: roller.token?.document ?? null,
+			item: roller.item,
+			activity: roller.activity,
+			target: {
+				actor,
+				document: saver.document
+			},
+			details: roller.details
+		}, traitTrees());
+		const saveCtx = {
+			...ctx,
+			roller
+		};
+		const saveContext = {
+			...context,
+			target: actor,
+			facts
+		};
+		const pin = outcomePin(outcome.success);
+		const chain = runWithSignals(entries, {
+			event: "demandedSave",
+			pins: [pin],
+			from: intent.nodeId
+		}, facts, { starters: [intent.entry] });
+		const sorted = sortIntents(allowIntents(resolveCounterIntents(chain.intents, saveCtx.sources, saveCtx.roller), saveContext));
+		const done = await applyReactionIntents([...sorted.immediate, ...sorted.choices.flatMap((choice) => choice.intents)], saveCtx, applied.activation);
+		await whisperReminders(sorted.reminders, saveCtx);
+		announceApplied([...done, ...sorted.reminders], saveContext);
+		recordUsages(done, roller.actor);
+		await runContinuations({
+			...applied,
+			intents: [
+				...done,
+				...sorted.reminders,
+				...chain.sent
+			],
+			ctx: saveCtx,
+			context: saveContext
+		}, depth + 1);
+	}));
+}
+async function promptChoices(host, choices, actor) {
+	const panel = renderChoices(host, {
+		choices,
+		reminders: []
+	});
+	if (!panel) return;
+	await foundry.applications.api.DialogV2.wait({
+		window: {
+			title: game.i18n.format("BNA.Reaction.Title", { name: actor.name }),
+			icon: "fa-solid fa-diagram-project"
+		},
+		position: { width: 420 },
+		content: "<div class=\"bna-reaction\"></div>",
+		buttons: [{
+			action: "done",
+			label: game.i18n.localize("BNA.Reaction.Done"),
+			default: true
+		}],
+		rejectClose: false,
+		render: (_event, dialog) => {
+			const element = asRecord(dialog).element;
+			if (element instanceof HTMLElement) element.querySelector(".bna-reaction")?.append(panel);
+		}
+	});
+}
+/** Run blueprints reacting to an outcome: immediate results now, optional ones through a prompt. */
+async function runReaction(input) {
+	if (!input.pins.length) return;
+	const roller = makeRoller(input.actor, input.item, input.activity, input.target, { ...input.details ?? {} });
+	const evaluation = evaluateEvent(input.event, roller, input.pins, input.activation);
+	if (!evaluation?.chain.intents.length) return;
+	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
+	const ctx = {
+		event: input.event,
+		roller,
+		sources: evaluation.collected.sources
+	};
+	const run = input.activation ?? evaluation.id;
+	const done = await applyReactionIntents(sorted.immediate, ctx, input.activation);
+	announceApplied(done, evaluation.context);
+	recordUsages(done, roller.actor);
+	await runContinuations({
+		intents: [...done, ...evaluation.chain.sent],
+		ctx,
+		context: evaluation.context,
+		activation: input.activation,
+		run
+	});
+	if (!sorted.choices.length) return;
+	await promptChoices({
+		ctx,
+		applied: /* @__PURE__ */ new Set(),
+		apply: async (choice, info, scale) => {
+			const done = await applyReactionIntents(choice.intents, ctx, input.activation, {
+				data: choiceData(info, ctx, scale),
+				scale,
+				costFormula: choice.cost.formula
+			});
+			announceApplied(done, evaluation.context);
+			await runContinuations({
+				intents: done,
+				ctx,
+				context: evaluation.context,
+				activation: input.activation,
+				run
+			});
+		}
+	}, sorted.choices, input.actor);
+}
+//#endregion
 //#region src/foundry/preroll.ts
 function runRoll(event, config, dialog, message, roller) {
 	const activation = activationOf(config, message);
 	const evaluation = evaluateEvent(event, roller, ["out"], activation);
-	if (!evaluation?.chain.intents.length) return;
+	if (!evaluation || !evaluation.chain.intents.length && !evaluation.chain.sent.length) return;
 	const process = config;
 	if (roller.target?.actor) injectTargetData(process, rollDataOf(roller.target.actor));
 	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
@@ -833,19 +1096,48 @@ function runRoll(event, config, dialog, message, roller) {
 	recordUsages(sorted.immediate, roller.actor);
 	const riders = [...new Set(sorted.immediate.flatMap((intent) => ctx.sources.get(intent.entry)?.rider?.id ?? []))];
 	if (riders.length) useRiders(roller.actor, riders).catch((error) => console.warn("Build-n-Action | could not use up riders", error));
-	if (!sorted.choices.length && !sorted.reminders.length || !dialog || typeof dialog !== "object") return;
-	const id = registerPending({
-		ctx,
-		sorted,
-		tracker,
-		applied: /* @__PURE__ */ new Set(),
-		context: evaluation.context
+	let pending = null;
+	if ((sorted.choices.length || sorted.reminders.length) && dialog && typeof dialog === "object") {
+		pending = {
+			ctx,
+			sorted,
+			tracker,
+			applied: /* @__PURE__ */ new Set(),
+			chosen: [],
+			context: evaluation.context
+		};
+		const id = registerPending(pending);
+		const holder = dialog;
+		const options = asRecord(holder.options);
+		holder.options = options;
+		options[MODULE_SCOPE] = { pending: id };
+		if (sorted.choices.length) holder.configure = true;
+	}
+	rememberAfterRoll(config, {
+		applied: {
+			ctx,
+			context: evaluation.context,
+			activation,
+			run: activation ?? evaluation.id
+		},
+		intents: [
+			...sorted.immediate,
+			...sorted.reminders,
+			...evaluation.chain.sent
+		],
+		pending
 	});
-	const holder = dialog;
-	const options = asRecord(holder.options);
-	holder.options = options;
-	options[MODULE_SCOPE] = { pending: id };
-	if (sorted.choices.length) holder.configure = true;
+}
+/** The roll goes ahead (dialog submitted or skipped): continue from what it applied. A cancelled dialog gives no rolls. */
+function postRollConfiguration(rolls, config) {
+	const after = takeAfterRoll(config);
+	if (!after || !listOf(rolls).length) return;
+	const intents = [...after.intents, ...after.pending?.chosen ?? []];
+	if (!intents.some(startsLater)) return;
+	guardedAsync("continuation", () => runContinuations({
+		...after.applied,
+		intents
+	}));
 }
 function itemOf(activity) {
 	const item = read(activity, "item");
@@ -921,6 +1213,17 @@ function postActivityConsumption(activity, usageConfig) {
 		});
 		if (evaluation) announceApplied(intents, evaluation.context);
 		recordUsages(intents, actor);
+		if (evaluation) guardedAsync("continuation", () => runContinuations({
+			intents: [...intents, ...evaluation.chain.sent],
+			ctx: {
+				event: "saveDC",
+				roller,
+				sources: evaluation.collected.sources
+			},
+			context: evaluation.context,
+			activation: null,
+			run: evaluation.id
+		}));
 	});
 }
 function usesTemplateReach(blueprint) {
@@ -953,6 +1256,7 @@ function registerPreRollHooks() {
 	Hooks.on("dnd5e.preRollSavingThrow", preRollSavingThrow);
 	Hooks.on("dnd5e.preRollAbilityCheck", preRollAbilityCheck);
 	Hooks.on("dnd5e.preRollHitDie", preRollHitDie);
+	Hooks.on("dnd5e.postRollConfiguration", postRollConfiguration);
 	Hooks.on("dnd5e.postActivityConsumption", postActivityConsumption);
 	Hooks.on("dnd5e.preCreateActivityTemplate", preCreateActivityTemplate);
 	Hooks.on("dnd5e.restCompleted", (actor, result) => {
@@ -987,413 +1291,6 @@ function damagePins(hpDamage, newHp) {
 function checkPins(total, dc) {
 	if (total === null || dc === null) return [];
 	return [total >= dc ? "success" : "failure"];
-}
-//#endregion
-//#region src/runtime/operations.ts
-var OPERATION_KINDS = [
-	"status",
-	"copyEffect",
-	"removeEffects",
-	"resource",
-	"rider"
-];
-var RESOURCES = [
-	"uses",
-	"slots",
-	"hp",
-	"tempHp",
-	"hitDice",
-	"currency"
-];
-function recipient(data, fallback, ctx) {
-	return asString(data.who, fallback) === "target" ? ctx.target : ctx.self;
-}
-/** The change an applyEffect, removeEffect or resource result makes; null when there is nothing to do. */
-function planOperation(type, data, ctx) {
-	switch (type) {
-		case "applyEffect": {
-			const actor = recipient(data, "target", ctx);
-			if (!actor) return null;
-			if (asString(data.source, "status") === "itemEffect") {
-				const effectId = asString(data.effectId);
-				if (!effectId || !ctx.carrierItem) return null;
-				return {
-					kind: "copyEffect",
-					actor,
-					effect: `${ctx.carrierItem}.ActiveEffect.${effectId}`,
-					origin: ctx.origin
-				};
-			}
-			const status = asString(data.status);
-			return status ? {
-				kind: "status",
-				actor,
-				status,
-				active: true
-			} : null;
-		}
-		case "removeEffect": {
-			const actor = recipient(data, "self", ctx);
-			if (!actor) return null;
-			if (asString(data.match, "status") === "name") {
-				const name = asString(data.name).trim();
-				return name ? {
-					kind: "removeEffects",
-					actor,
-					name
-				} : null;
-			}
-			const status = asString(data.status);
-			return status ? {
-				kind: "status",
-				actor,
-				status,
-				active: false
-			} : null;
-		}
-		case "resource": {
-			const actor = recipient(data, "self", ctx);
-			const resource = asString(data.resource, "uses");
-			const amount = Math.trunc(ctx.amount);
-			if (!actor || !RESOURCES.includes(resource) || !amount) return null;
-			if (resource === "uses" && !ctx.carrierItem) return null;
-			return {
-				kind: "resource",
-				actor,
-				item: resource === "uses" ? ctx.carrierItem : null,
-				resource,
-				delta: asString(data.action, "spend") === "restore" ? amount : -amount,
-				slot: asString(data.slotLevel),
-				currency: asString(data.currency, "gp")
-			};
-		}
-		default: return null;
-	}
-}
-/** New `spent` after `delta` uses become available (negative spends). */
-function usesSpent(spent, max, delta) {
-	return Math.min(max, Math.max(0, spent - delta));
-}
-function slotValue(value, max, delta) {
-	return Math.min(max, Math.max(0, value + delta));
-}
-/** The requested slot, or the lowest slot that can be spent (delta < 0) or refilled (delta > 0). */
-function pickSlot(slots, wanted, delta) {
-	if (wanted) return slots.some((slot) => slot.key === wanted) ? wanted : null;
-	return slots.filter((slot) => slot.max > 0 && (delta < 0 ? slot.value > 0 : slot.value < slot.max)).sort((a, b) => a.level - b.level || a.key.localeCompare(b.key))[0]?.key ?? null;
-}
-/** Temporary hit points do not stack: restoring keeps the higher value; spending removes them. */
-function tempHp(current, delta) {
-	return delta > 0 ? Math.max(current, delta) : Math.max(0, current + delta);
-}
-function currencyValue(value, delta) {
-	return Math.max(0, value + delta);
-}
-//#endregion
-//#region src/foundry/operations.ts
-function number(value) {
-	return asNumber(value) ?? 0;
-}
-async function call$1(target, method, ...args) {
-	const fn = read(target, method);
-	if (typeof fn !== "function") throw new Error(`Build-n-Action | ${method} is not available`);
-	return fn.apply(target, args);
-}
-async function documentAt(uuid) {
-	if (!uuid) return null;
-	const found = await fromUuid(uuid);
-	return isDocument(found) ? found : null;
-}
-/** Whether this user may make the change without the GM. */
-function canRunLocally(op) {
-	if (!documentFromUuid(op.actor)?.isOwner) return false;
-	if (op.kind === "resource" && op.item) return documentFromUuid(op.item)?.isOwner === true;
-	return true;
-}
-async function applyResource(actor, op) {
-	switch (op.resource) {
-		case "uses": {
-			const item = await documentAt(op.item ?? "");
-			if (!item) return;
-			await item.update({ "system.uses.spent": usesSpent(number(read(item, "system.uses.spent")), number(read(item, "system.uses.max")), op.delta) });
-			return;
-		}
-		case "slots": {
-			const slots = slotsOf(actor);
-			const key = pickSlot(slots, op.slot, op.delta);
-			const slot = slots.find((entry) => entry.key === key);
-			if (!slot) return;
-			await actor.update({ [`system.spells.${slot.key}.value`]: slotValue(slot.value, slot.max, op.delta) });
-			return;
-		}
-		case "hp":
-			await call$1(actor, "applyDamage", -op.delta);
-			return;
-		case "tempHp":
-			await actor.update({ "system.attributes.hp.temp": tempHp(number(read(actor, "system.attributes.hp.temp")), op.delta) });
-			return;
-		case "hitDice": {
-			const updates = hitDiceSpend(classHitDice(actor), op.delta < 0 ? "smallest" : "largest", -op.delta).map((entry) => ({
-				_id: entry.id,
-				"system.hd.spent": entry.spent
-			}));
-			if (updates.length) await call$1(actor, "updateEmbeddedDocuments", "Item", updates);
-			return;
-		}
-		case "currency":
-			await actor.update({ [`system.currency.${op.currency}`]: currencyValue(number(read(actor, `system.currency.${op.currency}`)), op.delta) });
-			return;
-	}
-}
-/** Make one change; throws when the documents are missing. */
-async function executeOperation(op) {
-	const actor = await documentAt(op.actor);
-	if (!actor) throw new Error(`Build-n-Action | no actor ${op.actor}`);
-	switch (op.kind) {
-		case "status":
-			await call$1(actor, "toggleStatusEffect", op.status, { active: op.active });
-			return;
-		case "copyEffect": {
-			const effect = await documentAt(op.effect);
-			if (!effect) throw new Error(`Build-n-Action | no effect ${op.effect}`);
-			const data = asRecord(await call$1(effect, "toObject"));
-			delete data._id;
-			Object.assign(data, {
-				origin: op.origin,
-				transfer: false,
-				disabled: false
-			});
-			await call$1(actor, "createEmbeddedDocuments", "ActiveEffect", [data]);
-			return;
-		}
-		case "removeEffects": {
-			const ids = listOf(read(actor, "effects")).filter(isDocument).filter((effect) => effect.name === op.name).map((effect) => effect.id);
-			if (ids.length) await call$1(actor, "deleteEmbeddedDocuments", "ActiveEffect", ids);
-			return;
-		}
-		case "resource":
-			await applyResource(actor, op);
-			return;
-		case "rider":
-			await addRider(actor, op.rider);
-			return;
-	}
-}
-//#endregion
-//#region src/foundry/socket.ts
-var CHANNEL = `module.${MODULE_SCOPE}`;
-var TIMEOUT_MS = 15e3;
-var waiting = /* @__PURE__ */ new Map();
-function isOperation(value) {
-	return OPERATION_KINDS.includes(asString(read(value, "kind"))) && typeof read(value, "actor") === "string";
-}
-async function onMessage(message) {
-	const type = read(message, "type");
-	const id = asString(read(message, "id"));
-	if (type === "reply") {
-		if (read(message, "recipient") !== game.user.id) return;
-		waiting.get(id)?.({
-			ok: read(message, "ok") === true,
-			error: asString(read(message, "error")) || null
-		});
-		return;
-	}
-	if (type !== "operations" || !game.user.isGM || read(message, "gm") !== game.user.id) return;
-	let error = null;
-	for (const op of listOf(read(message, "operations")).filter(isOperation)) try {
-		await executeOperation(op);
-	} catch (failure) {
-		error = failure instanceof Error ? failure.message : String(failure);
-		console.warn("Build-n-Action | a requested change failed", op, failure);
-	}
-	game.socket.emit(CHANNEL, {
-		type: "reply",
-		id,
-		recipient: read(message, "sender"),
-		ok: error === null,
-		error
-	});
-}
-function registerSocket() {
-	game.socket.on(CHANNEL, (message) => {
-		onMessage(message);
-	});
-}
-/** Make changes: locally where allowed, through the active GM otherwise. False when something was skipped. */
-async function performOperations(operations) {
-	const remote = [];
-	let ok = true;
-	for (const op of operations) {
-		if (!canRunLocally(op)) {
-			remote.push(op);
-			continue;
-		}
-		try {
-			await executeOperation(op);
-		} catch (error) {
-			ok = false;
-			console.warn("Build-n-Action | a change failed", op, error);
-		}
-	}
-	if (!remote.length) return ok;
-	const gm = game.users.activeGM;
-	if (!gm) {
-		ui.notifications.warn(game.i18n.localize("BNA.Runtime.NoGM"));
-		return false;
-	}
-	const id = randomId();
-	const reply = new Promise((resolve) => {
-		const timer = setTimeout(() => {
-			waiting.delete(id);
-			resolve(null);
-		}, TIMEOUT_MS);
-		waiting.set(id, (answer) => {
-			clearTimeout(timer);
-			waiting.delete(id);
-			resolve(answer);
-		});
-	});
-	game.socket.emit(CHANNEL, {
-		type: "operations",
-		id,
-		sender: game.user.id,
-		gm: gm.id,
-		operations: remote
-	});
-	const answer = await reply;
-	if (!answer?.ok) {
-		console.warn("Build-n-Action | the GM could not make all changes", answer?.error ?? "no reply");
-		ui.notifications.warn(game.i18n.localize("BNA.Runtime.RemoteFailed"));
-		return false;
-	}
-	return ok;
-}
-//#endregion
-//#region src/foundry/reactions.ts
-/** Formula fields of roll results that a rider carries; resolved when the rider is made. */
-var RIDER_FORMULAS = [
-	"formula",
-	"damage",
-	"dice",
-	"critical",
-	"fumble",
-	"targetValue",
-	"deathSaveCritical"
-];
-function riderData(intent, data, options) {
-	const effect = asRecord(intent.data.effect);
-	const fields = { ...asRecord(effect.data) };
-	for (const key of RIDER_FORMULAS) {
-		const value = asString(fields[key]).trim();
-		if (value) fields[key] = resolveForeign(value, data);
-	}
-	if (asString(effect.type) === "rollBonus" && options.scale) fields.formula = scaledFormula(asString(asRecord(effect.data).formula), options.costFormula ?? "", data, options.scale);
-	return {
-		...intent.data,
-		effect: {
-			type: asString(effect.type),
-			data: fields
-		}
-	};
-}
-/** Turn reaction results into operations (riders, effects, resources) and perform them. */
-async function applyReactionIntents(intents, ctx, activation, options = {}) {
-	const operations = [];
-	const self = ctx.roller.actor;
-	const target = ctx.roller.target?.actor ?? null;
-	for (const intent of intents) {
-		const info = ctx.sources.get(intent.entry);
-		if (!info) continue;
-		const data = options.data ?? originRollData(info.document);
-		const origin = info.origin?.uuid ?? info.document.uuid;
-		if (intent.type === "rider") {
-			if (asString(intent.data.scope) !== "nextRoll" && !activation) continue;
-			const recipient = asString(intent.data.scope) === "nextRoll" && asString(intent.data.who, "self") === "target" ? target : self;
-			if (!recipient) continue;
-			const rider = createRider(riderData(intent, data, options), {
-				id: randomId(),
-				activation,
-				clock: riderClock(recipient),
-				source: {
-					name: info.blueprint.name,
-					origin,
-					blueprintId: intent.blueprintId,
-					nodeId: intent.nodeId
-				}
-			});
-			if (rider) operations.push({
-				kind: "rider",
-				actor: recipient.uuid,
-				rider
-			});
-			continue;
-		}
-		const amountFormula = asString(intent.data.amount).trim() || "1";
-		const amount = intent.type === "resource" ? simplifyNumber(resolveForeign(amountFormula, data), data) ?? 0 : 0;
-		const op = planOperation(intent.type, intent.data, {
-			self: self.uuid,
-			target: target?.uuid ?? null,
-			carrierItem: info.carrierItem?.uuid ?? null,
-			origin,
-			amount
-		});
-		if (op) operations.push(op);
-	}
-	if (operations.length) await performOperations(operations);
-}
-async function promptChoices(host, choices, actor) {
-	const panel = renderChoices(host, {
-		choices,
-		reminders: []
-	});
-	if (!panel) return;
-	await foundry.applications.api.DialogV2.wait({
-		window: {
-			title: game.i18n.format("BNA.Reaction.Title", { name: actor.name }),
-			icon: "fa-solid fa-diagram-project"
-		},
-		position: { width: 420 },
-		content: "<div class=\"bna-reaction\"></div>",
-		buttons: [{
-			action: "done",
-			label: game.i18n.localize("BNA.Reaction.Done"),
-			default: true
-		}],
-		rejectClose: false,
-		render: (_event, dialog) => {
-			const element = asRecord(dialog).element;
-			if (element instanceof HTMLElement) element.querySelector(".bna-reaction")?.append(panel);
-		}
-	});
-}
-/** Run blueprints reacting to an outcome: immediate results now, optional ones through a prompt. */
-async function runReaction(input) {
-	if (!input.pins.length) return;
-	const roller = makeRoller(input.actor, input.item, input.activity, input.target, { ...input.details ?? {} });
-	const evaluation = evaluateEvent(input.event, roller, input.pins, input.activation);
-	if (!evaluation?.chain.intents.length) return;
-	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
-	const ctx = {
-		event: input.event,
-		roller,
-		sources: evaluation.collected.sources
-	};
-	await applyReactionIntents(sorted.immediate, ctx, input.activation);
-	announceApplied(sorted.immediate, evaluation.context);
-	recordUsages(sorted.immediate, roller.actor);
-	if (!sorted.choices.length) return;
-	await promptChoices({
-		ctx,
-		applied: /* @__PURE__ */ new Set(),
-		apply: async (choice, info, scale) => {
-			await applyReactionIntents(choice.intents, ctx, input.activation, {
-				data: choiceData(info, ctx, scale),
-				scale,
-				costFormula: choice.cost.formula
-			});
-			announceApplied(choice.intents, evaluation.context);
-		}
-	}, sorted.choices, input.actor);
 }
 //#endregion
 //#region src/foundry/reaction-hooks.ts
@@ -1658,6 +1555,176 @@ function registerReactionHooks() {
 	});
 }
 //#endregion
+//#region src/foundry/triggers.ts
+/** Turns, regions and rests: a trigger is remembered for ten minutes. */
+var once = createOnce(6e5);
+var warnedNoGM = false;
+function isActiveGM() {
+	return game.users.activeGM?.id === game.user.id;
+}
+/** Run the blueprints a trigger starts. Only the active GM does; others ignore it (see requestTrigger). */
+async function runTrigger(input) {
+	if (!isActiveGM() || !once(input.key)) return;
+	if (input.event === "shortRest" || input.event === "longRest" || input.event === "turnStart") await resetCounters(input.actor, input.event);
+	const roller = {
+		...makeRoller(input.actor, null, null, null, {}),
+		token: input.token ?? actorToken(input.actor)
+	};
+	const evaluation = evaluateEvent(input.event, roller, ["out"], null, input.only ? { only: input.only } : {});
+	if (!evaluation?.chain.intents.length) return;
+	const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
+	const intents = [...sorted.immediate, ...sorted.choices.flatMap((choice) => choice.intents)];
+	const ctx = {
+		event: input.event,
+		roller,
+		sources: evaluation.collected.sources
+	};
+	const done = await applyReactionIntents(intents, ctx, null);
+	await whisperReminders(sorted.reminders, ctx);
+	announceApplied([...done, ...sorted.reminders], evaluation.context);
+	recordUsages(done, roller.actor);
+	await runContinuations({
+		intents: [
+			...done,
+			...sorted.reminders,
+			...evaluation.chain.sent
+		],
+		ctx,
+		context: evaluation.context,
+		activation: null,
+		run: evaluation.id
+	});
+}
+/** Start a trigger from any client: here when this is the active GM, otherwise through the GM. */
+function requestTrigger(input) {
+	if (isActiveGM()) {
+		guardedAsync("trigger", () => runTrigger({
+			...input,
+			token: null
+		}));
+		return;
+	}
+	const gm = game.users.activeGM;
+	if (!gm) {
+		if (!warnedNoGM) console.warn("Build-n-Action | no GM is connected, so turn, region and rest events do not run.");
+		warnedNoGM = true;
+		return;
+	}
+	sendTrigger(gm.id, input.event, input.actor.uuid, input.key);
+}
+function turnState(value) {
+	const number = (key) => {
+		const found = read(value, key);
+		return typeof found === "number" ? found : null;
+	};
+	return {
+		round: number("round"),
+		turn: number("turn"),
+		combatantId: asString(read(value, "combatantId")) || null
+	};
+}
+async function onTurnChange(combat, previous, current) {
+	if (!isActiveGM()) return;
+	const combatId = asString(read(combat, "id"));
+	for (const transition of turnTransitions(previous ? turnState(previous) : null, current ? turnState(current) : null)) {
+		const combatant = listOf(read(combat, "combatants")).find((entry) => read(entry, "id") === transition.combatantId);
+		const actor = read(combatant, "actor");
+		if (!isDocument(actor)) continue;
+		const token = read(combatant, "token.object") ?? null;
+		await runTrigger({
+			event: transition.event,
+			actor,
+			token,
+			key: `${combatId}|${transition.event}|${transition.round}|${transition.turn}|${transition.combatantId}`
+		});
+	}
+}
+function registerTriggerHooks() {
+	setTriggerReceiver(receiveTrigger);
+	Hooks.on("combatTurnChange", (combat, previous, current) => {
+		guardedAsync("turn", () => onTurnChange(combat, previous, current));
+	});
+	Hooks.on("dnd5e.restCompleted", (actor, _result, config) => {
+		const event = restEvent(read(config, "type"));
+		if (!event || !isDocument(actor)) return;
+		requestTrigger({
+			event,
+			actor,
+			key: `${actor.uuid}|${event}|${Date.now()}`
+		});
+	});
+}
+/** A trigger the GM received from another client. */
+async function receiveTrigger(event, actorUuid, key) {
+	const actor = documentFromUuid(actorUuid);
+	if (actor) await runTrigger({
+		event,
+		actor,
+		token: null,
+		key
+	});
+}
+//#endregion
+//#region src/foundry/region-behavior.ts
+var REGION_BEHAVIOR_TYPE = `${MODULE_SCOPE}.blueprints`;
+async function onToken(event, trigger) {
+	const token = event.data.token;
+	const actor = read(token, "actor");
+	if (!token || !isDocument(actor)) return;
+	await runTrigger({
+		event: trigger,
+		actor,
+		token: read(token, "object") ?? null,
+		only: this.region,
+		key: `${this.region.uuid}|${token.uuid}|${trigger}|${event.data.movement?.id ?? Date.now()}`
+	});
+}
+/**
+* Hears tokens entering and leaving its region and runs the region's blueprints on the active GM.
+* Region events reach every client; runTrigger acts only on the active GM.
+*/
+var BlueprintsRegionBehavior = class extends foundry.data.regionBehaviors.RegionBehaviorType {
+	static defineSchema() {
+		return { events: foundry.data.regionBehaviors.RegionBehaviorType._createEventsField() };
+	}
+	static events = {
+		tokenEnter(event) {
+			return guardedAsync("region enter", () => onToken.call(this, event, "regionEnter"));
+		},
+		tokenExit(event) {
+			return guardedAsync("region exit", () => onToken.call(this, event, "regionExit"));
+		}
+	};
+};
+/** Register the behavior type (init). */
+function registerRegionBehavior() {
+	CONFIG.RegionBehavior.dataModels[REGION_BEHAVIOR_TYPE] = BlueprintsRegionBehavior;
+	CONFIG.RegionBehavior.typeLabels[REGION_BEHAVIOR_TYPE] = "BNA.RegionBehavior.label";
+	CONFIG.RegionBehavior.typeIcons[REGION_BEHAVIOR_TYPE] = "fa-solid fa-diagram-project";
+	CONFIG.RegionBehavior.typeHints[REGION_BEHAVIOR_TYPE] = "BNA.RegionBehavior.hint";
+}
+/** Add the behavior while the region's blueprints start on entering or leaving it, and remove it otherwise. */
+async function syncRegionBehavior(region) {
+	const wanted = needsRegionBehavior(documentBlueprints(region).blueprints);
+	const behaviors = [...read(region, "behaviors") ?? []].filter((behavior) => read(behavior, "type") === REGION_BEHAVIOR_TYPE);
+	if (wanted && !behaviors.length) await region.createEmbeddedDocuments?.("RegionBehavior", [{
+		type: REGION_BEHAVIOR_TYPE,
+		name: game.i18n.localize("BNA.RegionBehavior.label")
+	}]);
+	else if (!wanted && behaviors.length) await region.deleteEmbeddedDocuments?.("RegionBehavior", behaviors.map((behavior) => behavior.id));
+}
+/** Keep regions' behaviors in step with their blueprints (active GM). */
+function registerRegionBehaviorSync() {
+	const sync = (region) => {
+		if (!isDocument(region) || game.users.activeGM?.id !== game.user.id) return;
+		guardedAsync("region behavior", () => syncRegionBehavior(region));
+	};
+	Hooks.on("createRegion", (region) => sync(region));
+	Hooks.on("updateRegion", (region, changes) => {
+		if (touchesBlueprints(changes)) sync(region);
+	});
+}
+//#endregion
 //#region src/module.ts
 var api = createApi();
 Object.assign(globalThis, {
@@ -1668,6 +1735,7 @@ Hooks.once("init", () => {
 	registerSettings();
 	registerLibrary();
 	registerMigrationMenu();
+	registerRegionBehavior();
 	registerHeaderControls();
 	const module = game.modules.get(MODULE_SCOPE);
 	if (module) module.api = api;
@@ -1675,13 +1743,14 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
 	registerAuraPreviews();
 	registerSocket();
+	registerSaves();
 	validateIntegrations();
 	registerPreRollHooks();
 	registerChoicePanel();
 	registerReactionHooks();
+	registerTriggerHooks();
+	registerRegionBehaviorSync();
 	loadTraitTrees().catch((error) => console.warn("Build-n-Action | could not load language and tool trees", error));
 	Hooks.callAll(`${MODULE_SCOPE}.ready`, api);
 });
 //#endregion
-
-//# sourceMappingURL=module.mjs.map
