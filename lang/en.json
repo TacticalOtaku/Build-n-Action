@@ -1518,6 +1518,10 @@
         "name": "Show the Build-n-Action button in the title bar",
         "hint": "Besides the entry in each sheet's header menu, show a Build-n-Action button in the window's title bar."
       },
+      "debug": {
+        "name": "Debug logging",
+        "hint": "Write detailed Build-n-Action diagnostics to the browser console on this device."
+      },
       "migration": {
         "name": "Migrate the world",
         "label": "Open the migration",

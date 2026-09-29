@@ -1,4 +1,4 @@
-import { $ as resolveCost, A as traitTrees, At as rollDataOf, B as resetCounters, C as pendingRoll, Dt as isDocument, E as takeAfterRoll, Et as documentFromUuid, F as resolveForeign, G as sendTrigger, Gt as randomId, H as performOperations, I as scaledFormula, It as MODULE_SCOPE, J as costState, K as setSaveReceiver, L as simplifyNumber, M as registerAuraPreviews, Mt as listOf, N as modifyFormulaParts, Nt as read, O as loadTraitTrees, Ot as isSuppressed, P as replaceData, Pt as stringList, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as actorToken, T as rememberAfterRoll, Tt as documentBlueprints, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Xt as getResult, Y as payCost, Z as costOptions, _ as guardedAsync, an as counterDef, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterValue, ct as buildRollFacts, d as activationFor, dn as asRecord, et as sortIntents, f as activationOf, fn as asString, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as touchesBlueprints, k as sourceLabel, kt as originRollData, ln as nextCounterValue, m as announceApplied, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterKey, ot as createRider, p as allowIntents, pn as asStrings, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterName, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as asNumber, v as makeRoller, vt as registerSettings, w as registerPending, wt as carrierKind, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-CUxpO87f.mjs";
+import { $ as resolveCost, A as traitTrees, At as originRollData, B as resetCounters, C as pendingRoll, Ct as actorToken, Dt as documentFromUuid, E as takeAfterRoll, Et as documentBlueprints, F as resolveForeign, Ft as stringList, G as sendTrigger, H as performOperations, I as scaledFormula, J as costState, K as setSaveReceiver, Kt as randomId, L as simplifyNumber, Lt as MODULE_SCOPE, M as registerAuraPreviews, Mt as touchesBlueprints, N as modifyFormulaParts, Nt as listOf, O as loadTraitTrees, Ot as isDocument, P as replaceData, Pt as read, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as log, T as rememberAfterRoll, Tt as carrierKind, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Y as payCost, Z as costOptions, Zt as getResult, _ as guardedAsync, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterName, ct as buildRollFacts, d as activationFor, dn as asNumber, et as sortIntents, f as activationOf, fn as asRecord, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as rollDataOf, k as sourceLabel, kt as isSuppressed, ln as counterValue, m as announceApplied, mn as asStrings, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterDef, ot as createRider, p as allowIntents, pn as asString, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterKey, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as nextCounterValue, v as makeRoller, vt as registerSettings, w as registerPending, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-CVWWtjpP.mjs";
 //#region src/runtime/roll-config.ts
 function isEntry(roll) {
 	return !!roll && typeof roll === "object";
@@ -301,14 +301,14 @@ async function onApply(host, choice, info, cost, section, controls) {
 		await host.apply(choice, info, option.scale, controls.damageType?.value || void 0);
 		for (const intent of choice.intents) {
 			if (intent.common.limit === "none") continue;
-			recordUsage(actor, intent.blueprintId, intent.nodeId).catch((error) => console.warn("Build-n-Action | could not record a limited use", error));
+			recordUsage(actor, intent.blueprintId, intent.nodeId).catch((error) => log.warn("could not record a limited use", error));
 		}
 		host.applied.add(choice.key);
 		section.classList.add("is-applied");
 		button.textContent = game.i18n.localize("BNA.Panel.Applied");
 		for (const select of [controls.amount, controls.damageType]) if (select) select.disabled = true;
 	} catch (error) {
-		console.warn("Build-n-Action | could not apply a choice", error);
+		log.warn("could not apply a choice", error);
 		button.disabled = false;
 	}
 }
@@ -414,7 +414,7 @@ function carrierOf(application) {
 	return canEdit(document) ? document : null;
 }
 function open(document) {
-	openEditor(document).catch((error) => console.error("Build-n-Action | could not open the editor", error));
+	openEditor(document).catch((error) => log.error("could not open the editor", error));
 }
 /** The document's blueprints, and whether one of them works now (enabled, on a carrier that is not switched off). */
 function blueprintState(document) {
@@ -691,7 +691,7 @@ async function requestSave(request) {
 	if (isActiveGM$1()) return coordinate(request);
 	const gm = game.users.activeGM;
 	if (!gm) {
-		if (!warnedNoGM$1) console.warn("Build-n-Action | no GM is connected, so demanded saving throws are not rolled.");
+		if (!warnedNoGM$1) log.warn("no GM is connected, so demanded saving throws are not rolled.");
 		warnedNoGM$1 = true;
 		return null;
 	}
@@ -1095,7 +1095,7 @@ function runRoll(event, config, dialog, message, roller) {
 	announceApplied(sorted.immediate, evaluation.context);
 	recordUsages(sorted.immediate, roller.actor);
 	const riders = [...new Set(sorted.immediate.flatMap((intent) => ctx.sources.get(intent.entry)?.rider?.id ?? []))];
-	if (riders.length) useRiders(roller.actor, riders).catch((error) => console.warn("Build-n-Action | could not use up riders", error));
+	if (riders.length) useRiders(roller.actor, riders).catch((error) => log.warn("could not use up riders", error));
 	let pending = null;
 	if ((sorted.choices.length || sorted.reminders.length) && dialog && typeof dialog === "object") {
 		pending = {
@@ -1260,7 +1260,7 @@ function registerPreRollHooks() {
 	Hooks.on("dnd5e.postActivityConsumption", postActivityConsumption);
 	Hooks.on("dnd5e.preCreateActivityTemplate", preCreateActivityTemplate);
 	Hooks.on("dnd5e.restCompleted", (actor, result) => {
-		countRest(actor, result).catch((error) => console.warn("Build-n-Action | could not count a rest", error));
+		countRest(actor, result).catch((error) => log.warn("could not count a rest", error));
 	});
 }
 //#endregion
@@ -1606,7 +1606,7 @@ function requestTrigger(input) {
 	}
 	const gm = game.users.activeGM;
 	if (!gm) {
-		if (!warnedNoGM) console.warn("Build-n-Action | no GM is connected, so turn, region and rest events do not run.");
+		if (!warnedNoGM) log.warn("no GM is connected, so turn, region and rest events do not run.");
 		warnedNoGM = true;
 		return;
 	}
@@ -1750,9 +1750,7 @@ Hooks.once("ready", () => {
 	registerReactionHooks();
 	registerTriggerHooks();
 	registerRegionBehaviorSync();
-	loadTraitTrees().catch((error) => console.warn("Build-n-Action | could not load language and tool trees", error));
+	loadTraitTrees().catch((error) => log.warn("could not load language and tool trees", error));
 	Hooks.callAll(`${MODULE_SCOPE}.ready`, api);
 });
 //#endregion
-
-//# sourceMappingURL=module.mjs.map
