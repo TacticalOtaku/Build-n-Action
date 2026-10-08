@@ -1445,6 +1445,7 @@
       "scriptFalse": "The script returned false.",
       "scriptError": "The script stopped with an error.",
       "scriptDisabled": "Scripts are turned off in the module settings, so this passes.",
+      "scriptUntrusted": "Another player can edit this script, so it does not run here and the check fails.",
       "otherItem": "The roll uses a different item.",
       "noChecks": "No checks, so this always passes.",
       "disabled": "The blueprint is turned off.",
