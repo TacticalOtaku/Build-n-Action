@@ -1,4 +1,4 @@
-import { $ as resolveCost, A as traitTrees, At as originRollData, B as resetCounters, C as pendingRoll, Ct as actorToken, Dt as documentFromUuid, E as takeAfterRoll, Et as documentBlueprints, F as resolveForeign, Ft as stringList, G as sendTrigger, H as performOperations, I as scaledFormula, J as costState, K as setSaveReceiver, Kt as randomId, L as simplifyNumber, Lt as MODULE_SCOPE, M as registerAuraPreviews, Mt as touchesBlueprints, N as modifyFormulaParts, Nt as listOf, O as loadTraitTrees, Ot as isDocument, P as replaceData, Pt as read, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as log, T as rememberAfterRoll, Tt as carrierKind, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Y as payCost, Z as costOptions, Zt as getResult, _ as guardedAsync, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterName, ct as buildRollFacts, d as activationFor, dn as asNumber, et as sortIntents, f as activationOf, fn as asRecord, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as rollDataOf, k as sourceLabel, kt as isSuppressed, ln as counterValue, m as announceApplied, mn as asStrings, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterDef, ot as createRider, p as allowIntents, pn as asString, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterKey, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as nextCounterValue, v as makeRoller, vt as registerSettings, w as registerPending, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-BDCXDVoH.mjs";
+import { $ as resolveCost, A as traitTrees, At as originRollData, B as resetCounters, C as pendingRoll, Ct as actorToken, Dt as documentFromUuid, E as takeAfterRoll, Et as documentBlueprints, F as resolveForeign, Ft as stringList, G as sendTrigger, H as performOperations, I as scaledFormula, J as costState, K as setSaveReceiver, Kt as randomId, L as simplifyNumber, Lt as MODULE_SCOPE, M as registerAuraPreviews, Mt as touchesBlueprints, N as modifyFormulaParts, Nt as listOf, O as loadTraitTrees, Ot as isDocument, P as replaceData, Pt as read, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as log, T as rememberAfterRoll, Tt as carrierKind, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Y as payCost, Z as costOptions, Zt as getResult, _ as guardedAsync, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterName, ct as buildRollFacts, d as activationFor, dn as asString, et as sortIntents, f as activationOf, fn as asStrings, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as rollDataOf, k as sourceLabel, kt as isSuppressed, ln as asNumber, m as announceApplied, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterDef, ot as createRider, p as allowIntents, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterKey, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as asRecord, v as makeRoller, vt as registerSettings, w as registerPending, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-DEuSkxtY.mjs";
 //#region src/runtime/roll-config.ts
 function isEntry(roll) {
 	return !!roll && typeof roll === "object";
@@ -488,20 +488,20 @@ function startsLater(intent) {
 }
 //#endregion
 //#region src/runtime/counters.ts
-/** The change a "Change counter" result makes, with its final value; `store` is the recipient's counters. */
+/** The change a "Change counter" result makes, with the counter's limits; `store` is the recipient's counters. */
 function planCounter(data, ctx, store) {
 	const name = counterName(asString(data.name));
 	const actor = asString(data.who, "self") === "target" ? ctx.target : ctx.self;
 	if (!name || !actor) return null;
 	const scope = asString(data.scope) === "blueprint" ? "blueprint" : "actor";
 	const def = counterDef(store, scope, name, ctx.blueprint);
-	const current = counterValue(store, scope, name, ctx.blueprint);
-	const value = nextCounterValue(current, asString(data.action, "add"), ctx.amount, def);
 	return {
 		kind: "counter",
 		actor,
 		key: counterKey(scope, name, ctx.blueprint.id),
-		value
+		action: asString(data.action, "add"),
+		amount: ctx.amount,
+		def
 	};
 }
 //#endregion
@@ -629,6 +629,8 @@ var answers = createWaiter();
 var prompts = /* @__PURE__ */ new Map();
 /** On the GM: requests whose player pressed "Roll" and is in the roll dialog. */
 var rolling = /* @__PURE__ */ new Set();
+/** On the GM: which player each open request asked; only they may answer it. */
+var asked = /* @__PURE__ */ new Map();
 /** On the player: requests being rolled here. */
 var rollingHere = /* @__PURE__ */ new Set();
 var warnedNoGM$1 = false;
@@ -668,6 +670,7 @@ async function coordinate(request) {
 	})));
 	if (player) {
 		const id = randomId();
+		asked.set(id, player);
 		sendSaveMessage({
 			type: "saveAsk",
 			id,
@@ -677,6 +680,7 @@ async function coordinate(request) {
 		let answer = await answers.wait(id, SAVE_WAIT_MS);
 		if (answer === null && rolling.has(id)) answer = await answers.wait(id, SAVE_WAIT_MS);
 		rolling.delete(id);
+		asked.delete(id);
 		if (answer && answer !== "declined") return answer;
 		sendSaveMessage({
 			type: "saveCancel",
@@ -700,7 +704,6 @@ async function requestSave(request) {
 		type: "saveRequest",
 		id,
 		gm: gm.id,
-		sender: game.user.id,
 		request
 	});
 	return await results.wait(id, ASKER_WAIT_MS) ?? null;
@@ -758,21 +761,24 @@ function isRequest(value) {
 function asOutcome(value) {
 	return value && typeof value === "object" && typeof read(value, "total") === "number" ? value : null;
 }
-function receive(message) {
+/** `sender` is the user Foundry says sent the message: results, questions and cancellations come from the GM, answers from the player asked. */
+function receive(message, sender) {
 	const type = read(message, "type");
 	const id = asString(read(message, "id"));
 	const request = read(message, "request");
+	const fromGM = sender === game.users.activeGM?.id;
+	const fromAsked = isActiveGM$1() && asked.get(id) === sender;
 	if (type === "saveRequest" && isActiveGM$1() && read(message, "gm") === game.user.id && isRequest(request)) coordinate(request).then((outcome) => sendSaveMessage({
 		type: "saveResult",
 		id,
-		recipient: read(message, "sender"),
+		recipient: sender,
 		outcome
 	}));
-	else if (type === "saveResult" && read(message, "recipient") === game.user.id) results.answer(id, asOutcome(read(message, "outcome")));
-	else if (type === "saveAsk" && read(message, "user") === game.user.id && isRequest(request)) promptPlayer(id, request);
-	else if (type === "saveRolling" && isActiveGM$1()) rolling.add(id);
-	else if (type === "saveAnswer" && isActiveGM$1()) answers.answer(id, asOutcome(read(message, "outcome")) ?? "declined");
-	else if (type === "saveCancel" && read(message, "user") === game.user.id && (prompts.has(id) || rollingHere.has(id))) {
+	else if (type === "saveResult" && fromGM && read(message, "recipient") === game.user.id) results.answer(id, asOutcome(read(message, "outcome")));
+	else if (type === "saveAsk" && fromGM && read(message, "user") === game.user.id && isRequest(request)) promptPlayer(id, request);
+	else if (type === "saveRolling" && fromAsked) rolling.add(id);
+	else if (type === "saveAnswer" && fromAsked) answers.answer(id, asOutcome(read(message, "outcome")) ?? "declined");
+	else if (type === "saveCancel" && fromGM && read(message, "user") === game.user.id && (prompts.has(id) || rollingHere.has(id))) {
 		prompts.get(id)?.();
 		prompts.delete(id);
 		ui.notifications.info(game.i18n.localize("BNA.Save.TakenByGM"));
@@ -1092,10 +1098,7 @@ function runRoll(event, config, dialog, message, roller) {
 		halted: /* @__PURE__ */ new Set()
 	};
 	applyRollIntents(process, sorted.immediate, ctx, tracker);
-	announceApplied(sorted.immediate, evaluation.context);
-	recordUsages(sorted.immediate, roller.actor);
 	const riders = [...new Set(sorted.immediate.flatMap((intent) => ctx.sources.get(intent.entry)?.rider?.id ?? []))];
-	if (riders.length) useRiders(roller.actor, riders).catch((error) => log.warn("could not use up riders", error));
 	let pending = null;
 	if ((sorted.choices.length || sorted.reminders.length) && dialog && typeof dialog === "object") {
 		pending = {
@@ -1125,13 +1128,22 @@ function runRoll(event, config, dialog, message, roller) {
 			...sorted.reminders,
 			...evaluation.chain.sent
 		],
+		immediate: sorted.immediate,
+		riders,
 		pending
 	});
 }
-/** The roll goes ahead (dialog submitted or skipped): continue from what it applied. A cancelled dialog gives no rolls. */
+/**
+* The roll goes ahead (dialog submitted or skipped): spend limits and riders, then continue from what it applied.
+* A cancelled dialog gives no rolls, so nothing is spent for it.
+*/
 function postRollConfiguration(rolls, config) {
 	const after = takeAfterRoll(config);
 	if (!after || !listOf(rolls).length) return;
+	const actor = after.applied.ctx.roller.actor;
+	announceApplied(after.immediate, after.applied.context);
+	recordUsages(after.immediate, actor);
+	if (after.riders.length) useRiders(actor, after.riders).catch((error) => log.warn("could not use up riders", error));
 	const intents = [...after.intents, ...after.pending?.chosen ?? []];
 	if (!intents.some(startsLater)) return;
 	guardedAsync("continuation", () => runContinuations({
