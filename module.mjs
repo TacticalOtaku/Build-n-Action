@@ -1,4 +1,4 @@
-import { $ as resolveCost, A as traitTrees, At as originRollData, B as resetCounters, C as pendingRoll, Ct as actorToken, Dt as documentFromUuid, E as takeAfterRoll, Et as documentBlueprints, F as resolveForeign, Ft as stringList, G as sendTrigger, H as performOperations, I as scaledFormula, J as costState, K as setSaveReceiver, Kt as randomId, L as simplifyNumber, Lt as MODULE_SCOPE, M as registerAuraPreviews, Mt as touchesBlueprints, N as modifyFormulaParts, Nt as listOf, O as loadTraitTrees, Ot as isDocument, P as replaceData, Pt as read, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as log, T as rememberAfterRoll, Tt as carrierKind, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Y as payCost, Z as costOptions, Zt as getResult, _ as guardedAsync, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterName, ct as buildRollFacts, d as activationFor, dn as asString, et as sortIntents, f as activationOf, fn as asStrings, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as rollDataOf, k as sourceLabel, kt as isSuppressed, ln as asNumber, m as announceApplied, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterDef, ot as createRider, p as allowIntents, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterKey, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as asRecord, v as makeRoller, vt as registerSettings, w as registerPending, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-DEuSkxtY.mjs";
+import { $ as resolveCost, A as traitTrees, At as originRollData, B as resetCounters, C as pendingRoll, Ct as actorToken, Dt as documentFromUuid, E as takeAfterRoll, Et as documentBlueprints, F as resolveForeign, Ft as stringList, G as sendTrigger, H as performOperations, I as scaledFormula, J as costState, K as setSaveReceiver, Kt as randomId, L as simplifyNumber, Lt as MODULE_SCOPE, M as registerAuraPreviews, Mt as touchesBlueprints, N as modifyFormulaParts, Nt as listOf, O as loadTraitTrees, Ot as isDocument, P as replaceData, Pt as read, Q as costScales, R as resolveModifiers, S as resolveRollTarget, St as log, T as rememberAfterRoll, Tt as carrierKind, U as registerSocket, V as resolveCounterIntents, W as sendSaveMessage, X as costAvailable, Y as payCost, Z as costOptions, Zt as getResult, _ as guardedAsync, at as recordUsage, b as recordUsages, c as registerMigrationMenu, cn as counterName, ct as buildRollFacts, d as activationFor, dn as asString, et as sortIntents, f as activationOf, fn as asStrings, ft as runWithSignals, g as guarded, gt as SETTINGS, h as evaluateEvent, i as createApi, it as countRest, j as withinAura, jt as rollDataOf, k as sourceLabel, kt as isSuppressed, ln as asNumber, m as announceApplied, mt as openEditor, n as foundryTranslator, nt as riderClock, on as counterDef, ot as createRider, p as allowIntents, pt as canEdit, q as setTriggerReceiver, r as createPhraseFormatter, rt as useRiders, s as validateIntegrations, sn as counterKey, st as matchDisposition, t as foundryChoices, tt as planOperation, u as registerLibrary, un as asRecord, v as makeRoller, vt as registerSettings, w as registerPending, x as rememberActivation, xt as setting, y as midiActivation, z as counterStore } from "./chunks/choices-COrevEMD.mjs";
 //#region src/runtime/roll-config.ts
 function isEntry(roll) {
 	return !!roll && typeof roll === "object";
@@ -11,25 +11,55 @@ function appendRollPart(config, part) {
 	for (const roll of entries(config)) (roll.parts ??= []).push(part);
 }
 /**
-* Remove dnd5e 5.3 compatibility getters from senses in plain target roll data: reading them
-* logs a deprecation when the roll dialog deep-clones its configuration.
+* Plain target roll data with dnd5e 5.3's senses shims (non-configurable getters such as `senses.darkvision` that
+* log a deprecation when the roll dialog deep-clones its configuration) turned into plain values from
+* `senses.ranges`. Roll data shares objects with the actor, so only the objects on the way to a shimmed senses
+* object are copied; everything else, and the actor, stays as it is.
 */
-function removeLegacySenseAccessors(value, visited = /* @__PURE__ */ new WeakSet()) {
-	if (!value || typeof value !== "object" || visited.has(value)) return;
+function withoutSenseShims(value, seen = /* @__PURE__ */ new Map()) {
+	if (!value || typeof value !== "object") return value;
+	if (seen.has(value)) return seen.get(value);
+	seen.set(value, value);
+	let result = value;
 	const prototype = Object.getPrototypeOf(value);
-	if (!Array.isArray(value) && prototype !== Object.prototype && prototype !== null) return;
-	visited.add(value);
-	const descriptors = Object.getOwnPropertyDescriptors(value);
-	const ranges = descriptors.ranges;
-	const isSenses = !!ranges && "value" in ranges;
-	for (const [key, descriptor] of Object.entries(descriptors)) if ("value" in descriptor) removeLegacySenseAccessors(descriptor.value, visited);
-	else if (isSenses && descriptor.configurable) delete value[key];
+	if (Array.isArray(value)) {
+		const items = value.map((item) => withoutSenseShims(item, seen));
+		if (items.some((item, index) => item !== value[index])) result = items;
+	} else if (prototype === Object.prototype || prototype === null) {
+		const descriptors = Object.getOwnPropertyDescriptors(value);
+		const ranges = descriptors.ranges;
+		const shimmed = ranges && "value" in ranges ? ranges.value : null;
+		let changed = false;
+		for (const [key, descriptor] of Object.entries(descriptors)) {
+			if (!("value" in descriptor)) {
+				if (!shimmed) continue;
+				descriptors[key] = {
+					value: shimmed[key],
+					enumerable: descriptor.enumerable,
+					writable: true,
+					configurable: true
+				};
+				changed = true;
+				continue;
+			}
+			const next = withoutSenseShims(descriptor.value, seen);
+			if (next === descriptor.value) continue;
+			descriptors[key] = {
+				...descriptor,
+				value: next
+			};
+			changed = true;
+		}
+		if (changed) result = Object.create(prototype, descriptors);
+	}
+	seen.set(value, result);
+	return result;
 }
 /** Make `@target` available to every roll (dnd5e merges its own roll data into these containers later). */
 function injectTargetData(config, targetData) {
-	removeLegacySenseAccessors(targetData);
-	if (config.data && typeof config.data === "object") config.data.target = targetData;
-	for (const roll of entries(config)) (roll.data ??= {}).target = targetData;
+	const target = withoutSenseShims(targetData);
+	if (config.data && typeof config.data === "object") config.data.target = target;
+	for (const roll of entries(config)) (roll.data ??= {}).target = target;
 }
 /** A stored number, or the fallback when absent or not a number (0 is kept). */
 function numberOr(value, fallback) {
@@ -104,6 +134,21 @@ function sanitizeCritical(config, validateFormula) {
 }
 //#endregion
 //#region src/foundry/apply.ts
+var warnedFormulas = /* @__PURE__ */ new Set();
+/**
+* Whether a bonus formula parses. A broken one would make dnd5e throw and drop the whole roll, so it is skipped
+* (the editor reports it as "invalid-formula"); the console says so once per result.
+*/
+function rollable(formula, intent, ctx) {
+	if (Roll.validate(formula)) return true;
+	const key = `${intent.blueprintId}|${intent.nodeId}`;
+	if (!warnedFormulas.has(key)) {
+		warnedFormulas.add(key);
+		const name = asString(read(ctx.sources.get(intent.entry), "blueprint.name")) || intent.blueprintId;
+		log.warn(`the formula "${formula}" in "${name}" is not a valid roll formula; the bonus is skipped.`);
+	}
+	return false;
+}
 /** Roll data of a blueprint whose origin is neither the roller nor the rolled item (v1 _replaceRollDataOfBonuses). */
 function foreignData(intent, ctx) {
 	const info = ctx.sources.get(intent.entry);
@@ -175,7 +220,7 @@ function applyRollIntents(config, intents, ctx, tracker, options = {}) {
 	for (const intent of intents) switch (intent.type) {
 		case "rollBonus": {
 			const formula = options.formula?.(intent) ?? formulaOf(intent, "formula", ctx, options);
-			if (!formula) break;
+			if (!formula || !rollable(formula, intent, ctx)) break;
 			if (ctx.event === "damageRoll") appendDamagePart(config, formula, options.damageType ? [options.damageType] : asStrings(intent.data.damageTypes), options.data ?? firstData);
 			else appendRollPart(config, formula);
 			break;
@@ -1354,6 +1399,14 @@ function midiChecksHits() {
 	const settings = call(read(globalThis, "MidiQOL"), "configSettings");
 	return asString(read(settings, "autoCheckHit"), "none") !== "none";
 }
+/**
+* Whether Midi QOL rolls targets' saves itself (its "Auto check saves" setting) and reports them in postCheckSaves.
+* Otherwise the targets roll from the save buttons on the card, as in plain dnd5e.
+*/
+function midiChecksSaves() {
+	const settings = call(read(globalThis, "MidiQOL"), "configSettings");
+	return asString(read(settings, "autoCheckSaves"), "none") !== "none";
+}
 function targetAc(target) {
 	return call(read(target.actor, "statuses"), "has", "coverTotal") === true ? null : asNumber(read(target.actor, "system.attributes.ac.value"));
 }
@@ -1481,8 +1534,10 @@ function speakerToken(message) {
 	const actor = call(message, "getAssociatedActor");
 	return isDocument(actor) ? actorToken(actor) : null;
 }
-async function dndSave(message) {
+/** A save rolled from a save button on a usage card; under Midi only when Midi leaves the saves to the targets. */
+async function dndSave(message, midi) {
 	if (asString(read(message, "flags.dnd5e.roll.type")) !== "save") return;
+	if (midi && midiChecksSaves()) return;
 	const originId = asString(read(message, "flags.dnd5e.originatingMessage"));
 	const origin = originId ? game.messages.get(originId) : null;
 	const activity = call(origin, "getAssociatedActivity");
@@ -1496,12 +1551,13 @@ async function dndSave(message) {
 	const dc = asNumber(read(roll, "options.target"));
 	if (total === null || dc === null) return;
 	if (!firstTime(`afterTargetSave|${asString(read(message, "id"))}`)) return;
+	const activation = midi ? `midi:${asString(read(origin, "uuid"))}` : `message:${originId}`;
 	await runReaction({
 		...attacker,
 		event: "afterTargetSave",
 		pins: savePins(total >= dc),
 		target: speakerToken(message),
-		activation: `message:${originId}`
+		activation
 	});
 }
 async function dndDamage(actor, amount, options) {
@@ -1541,18 +1597,22 @@ async function dndCheck(rolls, data) {
 		}
 	});
 }
-/** Listen for roll outcomes: Midi's workflow when Midi is active, plain dnd5e otherwise; checks always from dnd5e. */
+/**
+* Listen for roll outcomes: Midi's workflow when Midi is active, plain dnd5e otherwise; checks always from dnd5e,
+* and targets' saves from dnd5e's save buttons whenever Midi does not roll them itself.
+*/
 function registerReactionHooks() {
-	if (game.modules.get("midi-qol")?.active === true) {
+	const midi = game.modules.get("midi-qol")?.active === true;
+	Hooks.on("createChatMessage", (message) => {
+		guardedAsync("after save", () => dndSave(message, midi));
+	});
+	if (midi) {
 		Hooks.on("midi-qol.AttackRollComplete", (workflow) => guardedAsync("after attack", () => midiAttack(workflow)));
 		Hooks.on("midi-qol.postCheckSaves", (workflow) => guardedAsync("after save", () => midiSaves(workflow)));
 		Hooks.on("midi-qol.RollComplete", (workflow) => guardedAsync("after damage", () => midiDamage(workflow)));
 	} else {
 		Hooks.on("dnd5e.rollAttack", (rolls, data) => {
 			guardedAsync("after attack", () => dndAttack(rolls, data));
-		});
-		Hooks.on("createChatMessage", (message) => {
-			guardedAsync("after save", () => dndSave(message));
 		});
 		Hooks.on("dnd5e.applyDamage", (actor, amount, options) => {
 			guardedAsync("after damage", () => dndDamage(actor, amount, options));
@@ -1766,5 +1826,3 @@ Hooks.once("ready", () => {
 	Hooks.callAll(`${MODULE_SCOPE}.ready`, api);
 });
 //#endregion
-
-//# sourceMappingURL=module.mjs.map

@@ -838,6 +838,21 @@
         "Help": "Example: a bonus against prone targets.",
         "Phrase": "the target is affected by {values}"
       },
+      "targetHealthPercentages": {
+        "Label": "Target hit points",
+        "Summary": "The target's hit points are above or below a percentage.",
+        "Help": "Temporary hit points are not counted. Example: at most 50% for a bonus against bloodied targets.",
+        "Phrase": {
+          "atMost": "the target has at most {value}% of its hit points",
+          "atLeast": "the target has at least {value}% of its hit points"
+        },
+        "PhraseAny": "the target's hit points are anything",
+        "Field": {
+          "value": "Percentage",
+          "valueHint": "From 0 to 100.",
+          "type": "Compare"
+        }
+      },
       "tokenSizes": {
         "Label": "Target size",
         "Summary": "The target's token is at least or at most a size.",
