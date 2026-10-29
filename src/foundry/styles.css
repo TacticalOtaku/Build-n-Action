@@ -1,0 +1,278 @@
+/* Build-n-Action inside Foundry. Every rule is scoped to .bna-* so Foundry and dnd5e stay untouched. */
+
+.bna-surface {
+  --bna-paper: #EEF2F7;
+  --bna-raised: #FFFFFF;
+  --bna-ink: #1A2B52;
+  --bna-muted: #56688A;
+  --bna-line: rgba(26, 43, 82, 0.18);
+  --bna-when: #A86A00;
+  --bna-if: #177A5E;
+  --bna-then: #BF3F2A;
+  --bna-then-ink: #FFFFFF;
+}
+
+body.theme-dark .bna-surface,
+.themed.theme-dark .bna-surface {
+  --bna-paper: #0C1522;
+  --bna-raised: #131E30;
+  --bna-ink: #D5DEEA;
+  --bna-muted: #8796AD;
+  --bna-line: rgba(213, 222, 234, 0.16);
+  --bna-when: #E8B05A;
+  --bna-if: #6CCBAE;
+  --bna-then: #EE7A63;
+  --bna-then-ink: #0C1522;
+}
+
+.themed.theme-light .bna-surface {
+  --bna-paper: #EEF2F7;
+  --bna-raised: #FFFFFF;
+  --bna-ink: #1A2B52;
+  --bna-muted: #56688A;
+  --bna-line: rgba(26, 43, 82, 0.18);
+  --bna-when: #A86A00;
+  --bna-if: #177A5E;
+  --bna-then: #BF3F2A;
+  --bna-then-ink: #FFFFFF;
+}
+
+/* Roll dialog: choices and reminders. Sizes follow Foundry's own variables so the panel belongs to the dialog. */
+
+.bna-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--bna-line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bna-paper) 60%, transparent);
+  color: var(--bna-ink);
+}
+
+.bna-panel > legend {
+  padding: 0 4px;
+  color: var(--bna-muted);
+  font-size: var(--font-size-12, 12px);
+}
+
+.bna-panel .bna-note {
+  margin: 0;
+  padding: 2px 0 2px 8px;
+  border-left: 3px solid var(--bna-when);
+  font-size: var(--font-size-13, 13px);
+  line-height: 1.4;
+}
+
+.bna-panel .bna-note strong {
+  margin-right: 6px;
+  color: var(--bna-when);
+  font-weight: 600;
+}
+
+.bna-panel .bna-choice {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--bna-line);
+  border-radius: 4px;
+  background: var(--bna-raised);
+}
+
+.bna-panel .bna-choice__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bna-panel .bna-choice__name {
+  font-weight: 600;
+}
+
+.bna-panel .bna-choice__from {
+  color: var(--bna-muted);
+  font-size: var(--font-size-11, 11px);
+  text-align: right;
+}
+
+.bna-panel .bna-choice__what {
+  margin: 0;
+  font-size: var(--font-size-13, 13px);
+  line-height: 1.4;
+}
+
+.bna-panel .bna-choice__description {
+  color: var(--bna-muted);
+  font-size: var(--font-size-12, 12px);
+}
+
+.bna-panel .bna-choice__description:empty {
+  display: none;
+}
+
+.bna-panel .bna-choice__description p {
+  margin: 0;
+}
+
+.bna-panel .bna-choice__controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bna-panel .bna-choice__controls select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bna-panel .bna-choice__apply {
+  flex: 0 0 auto;
+  width: auto;
+  margin-left: auto;
+  padding: 2px 12px;
+  border: 1px solid var(--bna-then);
+  border-radius: 4px;
+  background: var(--bna-then);
+  color: var(--bna-then-ink);
+  font-weight: 600;
+}
+
+.bna-panel .bna-choice__apply:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.bna-panel .bna-choice__apply:focus-visible {
+  outline: 2px solid var(--bna-ink);
+  outline-offset: 2px;
+}
+
+.bna-panel .bna-choice.is-applied {
+  border-color: var(--bna-then);
+}
+
+.bna-panel .bna-choice.is-applied .bna-choice__apply {
+  background: transparent;
+  color: var(--bna-then);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bna-panel .bna-choice {
+    transition: border-color 0.2s ease;
+  }
+}
+
+/* Reaction prompt: the same panel inside a small dialog. */
+.bna-reaction .bna-panel {
+  margin: 0 0 8px;
+}
+
+.bna-editor-window .window-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Migration wizard. */
+.bna-migration {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 10px;
+  min-height: 0;
+  padding: 4px 2px;
+  color: var(--bna-ink);
+}
+
+/* Long pack lists scroll, so the actions stay in view. */
+.bna-migration fieldset {
+  display: grid;
+  gap: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--bna-line);
+  border-radius: 4px;
+}
+
+.bna-migration__pack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bna-migration__summary {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--bna-then);
+  font-weight: 600;
+}
+
+.bna-migration__list {
+  flex: 1;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bna-migration__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 4px;
+  border-bottom: 1px solid var(--bna-line);
+}
+
+.bna-migration__list li.is-error {
+  border-left: 3px solid var(--bna-then);
+}
+
+.bna-migration__link {
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--bna-ink);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.bna-migration__muted {
+  color: var(--bna-muted);
+  font-size: var(--font-size-12, 12px);
+}
+
+.bna-migration__actions {
+  display: flex;
+  margin-top: auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bna-migration__actions button {
+  width: auto;
+}
+
+.bna-migration__primary {
+  border-color: var(--bna-then);
+}
+
+.bna-migration progress {
+  width: 100%;
+  accent-color: var(--bna-then);
+}
+
+.bna-migration__note {
+  margin: 0;
+  color: var(--bna-muted);
+}
+
+/* A header icon whose document has a working blueprint (v1 marked documents with bonuses the same way). */
+.bna-active-marker {
+  color: #6ccbae;
+  filter: drop-shadow(0 0 3px rgb(108 203 174 / 90%));
+}

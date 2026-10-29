@@ -1,0 +1,56 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0C1522;
+}
+
+body[data-theme="light"] {
+  background: #EEF2F7;
+}
+
+.playground {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+}
+
+.playground__bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 14px;
+  background: #060B12;
+  color: #8796AD;
+  font: 12px/1.4 system-ui, sans-serif;
+}
+
+.playground__bar strong {
+  color: #D5DEEA;
+  font-weight: 600;
+}
+
+.playground__langs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.playground__langs button {
+  padding: 2px 8px;
+  border: 1px solid #2A3547;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.playground__langs button[aria-pressed="true"] {
+  border-color: #D5DEEA;
+  color: #D5DEEA;
+}

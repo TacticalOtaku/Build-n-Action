@@ -18,7 +18,7 @@ Install from the manifest URL:
 
 ## Quick start
 
-1. **Open the editor.** Open an actor, item, effect or region sheet, and choose **Blueprints** in its header menu. The setting *Show the Blueprints button in the title bar* adds a button to the title bar.
+1. **Open the editor.** Open an actor, item, effect or region sheet, and choose **Build-n-Action** in its header menu (its icon lights up while a blueprint on the document works). The setting *Show the Build-n-Action button in the title bar* adds a button to the title bar.
 2. **Create a blueprint.** Choose **From a template** for one of the 14 presets, or **New blueprint** for an empty one.
 3. **Build the chain.**
    - Press **Space** on the canvas to add a node.
@@ -32,7 +32,8 @@ Install from the manifest URL:
 | Carrier | Works for |
 |---|---|
 | Actor | that actor's rolls |
-| Item | its owner's rolls; checks can require "this item only" |
+| Item | its owner's rolls while it is equipped; tick *Only rolls with this item* on a condition to limit it to rolls made with the item |
+| Region (enter/leave) | the creature that entered or left |
 | Active Effect | its actor's rolls, while the effect is active |
 | Region | creatures in the region |
 
@@ -48,6 +49,36 @@ A blueprint on an Active Effect works exactly while the effect is active. Anythi
 - equipping the item that carries the effect.
 
 In the editor, the title block shows the effect's state and its DAE rules. **More → Move to a new effect** moves a blueprint from an actor or item onto a new effect.
+
+## Turns, regions and rests
+
+Blueprints can start without a roll: at the start or end of a turn in combat, when a token enters or leaves a region, or after a short or long rest. They run on the GM's side, once each, and use results that do not change a roll: effects, resources, reminders (whispered to the owner and the GM), a bonus to a later roll, or a signal. Region events work on blueprints stored on the region; the module adds its region behavior for you.
+
+## "And then"
+
+Every result has an **"And then"** switch in its settings. Turn it on and the card gets an output: wire conditions and results from it to continue the chain, but only once the result has really been applied:
+
+- a mandatory result, when the roll goes ahead;
+- a player's choice, when the player applied it (and paid its cost) and the roll went ahead;
+- a limited result, only while its limit allows;
+- never when a module vetoed it through `build-n-action.preApplyResult`.
+
+After "And then" come results that leave the roll alone: apply or remove an effect, resources, a bonus to the next roll, a signal or a reminder. They see the same roll, item and target as the result before them. There is no dialog to ask in, so optional results there apply at once and reminders are whispered to the owners and the GM.
+
+## Demanded saves
+
+"Demand a saving throw" makes the target, you, or the creatures in your aura roll a save against a DC (a number, a formula, or your spell save DC). Its **Succeeded** and **Failed** outputs continue the chain once the save is rolled, with the creature that saved as the target.
+
+The player who owns the creature rolls it in their own dialog, so their bonuses apply. If they have not pressed "Roll" within 30 seconds, or no owner is connected, the GM rolls it; a player who pressed "Roll" gets another 30 seconds in the roll dialog. A GM must be connected for demanded saves to roll. Ability checks and events without a roll have no target: demand the save from yourself or your aura there.
+
+## Counters
+
+Counters are named numbers on an actor: rage charges, curse stacks, hits in a row.
+
+- **Change counter** adds, subtracts, sets or resets one; the **Counter** check compares one with a number; formulas read them as `@counters.name` (and the target's as `@target.counters.name`).
+- A counter is **shared on the actor** (every blueprint of the actor sees it) or **only this blueprint's**. Set them up with **Set up** in the blueprint's title block: minimum, maximum, starting value, and when it resets (by hand, on a short or long rest, on a long rest, or at the start of the turn). The title block shows the current values, each with a reset button.
+- An unknown counter counts as 0 and still works with default settings; the linter points out names nobody set up. Names ignore capitals, and spaces become "_".
+- The Test tab takes counter values for the run, starting from the chosen actor's.
 
 ## Library
 
@@ -75,7 +106,7 @@ Running it again converts nothing twice. The `@BNA[…]` enricher and the charac
 | Setting | What it does |
 |---|---|
 | Let players edit blueprints | Players can open the editor on documents they own. |
-| Show the Blueprints button in the title bar | Adds a title-bar button besides the header-menu entry. |
+| Show the Build-n-Action button in the title bar | Adds a title-bar button besides the header-menu entry. |
 | Turn off script checks | Script checks pass without running their code. |
 | Allow removing fumbles | Blueprints may lower the fumble range below 1. |
 | Measure auras from the token's edge | On gridless scenes, add half the source token's size to aura ranges. |
@@ -119,12 +150,11 @@ Hooks.on("build-n-action.applyResult", (result, context) => {});
 
 ```sh
 npm install
-npm test            # Vitest: core, runtime and editor
-npm run typecheck
-npm run lint
+npm run check       # typecheck, ESLint, Vitest, build
 npm run playground  # the editor alone, at http://localhost:5188
-npm run build       # dist/module, with source maps
-npm run release     # dist/build-n-action-v<version>.zip and the root module.json
+npm run build       # dist/module, with source maps (npm run watch rebuilds on change)
+npm run deploy      # copy dist/module into %LOCALAPPDATA%/FoundryVTT/Data/modules/build-n-action (or FOUNDRY_DATA)
+npm run release     # check, then dist/build-n-action-v<version>.zip and the root module.json
 ```
 
-Link `dist/module` into Foundry's `Data/modules/build-n-action` to run the development build. `tests/live/` holds scripts that check a running Foundry world from the browser console.
+`npm run release` refuses to replace an existing archive. Instead of deploying you can link `dist/module` into Foundry's `Data/modules/build-n-action`. `tests/live/` holds scripts that check a running Foundry world from the browser console. The *Debug logging* client setting turns on `log.debug` output (`src/core/log.ts`).
