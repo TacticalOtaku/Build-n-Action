@@ -1,0 +1,50 @@
+@layer bna {
+  .bna-app {
+    color-scheme: dark;
+    --bna-font: "Geologica Variable", "Geologica", system-ui, sans-serif;
+    --bna-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+    --bna-draft: "SHRP" 100, "slnt" -8;
+    --bna-radius: 3px;
+    --bna-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    --bna-paper: #0C1522;
+    --bna-raised: #131E30;
+    --bna-sunken: #09101A;
+    --bna-ink: #D5DEEA;
+    --bna-muted: #8796AD;
+    --bna-rule: rgba(213, 222, 234, 0.14);
+    --bna-rule-strong: rgba(213, 222, 234, 0.34);
+    --bna-grid: rgba(213, 222, 234, 0.09);
+    --bna-when: #E8B05A;
+    --bna-if: #6CCBAE;
+    --bna-then: #EE7A63;
+    --bna-when-text: #E8B05A;
+    --bna-if-text: #6CCBAE;
+    --bna-then-text: #EE7A63;
+    --bna-danger: #F2837A;
+    --bna-focus: #8FC3FF;
+    --bna-hover: rgba(213, 222, 234, 0.06);
+    --bna-active: rgba(213, 222, 234, 0.11);
+  }
+
+  .bna-app[data-theme="light"] {
+    color-scheme: light;
+    --bna-paper: #EEF2F7;
+    --bna-raised: #FFFFFF;
+    --bna-sunken: #E2E8F1;
+    --bna-ink: #1A2B52;
+    --bna-muted: #56688A;
+    --bna-rule: rgba(26, 43, 82, 0.16);
+    --bna-rule-strong: rgba(26, 43, 82, 0.38);
+    --bna-grid: rgba(26, 43, 82, 0.12);
+    --bna-when: #B7770E;
+    --bna-if: #1F8A6C;
+    --bna-then: #C8432F;
+    --bna-when-text: #8A5A00;
+    --bna-if-text: #146E55;
+    --bna-then-text: #A93724;
+    --bna-danger: #B3261E;
+    --bna-focus: #2E62C9;
+    --bna-hover: rgba(26, 43, 82, 0.05);
+    --bna-active: rgba(26, 43, 82, 0.09);
+  }
+}

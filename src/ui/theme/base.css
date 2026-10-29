@@ -1,0 +1,3 @@
+/* React Flow's stylesheet goes into a layer below ours; unlayered it would override every .bna rule. */
+@layer xyflow, bna;
+@import "@xyflow/react/dist/style.css" layer(xyflow);
