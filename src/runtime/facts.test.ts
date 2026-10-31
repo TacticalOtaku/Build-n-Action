@@ -78,7 +78,7 @@ describe("buildRollFacts", () => {
       creatureTypes: ["elf", "high elf", "humanoid"],
       size: "med",
       armor: ["plate", "heavy"],
-      statuses: ["blessed"],
+      statuses: ["blessed"], effects: [],
       conditionImmunities: ["charmed"],
       markers: ["oath", "hex"],
       tokenSize: 1,
@@ -149,5 +149,23 @@ describe("buildRollFacts", () => {
   it("tolerates actors without hit points, spells or a token", () => {
     const facts = buildRollFacts(input({ actor: { uuid: "Actor.cart", system: {} }, token: null }), {});
     expect(facts.actor).toMatchObject({ hpPercent: null, spellSlots: [], tokenSize: null, armor: [], languages: [] });
+  });
+});
+
+describe("effect facts", () => {
+  it("collects applicable effects, preserving names, activity and exact sources", () => {
+    const actor = hero({
+      allApplicableEffects: () => [
+        { name: "Метка (особая)", uuid: "Actor.hero.ActiveEffect.mark", active: true, origin: "Item.bow", flags: { "build-n-action": { effectSources: ["Item.bow.ActiveEffect.source"] } } },
+        { name: "Disabled", uuid: "Actor.hero.ActiveEffect.off", active: false, _stats: { duplicateSource: "Item.staff.ActiveEffect.original" } }
+      ],
+      items: [{ effects: [{ name: "Not transferred", active: true }] }]
+    });
+    const result = buildRollFacts(input({ actor, target: { actor, document: {} } }), {});
+    expect(result.actor.effects).toEqual([
+      { name: "Метка (особая)", uuid: "Actor.hero.ActiveEffect.mark", active: true, sources: ["Actor.hero.ActiveEffect.mark", "Item.bow.ActiveEffect.source"] },
+      { name: "Disabled", uuid: "Actor.hero.ActiveEffect.off", active: false, sources: ["Actor.hero.ActiveEffect.off", "Item.staff.ActiveEffect.original"] }
+    ]);
+    expect(result.target?.effects).toEqual(result.actor.effects);
   });
 });

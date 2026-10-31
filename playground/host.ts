@@ -19,12 +19,16 @@ interface FixtureTarget { uuid: string; name: Name; facts: CreatureFacts }
 
 /** The playground document is Aria's longsword. */
 const CARRIER = "Actor.aria.Item.longsword";
+const EFFECTS = [
+  { uuid: `${CARRIER}.ActiveEffect.blessing`, name: "Особое благословение" },
+  { uuid: `${CARRIER}.ActiveEffect.hex`, name: "Custom Hex" }
+];
 
 const ACTORS: readonly FixtureActor[] = [
   {
     uuid: "Actor.aria",
     name: ["Aria, fighter", "Ария, воин"],
-    facts: actorFacts({ uuid: "Actor.aria" }),
+    facts: actorFacts({ uuid: "Actor.aria", effects: [{ name: "Особое благословение", uuid: "Actor.aria.ActiveEffect.blessingCopy", sources: [`${CARRIER}.ActiveEffect.blessing`], active: true }] }),
     items: [
       {
         uuid: CARRIER,
@@ -194,6 +198,7 @@ function createLibrary(): LibraryHost {
 /** The playground's host: the real engine on fixture actors, items and targets. */
 export function createPlaygroundHost(language: Language, blueprints: () => readonly BlueprintSource[]): EditorHost {
   return {
+    effectSelection: { choices: () => EFFECTS, resolve: async uuid => EFFECTS.find(effect => effect.uuid === uuid) ?? null },
     library: createLibrary(),
     lintEnv: blueprint => {
       const { sent, received } = blueprintSignals([...blueprints().filter(entry => entry.id !== blueprint.id), blueprint]);

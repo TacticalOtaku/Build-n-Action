@@ -174,9 +174,7 @@ declare global {
       has(key: string): boolean;
       readonly lang: string;
     };
-    readonly user: {
-      readonly id: string;
-      readonly isGM: boolean;
+    readonly user: UserLike & {
       readonly targets: Iterable<TokenPlaceable>;
       readonly character: FoundryDocument | null;
     };

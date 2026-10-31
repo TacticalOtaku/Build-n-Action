@@ -1,5 +1,5 @@
-/** Version of the package built into dist/module; the root module.json stays v1.0.6 until release. */
-export const MODULE_VERSION = "2.3.1";
+/** Version used by the built package and the generated root module.json. */
+export const MODULE_VERSION = "2.3.2";
 
 const REPOSITORY = "https://github.com/TacticalOtaku/Build-n-Action";
 

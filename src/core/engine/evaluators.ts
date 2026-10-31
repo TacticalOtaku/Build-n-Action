@@ -1,6 +1,7 @@
 import type { CounterScope } from "../blueprint/types";
 import { counterName } from "../counters/counters";
-import type { RollFacts } from "../facts/types";
+import type { CreatureFacts, RollFacts } from "../facts/types";
+import { effectReference } from "../facts/effects";
 import { asBoolean, asNumber, asRecord, asString, asStrings } from "../registry/data";
 import type { NodeData } from "../registry/types";
 import { hasIncluded, matchValues } from "./inclusion";
@@ -24,6 +25,25 @@ export interface CheckEnv {
 export type Evaluator = (data: NodeData, facts: RollFacts, env: CheckEnv) => CheckOutcome;
 
 const OPERATOR_SYMBOLS: Record<string, string> = { EQ: "=", NE: "≠", LT: "<", GT: ">", LE: "≤", GE: "≥" };
+
+function activeEffectCheck(data: NodeData, creature: CreatureFacts | null): CheckOutcome {
+  const sourceMode = data.match === "source";
+  const reference = effectReference(data.source);
+  const name = asString(data.name).normalize("NFC").trim().toLowerCase();
+  if (sourceMode ? data.source == null : !name) return passed("empty");
+  if (sourceMode && !reference) return failed("noValue");
+  if (!creature) return failed("noTarget");
+  const effects = (creature.effects ?? []).filter(effect => effect.active || data.includeInactive === true);
+  const found = effects.some(effect => {
+    return sourceMode
+      ? effect.uuid === reference?.uuid || effect.sources.includes(reference?.uuid ?? "")
+      : effect.name.normalize("NFC").trim().toLowerCase() === name;
+  });
+  const absent = data.presence === "absent";
+  const expected = sourceMode ? reference?.name || reference?.uuid || "—" : asString(data.name).trim();
+  if (found !== absent) return passed("matched", { actual: expected });
+  return absent ? failed("excluded", { actual: expected }) : failed("notMatched", { actual: effects.map(effect => effect.name || effect.uuid).join(", ") || "—", expected });
+}
 
 function selection(data: NodeData): string[] {
   return asStrings(data.values);
@@ -162,6 +182,8 @@ export const EVALUATORS: Record<string, Evaluator> = {
   baseArmors: (data, facts) => matchValues(facts.actor.armor, selection(data)),
 
   statusEffects: (data, facts) => matchValues(facts.actor.statuses, withoutImmune(selection(data), facts.actor.conditionImmunities)),
+  actorActiveEffects: (data, facts) => activeEffectCheck(data, facts.actor),
+  targetActiveEffects: (data, facts) => activeEffectCheck(data, facts.target),
 
   counter: (data, _facts, env) => {
     const name = counterName(asString(data.name));

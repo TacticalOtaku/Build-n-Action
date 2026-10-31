@@ -1,4 +1,5 @@
 import { counterName } from "../counters/counters";
+import { effectReference } from "../facts/effects";
 import { STATIC } from "./choices";
 import { EVENT_TYPES, ITEM_EVENTS, type EventType } from "./constants";
 import { asBoolean, asNumber, asRecord, asString, asStrings } from "./data";
@@ -59,6 +60,29 @@ function tagCheck(type: string, category: CheckCategory, icon: string, relevantT
     phrase: (data, fmt) => {
       const values = asStrings(data.values);
       return fmt.t(`BNA.Check.${type}.Phrase`, { values: values.length ? fmt.joinOr(values) : fmt.t("BNA.Phrase.Any") });
+    }
+  };
+}
+
+function activeEffectCheck(type: string, category: "self" | "target"): CheckDefinition {
+  return {
+    type, category, icon: "activity", relevantTo: category === "self" ? ALL : NO_HIT_DIE,
+    fields: [
+      { key: "match", kind: "select", label: "BNA.Field.activeEffect.match", default: "name", choices: { static: [
+        { value: "name", label: "BNA.Field.activeEffect.byName" }, { value: "source", label: "BNA.Field.activeEffect.bySource" }
+      ] } },
+      { key: "name", kind: "text", label: "BNA.Field.activeEffect.name", hint: "BNA.Field.activeEffect.nameHint", default: "", visibleWhen: { key: "match", in: ["name"] } },
+      { key: "source", kind: "effectReference", label: "BNA.Field.activeEffect.source", hint: "BNA.Field.activeEffect.sourceHint", default: null, visibleWhen: { key: "match", in: ["source"] } },
+      { key: "presence", kind: "select", label: "BNA.Field.activeEffect.presence", default: "present", choices: { static: [
+        { value: "present", label: "BNA.Field.activeEffect.present" }, { value: "absent", label: "BNA.Field.activeEffect.absent" }
+      ] } },
+      { key: "includeInactive", kind: "toggle", label: "BNA.Field.activeEffect.includeInactive", hint: "BNA.Field.activeEffect.inactiveHint", default: false }
+    ],
+    phrase: (data, fmt) => {
+      const ref = effectReference(data.source);
+      const effect = (data.match === "source" ? ref?.name || ref?.uuid : asString(data.name).trim()) || fmt.t("BNA.Phrase.Unset");
+      const phrase = fmt.t(`BNA.Check.${type}.${data.presence === "absent" ? "PhraseAbsent" : "Phrase"}`, { effect });
+      return data.includeInactive === true ? `${phrase} (${fmt.t("BNA.Field.activeEffect.includeInactive")})` : phrase;
     }
   };
 }
@@ -271,6 +295,7 @@ export const CHECKS: readonly CheckDefinition[] = [
   listCheck("actorLanguages", "self", "languages", "languages", ALL),
   listCheck("baseArmors", "self", "shirt", "armorTypes", ALL),
   listCheck("statusEffects", "self", "activity", "statusEffects", ALL),
+  activeEffectCheck("actorActiveEffects", "self"),
   healthCheck("healthPercentages", "self", ALL),
   remainingSpellSlots,
   listCheck("proficiencyLevels", "self", "award", "proficiencyLevels",
@@ -281,6 +306,7 @@ export const CHECKS: readonly CheckDefinition[] = [
   listCheck("creatureTypes", "target", "paw-print", "creatureTypes", NO_HIT_DIE),
   listCheck("targetArmors", "target", "shield-half", "armorTypes", NO_HIT_DIE),
   listCheck("targetEffects", "target", "activity", "statusEffects", NO_HIT_DIE),
+  activeEffectCheck("targetActiveEffects", "target"),
   healthCheck("targetHealthPercentages", "target", NO_HIT_DIE),
   tokenSizes,
   tagCheck("targetMarkers", "target", "tags", NO_HIT_DIE),

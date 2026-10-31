@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.2
+
+### Added
+- **My effects** and **Target effects** condition checks, including custom Active Effects created by the GM.
+- Match an effect by its full name (case-insensitive) or by its source: choose an available effect, drag an Active Effect into the field, or enter its UUID.
+- Require an effect to be **Present** or **Absent**. Effects must be active by default; **Include inactive effects** also counts disabled and suppressed applicable effects. Transferred item effects are included.
+
+### Improved
+- Effects copied by **Apply effect** retain their source identity, including through repeated copies. Source checks distinguish effects with identical names. For older or third-party copies without a retained source link, use name matching.
+- Source selection preserves the previous choice on invalid input and ignores outdated asynchronous lookup results. Explicitly invalid references on new checks fail instead of leaving the check unrestricted.
+
 ## 2.3.1
 
 ### Added
