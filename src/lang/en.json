@@ -418,6 +418,29 @@
       "counterScope": {
         "label": "Kind",
         "hint": "Shared by the actor's blueprints, or private to this one."
+      },
+      "activeEffect": {
+        "match": "Identify effect",
+        "byName": "By name",
+        "bySource": "By source",
+        "name": "Effect name",
+        "nameHint": "Full effect name, including spaces and punctuation. Case does not matter.",
+        "source": "Effect source",
+        "sourceHint": "Choose an available effect, drop an Active Effect here, or enter its UUID. Copies must retain their source; a matching name alone is not enough.",
+        "presence": "Presence",
+        "present": "Present",
+        "absent": "Absent",
+        "includeInactive": "Include inactive effects",
+        "inactiveHint": "Also count disabled and suppressed applicable effects.",
+        "uuid": "Effect UUID",
+        "resolve": "Use UUID",
+        "choose": "Choose an effect",
+        "invalid": "This is not an accessible Active Effect. The previous choice is unchanged.",
+        "unavailable": "Effect selection is unavailable in this host.",
+        "pending": "Resolving effect…",
+        "clear": "Clear effect",
+        "dropHint": "Drop an Active Effect here.",
+        "selected": "Selected effect"
       }
     },
     "Event": {
@@ -937,6 +960,20 @@
           "self": "my counter “{name}” {operator} {value}",
           "target": "the target's counter “{name}” {operator} {value}"
         }
+      },
+      "actorActiveEffects": {
+        "Label": "My effects",
+        "Summary": "Check for an effect by name or source, including custom effects.",
+        "Help": "Only active effects count by default. Target checks require a target.",
+        "Phrase": "I have effect “{effect}”",
+        "PhraseAbsent": "I do not have effect “{effect}”"
+      },
+      "targetActiveEffects": {
+        "Label": "Target effects",
+        "Summary": "Check for an effect by name or source, including custom effects.",
+        "Help": "Only active effects count by default. Target checks require a target.",
+        "Phrase": "the target has effect “{effect}”",
+        "PhraseAbsent": "the target does not have effect “{effect}”"
       }
     },
     "Result": {

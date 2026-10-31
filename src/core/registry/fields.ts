@@ -73,6 +73,7 @@ interface FieldBase {
 }
 
 export type FieldSpec =
+  | (FieldBase & { readonly kind: "effectReference"; readonly default: null })
   | (FieldBase & { readonly kind: "formula"; readonly default: string })
   | (FieldBase & { readonly kind: "text"; readonly default: string; readonly multiline?: boolean })
   | (FieldBase & {

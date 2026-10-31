@@ -3,6 +3,7 @@ import type { EventType } from "../core/registry/constants";
 import { asNumber, asRecord, asString, asStrings } from "../core/registry/data";
 import { callList, listOf, read, stringList } from "./read";
 import { expandTraits, traitPath, type TraitTree } from "./traits";
+import { creatureEffects } from "./effects";
 
 const SCOPE = "build-n-action";
 
@@ -102,6 +103,7 @@ function creature(actor: unknown, tokenDocument: unknown): CreatureFacts {
     size: text(read(actor, "system.traits.size")),
     armor: wornArmor(actor),
     statuses: stringList(read(actor, "statuses")),
+    effects: creatureEffects(actor),
     conditionImmunities: stringList(read(actor, "system.traits.ci.value")),
     markers: markersOf(actor),
     tokenSize: footprint(tokenDocument),

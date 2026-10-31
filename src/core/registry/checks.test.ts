@@ -5,10 +5,10 @@ import { getCheck } from "./index";
 import { CHECK_CATEGORIES } from "./types";
 
 describe("check definitions", () => {
-  it("defines 36 uniquely named checks", () => {
+  it("defines 38 uniquely named checks", () => {
     const types = CHECKS.map(check => check.type);
-    expect(types).toHaveLength(36);
-    expect(new Set(types).size).toBe(36);
+    expect(types).toHaveLength(38);
+    expect(new Set(types).size).toBe(38);
   });
 
   it("covers every v1 filter plus thisItem and targetMarkers", () => {

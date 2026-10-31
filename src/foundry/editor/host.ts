@@ -11,6 +11,7 @@ import { entryFor, traitTrees } from "../collect";
 import { carrierItem, documentBlueprints, documentFromUuid, isDocument, originRollData, ownerActor } from "../documents";
 import { counterRows, countersHost, counterStore } from "../counters";
 import { createEffectsHost } from "../effects";
+import { createEffectSelectionHost } from "../effect-selection";
 import { makeRoller } from "../evaluate";
 import { libraryHost } from "../library";
 import { CLIENT_SETTINGS, clientSetting, setClientSetting } from "../settings";
@@ -97,6 +98,7 @@ export function createFoundryHost(carrier: FoundryDocument): EditorHost {
     library: libraryHost(),
     transfer: createTransferHost(carrier),
     effects: createEffectsHost(carrier),
+    effectSelection: createEffectSelectionHost(carrier),
     counters: countersHost(carrier),
     lintEnv: blueprint => {
       const others = neighbours(carrier).flatMap(document => documentBlueprints(document).blueprints).filter(entry => entry.id !== blueprint.id);

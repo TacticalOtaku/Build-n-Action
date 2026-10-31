@@ -4,6 +4,7 @@ import { MODULE_SCOPE } from "../core/storage/repository";
 import { hitDiceSpend } from "../runtime/choices";
 import { currencyValue, pickSlot, slotValue, tempHp, usesSpent, type Operation } from "../runtime/operations";
 import { listOf, read } from "../runtime/read";
+import { effectSources } from "../runtime/effects";
 import { classHitDice, slotsOf } from "./consume";
 import { documentFromUuid, isDocument, ownerActor, queueFor } from "./documents";
 import { addRider } from "./riders";
@@ -101,6 +102,8 @@ export async function executeOperation(op: Operation): Promise<void> {
       if (!effect) throw new Error(`Build-n-Action | no effect ${op.effect}`);
       const data = asRecord(await call(effect, "toObject"));
       delete data._id;
+      const flags = asRecord(data.flags);
+      data.flags = { ...flags, [MODULE_SCOPE]: { ...asRecord(flags[MODULE_SCOPE]), effectSources: effectSources(effect) } };
       Object.assign(data, { origin: op.origin, transfer: false, disabled: false });
       await call(actor, "createEmbeddedDocuments", "ActiveEffect", [data]);
       return;

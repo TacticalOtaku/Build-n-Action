@@ -1,4 +1,5 @@
 import type { BlueprintSource, CounterDef, CounterScope } from "../core/blueprint/types";
+import type { EffectReference } from "../core/facts/effects";
 import type { BlueprintRun } from "../core/engine/interpreter";
 import type { LintEnv } from "../core/engine/lint";
 import type { EventType, PinId } from "../core/registry/constants";
@@ -135,6 +136,11 @@ export interface EffectsHost {
   moveToEffect(blueprint: BlueprintSource): Promise<void>;
 }
 
+export interface EffectSelectionHost {
+  choices(): readonly EffectReference[];
+  resolve(uuid: string): Promise<EffectReference | null>;
+}
+
 /** What a host (the playground or Foundry) lends the editor; every part is optional. */
 export interface EditorHost {
   /** Environment for the linter, given the blueprint being edited. */
@@ -145,5 +151,6 @@ export interface EditorHost {
   library?: LibraryHost;
   transfer?: TransferHost;
   effects?: EffectsHost;
+  effectSelection?: EffectSelectionHost;
   counters?: CountersHost;
 }

@@ -1,4 +1,5 @@
 import type { EventType } from "../registry/constants";
+import type { EffectFacts } from "./effects";
 
 /** What checks need to know about a creature (the roller or the target). */
 export interface CreatureFacts {
@@ -9,6 +10,8 @@ export interface CreatureFacts {
   /** Worn armour and shield keys (base item and category), plus "natural" for natural armour. */
   armor: readonly string[];
   statuses: readonly string[];
+  /** Applicable Active Effects; optional for callers supplying pre-existing facts. */
+  effects?: readonly EffectFacts[];
   conditionImmunities: readonly string[];
   /** Markers on the creature, its items and its active effects. */
   markers: readonly string[];

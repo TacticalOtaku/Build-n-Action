@@ -7,6 +7,7 @@ import { getResult } from "../../core/registry/index";
 import { Icon } from "../icons";
 import { useT } from "../services";
 import { FormulaInput } from "./FormulaInput";
+import { EffectReferenceInput } from "./EffectReferenceInput";
 import { slugify } from "./slug";
 import { useChoiceOptions } from "./useChoiceOptions";
 
@@ -89,6 +90,12 @@ function FieldControl({ field, value, path, upstream, onChange }: ControlProps) 
   const set = (next: unknown) => onChange(path, next);
 
   switch (field.kind) {
+    case "effectReference":
+      return (
+        <Shell id={id} label={label} hint={hint} group>
+          <EffectReferenceInput key={asString(asRecord(value).uuid)} id={id} value={value} describedBy={describedBy} onChange={set} />
+        </Shell>
+      );
     case "formula":
       return (
         <Shell id={id} label={label} hint={hint}>
