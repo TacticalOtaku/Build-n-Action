@@ -152,8 +152,14 @@ Hooks.on("build-n-action.applyResult", (result, context) => {});
 
 ## Development
 
+Use Node.js 24 or newer. GitHub Actions runs `npm ci`, `npm run check` and
+`npm run playground:build` on Node.js 24 for pull requests to `main` and pushes to
+`main`. CI also checks that building leaves the committed root `module.json`
+unchanged. It can be started manually from the Actions tab; live Foundry checks
+remain manual.
+
 ```sh
-npm install
+npm ci
 npm run check       # typecheck, ESLint, Vitest, build
 npm run playground  # the editor alone, at http://localhost:5188
 npm run build       # dist/module, with source maps (npm run watch rebuilds on change)
