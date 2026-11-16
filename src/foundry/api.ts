@@ -5,19 +5,20 @@ import { validateBlueprintSource } from "../core/blueprint/validate";
 import { compileBlueprint, type CompiledBlueprint } from "../core/engine/compile";
 import type { EventType, PinId } from "../core/registry/constants";
 import { asRecord } from "../core/registry/data";
-import {
-  blueprintUuid, deleteBlueprint, flagChanges, MODULE_SCOPE, parseBlueprintUuid, upsertBlueprint
-} from "../core/storage/repository";
-import { read } from "../runtime/read";
+import { blueprintUuid } from "../core/storage/repository";
 import type { SimulationResult } from "../ui/host";
-import { documentBlueprints, documentFromUuid, isDocument } from "./documents";
+import {
+  blueprintFromUuid, blueprintFromUuidSync, documentBlueprints, removeBlueprint, saveBlueprint
+} from "./documents";
 import { openEditor } from "./editor/app";
 import { simulate } from "./editor/host";
 import { createLibraryApi } from "./library";
 import { deleteBackups, migrationPacks, runMigration, scanMigration } from "./migration";
 import { MigrationApp } from "./migration-app";
-import { recentRolls } from "./roll-state";
+import { recentRolls } from "./play";
 import { log } from "../core/log";
+
+export { blueprintFromUuid, blueprintFromUuidSync, removeBlueprint, saveBlueprint, type FoundBlueprint } from "./documents";
 
 const INTEGRATIONS = {
   "midi-qol": { label: "Midi QOL", minimum: "14.0.12" },
@@ -47,48 +48,6 @@ export function validateIntegrations(): void {
     const label = INTEGRATIONS[id as keyof typeof INTEGRATIONS].label;
     log.warn(`${label} ${state.version} is older than the supported ${state.minimum}.`);
   }
-}
-
-export interface FoundBlueprint {
-  document: FoundryDocument;
-  blueprint: BlueprintSource;
-}
-
-function find(document: FoundryDocument, id: string): FoundBlueprint | null {
-  const blueprint = documentBlueprints(document).blueprints.find(entry => entry.id === id);
-  return blueprint ? { document, blueprint } : null;
-}
-
-/** Resolve `<parent>.Blueprint.<id>` or a v1 `<parent>.ContextualBonus.<id>` synchronously. */
-export function blueprintFromUuidSync(uuid: string): FoundBlueprint | null {
-  const parsed = parseBlueprintUuid(uuid);
-  const document = parsed ? documentFromUuid(parsed.parentUuid) : null;
-  return (parsed && document) ? find(document, parsed.id) : null;
-}
-
-export async function blueprintFromUuid(uuid: string): Promise<FoundBlueprint | null> {
-  const parsed = parseBlueprintUuid(uuid);
-  if (!parsed) return null;
-  const document = await fromUuid(parsed.parentUuid);
-  return isDocument(document) ? find(document, parsed.id) : null;
-}
-
-/** Validate and store a blueprint on a document; a converted v1 bonus is retired to the backup. */
-export async function saveBlueprint(document: FoundryDocument, blueprint: unknown): Promise<BlueprintSource> {
-  const result = validateBlueprintSource(blueprint);
-  if (!result.ok) {
-    const problems = result.issues.map(issue => `${issue.path || "(root)"}: ${issue.code}`).join(", ");
-    throw new Error(`Build-n-Action | the blueprint is not valid (${problems})`);
-  }
-  await document.update(flagChanges(upsertBlueprint(read(document, `flags.${MODULE_SCOPE}`), result.value)));
-  return result.value;
-}
-
-export async function removeBlueprint(document: FoundryDocument, id: string): Promise<boolean> {
-  const found = find(document, id);
-  if (!found) return false;
-  await document.update(flagChanges(deleteBlueprint(read(document, `flags.${MODULE_SCOPE}`), found.blueprint)));
-  return true;
 }
 
 /** Turn a blueprint on or off (also what v1 hotbar macros call). */

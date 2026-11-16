@@ -7,11 +7,8 @@ import { CHECK_CATEGORIES, type CheckDefinition } from "../../core/registry/type
 import { Icon } from "../icons";
 import { useServices, useT } from "../services";
 import type { EditorAction } from "../state/editor-state";
+import { normalizeSearch } from "../text-search";
 import { FieldList } from "./FieldList";
-
-function normalize(text: string): string {
-  return text.toLocaleLowerCase().replaceAll("ё", "е");
-}
 
 /** Checks offered in the picker: "only this item" is the condition's own tick now; old blueprints keep the check. */
 const PICKABLE = CHECKS.filter(definition => definition.type !== "thisItem");
@@ -25,10 +22,10 @@ export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
   const [query, setQuery] = useState("");
   const checks = Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [];
   const relevant = (definition: CheckDefinition) => !upstream.length || definition.relevantTo.some(event => upstream.includes(event));
-  const needle = normalize(query.trim());
+  const needle = normalizeSearch(query);
   const candidates = PICKABLE.filter(definition => !needle
-    || normalize(t(`BNA.Check.${definition.type}.Label`)).includes(needle)
-    || normalize(t(`BNA.Check.${definition.type}.Summary`)).includes(needle));
+    || normalizeSearch(t(`BNA.Check.${definition.type}.Label`)).includes(needle)
+    || normalizeSearch(t(`BNA.Check.${definition.type}.Summary`)).includes(needle));
 
   const add = (definition: CheckDefinition) => {
     dispatch({ type: "addCheck", nodeId: node.id, check: createCheck(definition.type) });

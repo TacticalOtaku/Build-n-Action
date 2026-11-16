@@ -61,6 +61,32 @@ export function counterValue(store: CounterStore, scope: CounterScope, name: str
   return store.values[counterKey(scope, key, blueprint.id)] ?? counterDef(store, scope, key, blueprint).initial;
 }
 
+export interface CounterLookups {
+  /** "My" counter by a formula name (the blueprint's own first, then shared). */
+  self(name: string): number;
+  /** The target's counter by a formula name; null without a target. */
+  target: ((name: string) => number) | null;
+  /** A counter of a known kind, mine or the target's. */
+  value(name: string, scope: CounterScope, whose: "self" | "target"): number;
+}
+
+/** Counter lookups for one blueprint given the owner's and optional target's counter stores. */
+export function buildCounterLookups(
+  mine: CounterStore,
+  theirs: CounterStore | null,
+  blueprint: Pick<BlueprintSource, "id" | "counters">,
+  overrides: Readonly<Record<string, number>> = {}
+): CounterLookups {
+  const own = (name: string, scope: CounterScope) => overrides[`${scope}:${name}`] ?? counterValue(mine, scope, name, blueprint);
+  return {
+    self: name => own(name, formulaScope(mine, name, blueprint)),
+    target: theirs ? name => counterValue(theirs, formulaScope(theirs, name, blueprint), name, blueprint) : null,
+    value: (name, scope, whose) => (whose === "target")
+      ? (theirs ? counterValue(theirs, scope, name, blueprint) : 0)
+      : own(name, scope)
+  };
+}
+
 /** Formulas name counters without a kind: the blueprint's own when it has one by that name, else the shared one. */
 export function formulaScope(store: CounterStore, name: string, blueprint: Pick<BlueprintSource, "id" | "counters">): CounterScope {
   const key = counterName(name);

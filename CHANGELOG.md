@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.4.0
+
+### Added
+- **Combat start** trigger event (`combatStart`): fires once per distinct combatant actor when combat begins, without requiring a roll.
+- **Roll advantage** result (`rollAdvantage`): grant advantage or disadvantage to attack rolls, saving throws, ability checks, or signals—including as an optional player choice in the roll dialog and through riders—while combining with existing roll flags under D&D 5e mutual-cancellation rules.
+- **Reminder audience filters**: choose who sees each reminder note (*As usual*, *Me only*, *GM only*, *Target's owner (and GM)*, or *Everyone (public chat)*). Player roll dialogs hide *GM only* notes, cancelled rolls post nothing, and skipped dialogs fall back to chat when the roll proceeds.
+
+### Changed
+- Consolidated runtime orchestration, multiplayer transport, editor host state, and shared evaluator/UI helpers across clean module boundaries without changing saved blueprint behavior.
+- Added [tests/live/features-check.js](tests/live/features-check.js) covering editor palette/inspector controls, combat-start deduplication, interactive advantage choices, mutual cancellation, riders, and reminder audience routing in Foundry VTT.
+
 ## 2.3.2
 
 ### Added

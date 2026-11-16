@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { effectReference, isEffectUuid } from "../../core/facts/effects";
+import { effectReference, isEffectUuid } from "../../core/facts/types";
 import { asRecord, asString } from "../../core/registry/data";
 import { useHost, useT } from "../services";
 
@@ -15,6 +15,12 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
 
+  const markUnresolved = (uuid: string) => {
+    setStatus("invalid");
+    // Preserve an existing choice; a new invalid reference stores a non-effect reference (not null) so it fails "noValue" rather than passing "empty".
+    if (value == null && uuid) onChange({ uuid: isEffectUuid(uuid) ? "" : uuid, name: "" });
+  };
+
   const resolve = async (text: string) => {
     const current = ++request.current;
     const uuid = text.trim();
@@ -23,9 +29,7 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
       const result = isEffectUuid(uuid) && host ? effectReference(await host.resolve(uuid)) : null;
       if (current !== request.current) return;
       if (!result || result.uuid !== uuid) {
-        setStatus("invalid");
-        // Preserve an existing choice; an invalid new reference must not act as an empty check.
-        if (value == null && uuid) onChange({ uuid, name: "", invalid: true });
+        markUnresolved(uuid);
         return;
       }
       setDraft(result.uuid);
@@ -33,8 +37,7 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
       onChange(result);
     } catch {
       if (current !== request.current) return;
-      setStatus("invalid");
-      if (value == null && uuid) onChange({ uuid, name: "", invalid: true });
+      markUnresolved(uuid);
     }
   };
 
@@ -46,19 +49,14 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
       onDrop={event => {
         event.preventDefault();
         event.stopPropagation();
-        try {
-          const data = asRecord(JSON.parse(event.dataTransfer.getData("text/plain")));
-          if (data.type !== "ActiveEffect" || !isEffectUuid(asString(data.uuid))) {
-            request.current++;
-            setStatus("invalid");
-            if (data.type === "ActiveEffect" && value == null) onChange({ uuid: asString(data.uuid).trim(), name: "", invalid: true });
-            return;
-          }
-          void resolve(asString(data.uuid));
-        } catch {
+        const drop = host?.parseDrop?.(event.dataTransfer.getData("text/plain")) ?? null;
+        if (!drop || !drop.valid) {
           request.current++;
           setStatus("invalid");
+          if (drop && value == null) onChange({ uuid: isEffectUuid(drop.uuid) ? "" : drop.uuid, name: "" });
+          return;
         }
+        void resolve(drop.uuid);
       }}
     >
       {selected ? <p className="bna-field__hint" aria-label={t("BNA.Field.activeEffect.selected")}>{selected.name || selected.uuid}</p> : null}

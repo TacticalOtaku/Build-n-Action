@@ -22,6 +22,8 @@ export const STATIC = {
   saveWho: choices("saveWho", ["target", "self", "aura"]),
   saveDcMode: choices("saveDcMode", ["formula", "spell"]),
   rollMode: choices("rollMode", ["normal", "advantage", "disadvantage"]),
+  advantageType: choices("advantageType", ["advantage", "disadvantage"]),
+  reminderAudience: choices("reminderAudience", ["auto", "self", "gm", "target", "all"]),
   counterScope: choices("counterScope", ["actor", "blueprint"]),
   counterAction: choices("counterAction", ["add", "subtract", "set", "reset"]),
   counterOperator: choices("counterOperator", ["EQ", "NE", "LT", "LE", "GT", "GE"]),

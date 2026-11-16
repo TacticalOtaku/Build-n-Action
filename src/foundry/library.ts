@@ -7,7 +7,7 @@ import {
 import { MODULE_SCOPE } from "../core/storage/repository";
 import { read } from "../runtime/read";
 import type { LibraryHost } from "../ui/host";
-import { saveBlueprint } from "./api";
+import { saveBlueprint } from "./documents";
 
 const SETTING = "library";
 const listeners = new Set<() => void>();

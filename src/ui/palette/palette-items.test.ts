@@ -10,7 +10,7 @@ const NONE = { from: null, upstream: [] } as const;
 
 describe("PALETTE_ITEMS", () => {
   it("lists every event, the condition and every result", () => {
-    expect(PALETTE_ITEMS).toHaveLength(17 + 1 + 14);
+    expect(PALETTE_ITEMS).toHaveLength(18 + 1 + 15);
     expect(PALETTE_ITEMS.find(item => item.kind === "condition")?.type).toBe("condition");
   });
 

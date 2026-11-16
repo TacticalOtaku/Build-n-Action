@@ -3,12 +3,13 @@ import en from "../../lang/en.json";
 import ru from "../../lang/ru.json";
 import { createBlueprint } from "../blueprint/factory";
 import { isValidId } from "../blueprint/ids";
-import type { BlueprintSource } from "../blueprint/types";
+import type { BlueprintSource, ConditionCheck } from "../blueprint/types";
+import { makeCondition, makeEdge, makeNode } from "../testing/graph";
 import { createTranslator } from "../i18n";
 import { convertLegacyBonus } from "../legacy/adapter";
 import { LEGACY_FIXTURES } from "../legacy/fixtures";
 import {
-  blueprintUuid, deleteBlueprint, flagChanges, issueMessageKey, parseBlueprintUuid, readBlueprints, upsertBlueprint
+  blueprintUuid, deleteBlueprint, flagChanges, foldThisItemChecks, issueMessageKey, parseBlueprintUuid, readBlueprints, upsertBlueprint
 } from "./repository";
 
 function blueprint(id: string, name: string, sort = 0): BlueprintSource {
@@ -159,5 +160,26 @@ describe.each([["en", en], ["ru", ru]] as const)("%s storage messages", (_langua
     const translator = createTranslator(dictionary);
     const codes = ["invalidBlueprint", "invalidId", "unknownFilter", "unknownType"] as const;
     expect(codes.filter(code => !translator.has(issueMessageKey({ code })))).toEqual([]);
+  });
+});
+
+describe("foldThisItemChecks", () => {
+  const thisItem: ConditionCheck = { id: "c-thisItem", type: "thisItem", data: {} };
+  const undead: ConditionCheck = { id: "c1", type: "creatureTypes", data: { values: ["undead"] } };
+  const withCondition = (checks: ConditionCheck[], mode: "all" | "any" = "all") => createBlueprint({
+    nodes: [makeNode("event", "damageRoll", "ev"), makeCondition("if", checks, mode), makeNode("result", "rollBonus", "bonus")],
+    edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus")]
+  });
+
+  it("turns an \"only this item\" check in an all-of condition into the condition's tick", () => {
+    const folded = foldThisItemChecks(withCondition([thisItem, undead]));
+    expect(folded.nodes[1]?.data).toMatchObject({ mode: "all", checks: [undead], thisItem: true });
+  });
+
+  it("leaves any-of conditions, where the check means something else, and returns the same blueprint when nothing changes", () => {
+    const anyOf = withCondition([thisItem, undead], "any");
+    expect(foldThisItemChecks(anyOf)).toBe(anyOf);
+    const plain = withCondition([undead]);
+    expect(foldThisItemChecks(plain)).toBe(plain);
   });
 });

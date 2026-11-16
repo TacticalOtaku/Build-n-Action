@@ -40,7 +40,12 @@ const RICH_RESULT_DATA: Record<string, Record<string, unknown>[]> = {
   critRange: [{ critical: "-1", fumble: "1" }],
   critDamage: [{ dice: "1", damage: "1d6" }],
   saveThresholds: [{ targetValue: "-2", deathSaveCritical: "-1" }],
-  reminder: [{ text: "A very long reminder text that certainly exceeds the preview length limit" }],
+  rollAdvantage: [{ mode: "advantage" }, { mode: "disadvantage" }],
+  reminder: [
+    { text: "A very long reminder text that certainly exceeds the preview length limit" },
+    { audience: "gm", text: "Secret GM reminder" },
+    { audience: "all", text: "Public reminder" }
+  ],
   rider: [
     { effect: { type: "rollBonus", data: { formula: "2d6" } }, scope: "nextRoll", roll: "damageRoll", who: "self", duration: { unit: "rounds", value: 2 } },
     { effect: null, scope: "sameActivation", duration: { unit: "untilRest", value: 1 } },

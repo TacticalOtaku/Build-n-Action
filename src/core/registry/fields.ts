@@ -1,4 +1,5 @@
 import type { EventType } from "./constants";
+import { asRecord, asString } from "./data";
 
 /** Choice lists that only exist at runtime (CONFIG.DND5E, the carrying document, …). */
 export type DynamicChoiceSource =
@@ -140,4 +141,47 @@ export function walkFields(fields: readonly FieldSpec[], visit: (field: FieldSpe
     visit(field);
     if (field.kind === "group") walkFields(field.fields, visit);
   }
+}
+
+/** Collect every non-empty formula across fields, nested groups, and optional embedded results. */
+export function collectFormulaFields(
+  fields: readonly FieldSpec[],
+  data: Readonly<Record<string, unknown>>,
+  embeddedFields?: (type: string) => readonly FieldSpec[] | undefined
+): string[] {
+  const formulas: string[] = [];
+  const visit = (specs: readonly FieldSpec[], values: Readonly<Record<string, unknown>>) => {
+    for (const spec of specs) {
+      if (spec.kind === "formula") {
+        const value = asString(values[spec.key]).trim();
+        if (value) formulas.push(value);
+      } else if (spec.kind === "group") {
+        visit(spec.fields, asRecord(values[spec.key]));
+      } else if ((spec.kind === "embeddedResult") && embeddedFields) {
+        const embedded = asRecord(values[spec.key]);
+        const nested = embeddedFields(asString(embedded.type));
+        if (nested) visit(nested, asRecord(embedded.data));
+      }
+    }
+  };
+  visit(fields, data);
+  return formulas;
+}
+
+/** Transform every non-empty formula across fields and nested groups, returning updated data. */
+export function mapFormulaFields(
+  fields: readonly FieldSpec[],
+  data: Readonly<Record<string, unknown>>,
+  transform: (formula: string) => string
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...data };
+  for (const spec of fields) {
+    if (spec.kind === "formula") {
+      const value = asString(data[spec.key]).trim();
+      if (value) next[spec.key] = transform(value);
+    } else if ((spec.kind === "group") && (spec.key in data)) {
+      next[spec.key] = mapFormulaFields(spec.fields, asRecord(data[spec.key]), transform);
+    }
+  }
+  return next;
 }

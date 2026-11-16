@@ -1,6 +1,6 @@
 # Build-n-Action
 
-Blueprints for Foundry VTT and dnd5e: small graphs that read **When → If → Then**. A blueprint changes a roll before it is made (a bonus, a better critical range, a higher save DC). It can also react to the outcome: knock a target prone on a hit, restore hit points when a foe drops, or set up a bonus for the next roll.
+Blueprints for Foundry VTT and dnd5e: small graphs that read **When → If → Then**. A blueprint changes a roll before it is made (a bonus, advantage or disadvantage, a better critical range, a higher save DC). It can also react to the outcome: knock a target prone on a hit, restore hit points when a foe drops, or set up a bonus for the next roll.
 
 ## Requirements
 
@@ -54,9 +54,9 @@ Conditions offer **My effects** and **Target effects** alongside the existing st
 
 Only active effects count by default; **Include inactive effects** also counts disabled and suppressed applicable effects. Transferred item effects are included. Target checks require a target. Source matching requires a retained link to the original effect, which new copies made by **Apply effect** preserve; use name matching for older or third-party copies whose source link is missing.
 
-## Turns, regions and rests
+## Combat, turns, regions and rests
 
-Blueprints can start without a roll: at the start or end of a turn in combat, when a token enters or leaves a region, or after a short or long rest. They run on the GM's side, once each, and use results that do not change a roll: effects, resources, reminders (whispered to the owner and the GM), a bonus to a later roll, or a signal. Region events work on blueprints stored on the region; the module adds its region behavior for you.
+Blueprints can start without a roll: at combat start, at the start or end of a turn in combat, when a token enters or leaves a region, or after a short or long rest. They run on the GM's side, once each, and use results that do not change a roll: effects, resources, reminders (with configurable audience filters—roll dialog, owner, GM, target's owner, or public chat), a bonus to a later roll, or a signal. Region events work on blueprints stored on the region; the module adds its region behavior for you.
 
 ## "And then"
 

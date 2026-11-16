@@ -2,11 +2,10 @@ import type { BlueprintNode, BlueprintSource, ConditionCheck } from "../blueprin
 import { counterName } from "../counters/counters";
 import { upstreamEvents } from "../graph/upstream";
 import { CONTINUATION_EVENTS, TRIGGER_EVENTS, type EventType } from "../registry/constants";
-import { asRecord, asString, asStrings } from "../registry/data";
-import type { FieldSpec } from "../registry/fields";
+import { asRecord, asString } from "../registry/data";
+import { collectFormulaFields } from "../registry/fields";
 import { COMMON_RESULT_FIELDS, getCheck, getEvent, getResult } from "../registry/index";
 import { compileBlueprint } from "./compile";
-import { splitSelection } from "./inclusion";
 
 export const LINT_CODES = [
   "orphan-node", "dead-event", "incompatible-result", "irrelevant-check", "invalid-formula", "unknown-path",
@@ -58,47 +57,23 @@ const LEVELS: Record<LintCode, LintLevel> = {
   "migrated": "info"
 };
 
-/** Checks whose values are one-of lists, so two in an all-of condition can contradict each other. */
-const LIST_CHECKS = new Set([
-  "itemTypes", "identifiers", "baseWeapons", "damageTypes", "spellLevels", "spellSchools", "preparationModes",
-  "actorCreatureTypes", "actorCreatureSizes", "creatureTypes", "skillIds", "saveAbilities"
-]);
-
 /** Roll-data paths (without "@") referenced by a formula. */
 export function formulaPaths(formula: string): string[] {
   return [...formula.matchAll(/@([A-Za-z_][\w.]*)/g)].map(match => match[1] ?? "").filter(Boolean);
 }
 
-function formulaFields(fields: readonly FieldSpec[], data: Readonly<Record<string, unknown>>): string[] {
-  const formulas: string[] = [];
-  const visit = (specs: readonly FieldSpec[], values: Readonly<Record<string, unknown>>) => {
-    for (const spec of specs) {
-      if (spec.kind === "formula") {
-        const value = asString(values[spec.key]).trim();
-        if (value) formulas.push(value);
-      } else if (spec.kind === "group") {
-        visit(spec.fields, asRecord(values[spec.key]));
-      } else if (spec.kind === "embeddedResult") {
-        const embedded = asRecord(values[spec.key]);
-        const definition = getResult(asString(embedded.type));
-        if (definition) visit(definition.fields, asRecord(embedded.data));
-      }
-    }
-  };
-  visit(fields, data);
-  return formulas;
-}
+const embeddedFields = (type: string) => getResult(type)?.fields;
 
 function nodeFormulas(node: BlueprintNode): string[] {
-  if (node.kind === "event") return formulaFields(getEvent(node.type)?.fields ?? [], node.data);
+  if (node.kind === "event") return collectFormulaFields(getEvent(node.type)?.fields ?? [], node.data);
   if (node.kind === "result") {
     return [
-      ...formulaFields(getResult(node.type)?.fields ?? [], node.data),
-      ...formulaFields(COMMON_RESULT_FIELDS, asRecord(node.data.common))
+      ...collectFormulaFields(getResult(node.type)?.fields ?? [], node.data, embeddedFields),
+      ...collectFormulaFields(COMMON_RESULT_FIELDS, asRecord(node.data.common))
     ];
   }
   const checks = Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [];
-  return checks.flatMap(check => formulaFields(getCheck(check.type)?.fields ?? [], check.data));
+  return checks.flatMap(check => collectFormulaFields(getCheck(check.type)?.fields ?? [], check.data));
 }
 
 export function lintBlueprint(blueprint: BlueprintSource, env: LintEnv = {}): LintIssue[] {
@@ -153,10 +128,9 @@ export function lintBlueprint(blueprint: BlueprintSource, env: LintEnv = {}): Li
   for (const node of blueprint.nodes) {
     if ((node.kind !== "condition") || (asString(node.data.mode) === "any")) continue;
     const checks = Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [];
-    const firstByType = new Map<string, string[]>();
+    const firstByType = new Map<string, readonly string[]>();
     for (const check of checks) {
-      if (!LIST_CHECKS.has(check.type)) continue;
-      const included = splitSelection(asStrings(check.data.values)).included;
+      const included = getCheck(check.type)?.contradictionValues?.(check.data) ?? [];
       if (!included.length) continue;
       const earlier = firstByType.get(check.type);
       if (earlier && !earlier.some(value => included.includes(value))) {
@@ -196,19 +170,14 @@ export function lintBlueprint(blueprint: BlueprintSource, env: LintEnv = {}): Li
   // Counter names nobody defines (a typo), among the owner's shared counters and this blueprint's own.
   if (env.counterNames) {
     const known = new Set([...env.counterNames, ...(blueprint.counters ?? []).map(def => counterName(def.name))]);
-    const unknown = (data: Readonly<Record<string, unknown>>) => {
-      const name = counterName(asString(data.name));
-      return !!name && !known.has(name);
+    const checkCounter = (name: string | undefined, nodeId: string, checkId?: string) => {
+      if (name && !known.has(name)) report("counter-unknown", checkId ? { nodeId, checkId, values: { name } } : { nodeId, values: { name } });
     };
     for (const node of blueprint.nodes) {
-      if ((node.kind === "result") && (node.type === "counter") && unknown(node.data)) {
-        report("counter-unknown", { nodeId: node.id, values: { name: counterName(asString(node.data.name)) } });
-      }
+      if (node.kind === "result") checkCounter(getResult(node.type)?.counterRef?.(node.data)?.name, node.id);
       if (node.kind !== "condition") continue;
       for (const check of (Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [])) {
-        if ((check.type === "counter") && unknown(check.data)) {
-          report("counter-unknown", { nodeId: node.id, checkId: check.id, values: { name: counterName(asString(check.data.name)) } });
-        }
+        checkCounter(getCheck(check.type)?.counterRef?.(check.data)?.name, node.id, check.id);
       }
     }
   }

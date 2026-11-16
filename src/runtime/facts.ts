@@ -1,11 +1,66 @@
-import type { ActivityFacts, ActorFacts, CreatureFacts, ItemFacts, RollDetails, RollFacts } from "../core/facts/types";
+import { isEffectUuid, type ActivityFacts, type ActorFacts, type CreatureFacts, type EffectFacts, type ItemFacts, type RollDetails, type RollFacts } from "../core/facts/types";
 import type { EventType } from "../core/registry/constants";
 import { asNumber, asRecord, asString, asStrings } from "../core/registry/data";
 import { callList, listOf, read, stringList } from "./read";
 import { expandTraits, traitPath, type TraitTree } from "./traits";
-import { creatureEffects } from "./effects";
 
 const SCOPE = "build-n-action";
+
+export type EffectState = "active" | "disabled" | "expired" | "suppressed";
+
+export interface EffectSummary {
+  state: EffectState;
+  /** DAE: while this holds, DAE keeps the effect off. */
+  disableCondition: string | null;
+  /** DAE: when this fails, DAE deletes the effect. */
+  enableCondition: string | null;
+  /** DAE special duration keys (zeroHP, turnStart, …). */
+  specialDurations: string[];
+}
+
+/** Only exact effect references establish provenance; an item origin is ambiguous. */
+export function effectSources(effect: unknown): string[] {
+  return [...new Set([
+    asString(read(effect, "uuid")),
+    ...stringList(read(effect, "flags.build-n-action.effectSources")),
+    asString(read(effect, "_stats.duplicateSource")),
+    asString(read(effect, "_stats.compendiumSource")),
+    asString(read(effect, "origin"))
+  ].filter(isEffectUuid))];
+}
+
+/** Foundry supplies applicable actor/item effects, including inactive ones. */
+export function creatureEffects(actor: unknown): EffectFacts[] {
+  return callList(actor, "allApplicableEffects").flatMap(effect => {
+    const name = asString(read(effect, "name"));
+    const uuid = asString(read(effect, "uuid"));
+    return (name || isEffectUuid(uuid)) ? [{ name, uuid, sources: effectSources(effect), active: read(effect, "active") === true }] : [];
+  });
+}
+
+/** Whether an Active Effect is active and applies to its actor (collector & status badge share this check). */
+export function isEffectActive(effect: unknown): boolean {
+  return (read(effect, "active") === true)
+    && ((read(effect, "isAppliedEnchantment") === true) || (read(effect, "modifiesActor") === true));
+}
+
+function effectText(effect: unknown, path: string): string | null {
+  return asString(read(effect, path)).trim() || null;
+}
+
+/** An effect's state as the collector sees it (active / disabled / expired / suppressed) plus DAE hints. */
+export function effectSummary(effect: unknown): EffectSummary {
+  let state: EffectState = "active";
+  if (read(effect, "disabled") === true) state = "disabled";
+  else if ((read(effect, "active") !== true) && ((read(effect, "duration.expired") === true) || (read(effect, "_source.duration.expired") === true))) state = "expired";
+  else if (!isEffectActive(effect)) state = "suppressed";
+  return {
+    state,
+    disableCondition: effectText(effect, "flags.dae.disableCondition"),
+    enableCondition: effectText(effect, "flags.dae.enableCondition"),
+    specialDurations: stringList(read(effect, "flags.dae.specialDuration"))
+  };
+}
 
 /** dnd5e trait trees used to widen languages and tools; missing trees mean "no hierarchy". */
 export interface TraitTrees {

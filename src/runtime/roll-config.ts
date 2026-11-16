@@ -8,10 +8,50 @@ export interface RollConfigEntry {
 }
 
 export interface ProcessConfig {
+  advantage?: boolean;
+  disadvantage?: boolean;
   rolls?: RollConfigEntry[];
   data?: Record<string, unknown>;
   target?: unknown;
   critical?: { bonusDice?: number; bonusDamage?: string };
+}
+
+export type RollAdvantageMode = "advantage" | "disadvantage";
+export type ResolvedAdvantageMode = "normal" | RollAdvantageMode;
+
+function hasAdvantageFlag(config: ProcessConfig): boolean {
+  return Boolean(config.advantage) || entries(config).some(roll =>
+    (roll.options?.advantage === true) || (roll.options?.advantageMode === 1)
+  );
+}
+
+function hasDisadvantageFlag(config: ProcessConfig): boolean {
+  return Boolean(config.disadvantage) || entries(config).some(roll =>
+    (roll.options?.disadvantage === true) || (roll.options?.advantageMode === -1)
+  );
+}
+
+/** Resolved 5e roll mode after mutual cancellation of any advantage and disadvantage sources. */
+export function resolvedAdvantageMode(config: ProcessConfig): ResolvedAdvantageMode {
+  const advantage = hasAdvantageFlag(config);
+  const disadvantage = hasDisadvantageFlag(config);
+  if (advantage === disadvantage) return "normal";
+  return advantage ? "advantage" : "disadvantage";
+}
+
+/** Apply advantage or disadvantage onto the roll configuration while preserving mutual cancellation. */
+export function applyAdvantageMode(config: ProcessConfig, mode: RollAdvantageMode): void {
+  const advantage = (mode === "advantage") || hasAdvantageFlag(config);
+  const disadvantage = (mode === "disadvantage") || hasDisadvantageFlag(config);
+  config.advantage = advantage;
+  config.disadvantage = disadvantage;
+  const numericMode = (advantage === disadvantage) ? 0 : (advantage ? 1 : -1);
+  for (const roll of entries(config)) {
+    roll.options ??= {};
+    roll.options.advantage = advantage;
+    roll.options.disadvantage = disadvantage;
+    roll.options.advantageMode = numericMode;
+  }
 }
 
 function isEntry(roll: unknown): roll is RollConfigEntry {

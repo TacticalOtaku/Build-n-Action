@@ -1,13 +1,12 @@
-import type { ChainEntry, ChainIntent } from "../core/engine/interpreter";
-import type { EventType } from "../core/registry/constants";
+import type { ChainIntent } from "../core/engine/interpreter";
 import { asNumber, asRecord, asString, asStrings } from "../core/registry/data";
 import { resolveModifiers } from "../runtime/dice";
+import type { ModifierTracker, PlayApplyContext } from "../runtime/play";
 import { read } from "../runtime/read";
 import {
-  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, sanitizeCritical,
-  type ProcessConfig
+  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, applyAdvantageMode,
+  sanitizeCritical, type ProcessConfig
 } from "../runtime/roll-config";
-import type { Roller, SourceInfo } from "./collect";
 import { originRollData } from "./documents";
 import { modifyFormulaParts, replaceData, resolveForeign, simplifyNumber } from "./formulas";
 import { SETTINGS, setting } from "./settings";
@@ -30,17 +29,9 @@ function rollable(formula: string, intent: ChainIntent, ctx: ApplyContext): bool
   return false;
 }
 
-export interface ApplyContext {
-  event: EventType;
-  roller: Roller;
-  sources: ReadonlyMap<ChainEntry, SourceInfo>;
-}
+export type ApplyContext = PlayApplyContext<FoundryDocument, FoundryDocument, FoundryDocument, TokenPlaceable>;
 
-/** Dice modifiers keep applying to later parts until a "first die only" modifier has been used. */
-export interface ModifierTracker {
-  active: ChainIntent[];
-  halted: Set<string>;
-}
+export type { ModifierTracker };
 
 /** Overrides when the player applies a choice: its scaled formula, a picked damage type, origin roll data. */
 export interface ApplyOptions {
@@ -160,6 +151,9 @@ export function applyRollIntents(
       case "saveThresholds":
         target += numberOf(intent, "targetValue", ctx, options);
         deathCritical += numberOf(intent, "deathSaveCritical", ctx, options);
+        break;
+      case "rollAdvantage":
+        applyAdvantageMode(config, (asString(intent.data.mode, "advantage") === "disadvantage") ? "disadvantage" : "advantage");
         break;
       default:
         break;

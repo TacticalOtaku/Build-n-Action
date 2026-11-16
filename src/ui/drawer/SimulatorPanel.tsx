@@ -1,23 +1,152 @@
 import { type ReactNode, useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
-import type { BlueprintSource } from "../../core/blueprint/types";
-import type { EventType } from "../../core/registry/constants";
+import type { BlueprintNode, BlueprintSource } from "../../core/blueprint/types";
+import type { BlueprintRun, CheckTrace } from "../../core/engine/interpreter";
+import type { Reason } from "../../core/engine/reasons";
+import type { Translator } from "../../core/i18n";
+import { EVENT_TYPES, type EventType, type NodeKind, type PinId } from "../../core/registry/constants";
+import { asString } from "../../core/registry/data";
+import type { ChoiceSpec } from "../../core/registry/fields";
 import { getCheck, getResult } from "../../core/registry/index";
+import type { PhraseFormatter } from "../../core/registry/types";
 import { nodeTitle } from "../canvas/node-title";
-import type { CanvasTrace } from "../canvas/trace";
-import type { SimulationRequest, SimulationResult, SimulatorHost } from "../host";
+import type { CanvasTrace, NodeRunStatus } from "../canvas/trace";
+import type { SimulationOption, SimulationRequest, SimulationResult, SimulatorHost } from "../host";
 import { Icon } from "../icons";
 import { useChoiceOptions } from "../inspector/useChoiceOptions";
 import { useServices, useT } from "../services";
-import { eventOptions, outcomeOptions } from "../sim/outcomes";
-import { subjectStore } from "../sim/subjects";
-import { summarizeRun, type RunSummary } from "../sim/summarize";
-import { checkChoices, reasonText } from "./reason-text";
 
 const ABILITIES = { source: "abilities" } as const;
 const SKILLS = { source: "skills" } as const;
 const NEEDS_ABILITY: readonly EventType[] = ["abilityCheck", "savingThrow", "afterCheck"];
 const NEEDS_SKILL: readonly EventType[] = ["abilityCheck", "afterCheck"];
 const NOTE_KEYS = { suppressed: "BNA.UI.Sim.noteSuppressed", noToken: "BNA.UI.Sim.noteNoToken", trigger: "BNA.UI.Sim.noteTrigger", chosen: "BNA.UI.Sim.noteChosen" } as const;
+const KIND_ORDER: Record<NodeKind, number> = { event: 0, condition: 1, result: 2 };
+const LISTED_REASON_VALUES = ["actual", "expected"] as const;
+
+export interface OutcomeOption {
+  id: PinId;
+  pins: readonly PinId[];
+}
+
+export interface EventOption {
+  key: string;
+  event: EventType;
+  signal: string | null;
+}
+
+export interface Subjects {
+  actors: readonly SimulationOption[];
+  targets: readonly SimulationOption[];
+}
+
+export interface RunStep {
+  nodeId: string;
+  kind: NodeKind;
+  status: NodeRunStatus;
+  reason: Reason | null;
+  checks: readonly CheckTrace[];
+}
+
+export interface RunSummary {
+  trace: CanvasTrace;
+  /** Nodes the run reached, in reading order. */
+  steps: RunStep[];
+  /** Why nothing applies: the first failed node and check; null when something would apply. */
+  firstFailure: { nodeId: string | null; checkId: string | null; reason: Reason } | null;
+}
+
+const OUTCOMES: Partial<Record<EventType, readonly OutcomeOption[]>> = {
+  afterAttack: [
+    { id: "hit", pins: ["hit"] },
+    { id: "crit", pins: ["hit", "crit"] },
+    { id: "miss", pins: ["miss"] },
+    { id: "fumble", pins: ["miss", "fumble"] }
+  ],
+  afterTargetSave: [{ id: "failed", pins: ["failed"] }, { id: "succeeded", pins: ["succeeded"] }],
+  afterDamage: [{ id: "dealt", pins: ["dealt"] }, { id: "dropped", pins: ["dealt", "dropped"] }],
+  afterCheck: [{ id: "success", pins: ["success"] }, { id: "failure", pins: ["failure"] }]
+};
+
+export function outcomeOptions(event: EventType): readonly OutcomeOption[] {
+  return OUTCOMES[event] ?? [];
+}
+
+/** The events a test can fire: each event type in the blueprint once, and each named signal once. */
+export function eventOptions(blueprint: BlueprintSource): EventOption[] {
+  const options = new Map<string, EventOption>();
+  for (const node of blueprint.nodes) {
+    if ((node.kind !== "event") || !(EVENT_TYPES as readonly string[]).includes(node.type)) continue;
+    const event = node.type as EventType;
+    if (event === "signal") {
+      const name = asString(node.data.name).trim();
+      if (name) options.set(`signal:${name}`, { key: `signal:${name}`, event, signal: name });
+    } else if (!options.has(event)) {
+      options.set(event, { key: event, event, signal: null });
+    }
+  }
+  return [...options.values()];
+}
+
+/** External store reading the host's actors/targets once per revision. */
+export function subjectStore(simulator: SimulatorHost): {
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): Subjects;
+} {
+  let cached: { revision: number; subjects: Subjects } | null = null;
+  return {
+    subscribe: listener => simulator.subscribe?.(listener) ?? (() => undefined),
+    getSnapshot: () => {
+      const revision = simulator.revision?.() ?? 0;
+      if (cached?.revision !== revision) cached = { revision, subjects: { actors: simulator.actors(), targets: simulator.targets() } };
+      return cached.subjects;
+    }
+  };
+}
+
+function readingOrder(a: BlueprintNode, b: BlueprintNode): number {
+  return (KIND_ORDER[a.kind] - KIND_ORDER[b.kind]) || (a.position.x - b.position.x) || (a.position.y - b.position.y);
+}
+
+export function summarizeRun(blueprint: BlueprintSource, run: BlueprintRun): RunSummary {
+  const nodes: Record<string, NodeRunStatus> = {};
+  for (const node of blueprint.nodes) nodes[node.id] = run.nodes[node.id]?.status ?? "skipped";
+  const trace: CanvasTrace = { nodes, edges: new Set(run.edges) };
+
+  const steps: RunStep[] = [...blueprint.nodes].sort(readingOrder).flatMap(node => {
+    const traced = run.nodes[node.id];
+    if (!traced || (traced.status === "skipped")) return [];
+    return [{ nodeId: node.id, kind: node.kind, status: traced.status, reason: traced.reason ?? null, checks: traced.checks ?? [] }];
+  });
+
+  let firstFailure: RunSummary["firstFailure"] = null;
+  if (run.skipped) {
+    firstFailure = { nodeId: null, checkId: null, reason: run.skipped };
+  } else if (!run.intents.length) {
+    const failed = steps.find(step => step.status === "failed");
+    const check = failed?.checks.find(entry => !entry.outcome.pass);
+    const reason = check?.outcome.reason ?? failed?.reason;
+    if (failed && reason) firstFailure = { nodeId: failed.nodeId, checkId: check?.checkId ?? null, reason };
+  }
+  return { trace, steps, firstFailure };
+}
+
+/** The choice list a check's values come from, if it has one. */
+export function checkChoices(type: string): ChoiceSpec | null {
+  return getCheck(type)?.reasonChoices ?? null;
+}
+
+/** A reason as text; with a choice list, stored values ("humanoid, elf") show as their labels. */
+export function reasonText(reason: Reason, t: Translator["t"], fmt?: PhraseFormatter, spec?: ChoiceSpec | null): string {
+  if (!reason.values) return t(`BNA.Reason.${reason.code}`);
+  const values: Record<string, string | number> = { ...reason.values };
+  if (fmt && spec) {
+    for (const key of LISTED_REASON_VALUES) {
+      const value = values[key];
+      if ((typeof value === "string") && (value !== "—")) values[key] = value.split(", ").map(part => fmt.choice(part, spec)).join(", ");
+    }
+  }
+  return t(`BNA.Reason.${reason.code}`, values);
+}
 
 export interface SimulatorPanelProps {
   blueprint: BlueprintSource;

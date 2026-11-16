@@ -1,5 +1,5 @@
 /** Version used by the built package and the generated root module.json. */
-export const MODULE_VERSION = "2.3.2";
+export const MODULE_VERSION = "2.4.0";
 
 const REPOSITORY = "https://github.com/TacticalOtaku/Build-n-Action";
 

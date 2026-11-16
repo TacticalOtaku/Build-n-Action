@@ -1,9 +1,12 @@
-import type { CounterDef } from "../core/blueprint/types";
-import { readCounterDef } from "../core/counters/counters";
+import type { BlueprintSource, CounterDef } from "../core/blueprint/types";
+import { counterDef, counterKey, counterName, readCounterDef, type CounterStore } from "../core/counters/counters";
 import { asNumber, asRecord, asString } from "../core/registry/data";
+import type { CostOption, ResolvedCost } from "./choices";
 import { readRiders, type Rider } from "./riders";
 
-export type ResourceKind = "uses" | "slots" | "hp" | "tempHp" | "hitDice" | "currency";
+export type ResourceKind = "uses" | "slots" | "hp" | "tempHp" | "hitDice" | "currency" | "quantity" | "inspiration";
+
+export type ChatAudience = "gm" | "target";
 
 /** One document change, addressed by UUID so it can be sent to the GM. */
 export type Operation =
@@ -13,9 +16,13 @@ export type Operation =
   | { kind: "resource"; actor: string; item: string | null; resource: ResourceKind; delta: number; slot: string; currency: string }
   | { kind: "rider"; actor: string; rider: Rider }
   /** A counter change, worked out from the value stored when it is made, so changes never overwrite each other. */
-  | { kind: "counter"; actor: string; key: string; action: string; amount: number; def: CounterDef };
+  | { kind: "counter"; actor: string; key: string; action: string; amount: number; def: CounterDef }
+  /** A private chat reminder posted by the GM so players do not see hidden GM or target notes in their own chat log. */
+  | { kind: "chat"; actor: string; target: string | null; audience: ChatAudience; label: string; text: string };
 
-export const OPERATION_KINDS: readonly Operation["kind"][] = ["status", "copyEffect", "removeEffects", "resource", "rider", "counter"];
+export const OPERATION_KINDS: readonly Operation["kind"][] = ["status", "copyEffect", "removeEffects", "resource", "rider", "counter", "chat"];
+
+const CHAT_AUDIENCES: readonly string[] = ["gm", "target"];
 
 const RESOURCES: readonly string[] = ["uses", "slots", "hp", "tempHp", "hitDice", "currency"];
 
@@ -53,6 +60,12 @@ export function readOperation(value: unknown): Operation | null {
       const amount = asNumber(op.amount);
       if (!key || (amount === null) || (typeof op.action !== "string")) return null;
       return { kind: "counter", actor, key, action: op.action, amount, def: readCounterDef(op.def) };
+    }
+    case "chat": {
+      const audience = asString(op.audience);
+      const target = (op.target === null) ? null : asString(op.target) || null;
+      if (!CHAT_AUDIENCES.includes(audience) || (typeof op.label !== "string") || (typeof op.text !== "string")) return null;
+      return { kind: "chat", actor, target, audience: audience as ChatAudience, label: op.label, text: op.text };
     }
     default:
       return null;
@@ -121,6 +134,67 @@ export function planOperation(type: string, data: Readonly<Record<string, unknow
   }
 }
 
+export interface CounterPlanContext {
+  /** Actor UUID of "me" (the carrier's owner, else the creature the event is about). */
+  self: string;
+  target: string | null;
+  blueprint: Pick<BlueprintSource, "id" | "counters">;
+  /** The resolved amount of the change. */
+  amount: number;
+}
+
+/** The change a "Change counter" result makes, with the counter's limits; `store` is the recipient's counters. */
+export function planCounter(data: Readonly<Record<string, unknown>>, ctx: CounterPlanContext, store: CounterStore): Operation | null {
+  const name = counterName(asString(data.name));
+  const actor = (asString(data.who, "self") === "target") ? ctx.target : ctx.self;
+  if (!name || !actor) return null;
+  const scope = (asString(data.scope) === "blueprint") ? "blueprint" : "actor";
+  const def = counterDef(store, scope, name, ctx.blueprint);
+  return { kind: "counter", actor, key: counterKey(scope, name, ctx.blueprint.id), action: asString(data.action, "add"), amount: ctx.amount, def };
+}
+
+export interface CostPaymentContext {
+  actor: string;
+  carrier: string;
+  usesSpent?: number;
+  usesMax?: number;
+  autoDestroy?: boolean;
+}
+
+export type CostPaymentPlan =
+  | { kind: "none" }
+  | { kind: "confirmDelete"; target: string }
+  | { kind: "operation"; op: Operation };
+
+/** Plan the resource change (or confirmed deletion) that pays an optional choice's cost; null when unsupported. */
+export function planCostPayment(cost: ResolvedCost, option: CostOption, ctx: CostPaymentContext): CostPaymentPlan | null {
+  switch (cost.type) {
+    case "none":
+      return { kind: "none" };
+    case "uses":
+      if (((ctx.usesSpent ?? 0) + option.amount >= (ctx.usesMax ?? 0)) && ctx.autoDestroy) {
+        return { kind: "confirmDelete", target: ctx.carrier };
+      }
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: ctx.carrier, resource: "uses", delta: -option.amount, slot: "", currency: "" } };
+    case "quantity":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: ctx.carrier, resource: "quantity", delta: -option.amount, slot: "", currency: "" } };
+    case "slots":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: null, resource: "slots", delta: -1, slot: option.value, currency: "" } };
+    case "health":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: null, resource: "hp", delta: -option.amount, slot: "", currency: "" } };
+    case "effect":
+      return { kind: "confirmDelete", target: ctx.carrier };
+    case "inspiration":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: null, resource: "inspiration", delta: -1, slot: "", currency: "" } };
+    case "currency":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: null, resource: "currency", delta: -option.amount, slot: "", currency: cost.subtype } };
+    case "hitdice":
+      return { kind: "operation", op: { kind: "resource", actor: ctx.actor, item: null, resource: "hitDice", delta: -option.amount, slot: cost.subtype, currency: "" } };
+    default:
+      return null;
+  }
+}
+
 /** New `spent` after `delta` uses become available (negative spends). */
 export function usesSpent(spent: number, max: number, delta: number): number {
   return Math.min(max, Math.max(0, spent - delta));
@@ -145,5 +219,9 @@ export function tempHp(current: number, delta: number): number {
 }
 
 export function currencyValue(value: number, delta: number): number {
+  return Math.max(0, value + delta);
+}
+
+export function quantityValue(value: number, delta: number): number {
   return Math.max(0, value + delta);
 }

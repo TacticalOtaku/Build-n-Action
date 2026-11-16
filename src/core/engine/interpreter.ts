@@ -2,9 +2,8 @@ import type { BlueprintNode, BlueprintSource } from "../blueprint/types";
 import type { RollFacts } from "../facts/types";
 import { CONTINUATION_EVENT_BY_PIN, type EventType, type PinId } from "../registry/constants";
 import { asBoolean, asRecord, asString } from "../registry/data";
-import { getResult } from "../registry/index";
+import { evaluateCheck, getResult, type CheckEnv } from "../registry/index";
 import { compileBlueprint, type CompiledBlueprint, type CompiledGuard } from "./compile";
-import { evaluateCheck, type CheckEnv } from "./evaluators";
 import type { CheckOutcome, Reason } from "./reasons";
 
 /** What happened: the event, the outcome pins that fired (["out"] for rolls and signals), the signal name. */

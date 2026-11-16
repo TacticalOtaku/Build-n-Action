@@ -2,8 +2,7 @@ import type { EventType } from "../core/registry/constants";
 import { MODULE_SCOPE } from "../core/storage/repository";
 import { listOf, read } from "../runtime/read";
 import { readRiders, riderApplies, riderExpired, useRider, type Rider, type RiderClock } from "../runtime/riders";
-import { deletion, queueFor, replacement } from "./documents";
-import { usageClock } from "./usage";
+import { deletion, queueFor, replacement, usageClock } from "./documents";
 
 /** Now, for an actor's riders: wall time, combat position and its rest counters. */
 export function riderClock(actor: FoundryDocument): RiderClock {

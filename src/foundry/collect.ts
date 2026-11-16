@@ -11,7 +11,8 @@ import type { TraitTree } from "../runtime/traits";
 import { riderBlueprint, type Rider } from "../runtime/riders";
 import { substituteCounters } from "../core/counters/counters";
 import {
-  actorToken, carrierItem, documentBlueprints, documentFromUuid, isDocument, isSuppressed, originRollData, ownerActor, rollDataOrigin
+  actorToken, carrierItem, documentBlueprints, documentFromUuid, isDocument, isLimitAvailable, isSuppressed,
+  originRollData, ownerActor, rollDataOrigin
 } from "./documents";
 import { activeRiders } from "./riders";
 import { counterLookups } from "./counters";
@@ -19,7 +20,6 @@ import { evaluateNumber, replaceData, simplifyNumber } from "./formulas";
 import { previewAura } from "./aura-preview";
 import { auraShape, templateContains, tokenCenters, withinAura, type Point } from "./geometry";
 import { SETTINGS, setting } from "./settings";
-import { isLimitAvailable } from "./usage";
 import { log } from "../core/log";
 
 /** Who is rolling what. */

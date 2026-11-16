@@ -1,8 +1,8 @@
 import type { BlueprintSource } from "../core/blueprint/types";
-import { effectSummary } from "../runtime/effect-state";
+import { effectSummary } from "../runtime/facts";
 import { read } from "../runtime/read";
 import type { EffectStatus, EffectsHost } from "../ui/host";
-import { saveBlueprint } from "./api";
+import { saveBlueprint } from "./documents";
 
 /** DAE's localized special-duration labels, when DAE is active; keys otherwise. */
 function durationLabels(keys: readonly string[]): string[] {

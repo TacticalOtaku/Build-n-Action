@@ -1,17 +1,13 @@
 import "./foundry/styles.css";
 import { MODULE_SCOPE } from "./core/storage/repository";
 import { createApi, validateIntegrations } from "./foundry/api";
-import { registerChoicePanel } from "./foundry/choice-panel";
 import { registerHeaderControls } from "./foundry/header";
 import { registerAuraPreviews } from "./foundry/aura-preview";
 import { registerLibrary } from "./foundry/library";
 import { registerMigrationMenu } from "./foundry/migration-app";
 import { loadTraitTrees } from "./foundry/collect";
-import { registerPreRollHooks } from "./foundry/preroll";
-import { registerReactionHooks } from "./foundry/reaction-hooks";
-import { registerTriggerHooks } from "./foundry/triggers";
+import { receiveTrigger, registerPlayHooks } from "./foundry/play";
 import { registerRegionBehavior, registerRegionBehaviorSync } from "./foundry/region-behavior";
-import { registerSaves } from "./foundry/saves";
 import { registerSettings } from "./foundry/settings";
 import { registerSocket } from "./foundry/socket";
 import { log } from "./core/log";
@@ -33,13 +29,9 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   registerAuraPreviews();
-  registerSocket();
-  registerSaves();
+  registerSocket(receiveTrigger);
   validateIntegrations();
-  registerPreRollHooks();
-  registerChoicePanel();
-  registerReactionHooks();
-  registerTriggerHooks();
+  registerPlayHooks();
   registerRegionBehaviorSync();
   loadTraitTrees().catch(error => log.warn("could not load language and tool trees", error));
   Hooks.callAll(`${MODULE_SCOPE}.ready`, api);

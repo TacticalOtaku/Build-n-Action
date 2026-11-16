@@ -144,6 +144,17 @@
       }
     },
     "Choice": {
+      "advantageType": {
+        "advantage": "Advantage",
+        "disadvantage": "Disadvantage"
+      },
+      "reminderAudience": {
+        "auto": "As usual (roll dialog / owner & GM)",
+        "self": "Me only (owner)",
+        "gm": "GM only",
+        "target": "Target's owner (and GM)",
+        "all": "Everyone (public chat)"
+      },
       "reachMode": {
         "self": "Me",
         "aura": "My aura",
@@ -583,6 +594,17 @@
         "Summary": "When another blueprint sends a signal with this name.",
         "Help": "Signals let one blueprint trigger another. The receiver sees the same roll and targets as the sender. Example: a \"smite\" signal shared by several items.",
         "Phrase": "when the signal “{name}” arrives"
+      },
+      "combatStart": {
+        "Label": "Combat start",
+        "Summary": "When combat begins.",
+        "Help": "Fires once for each combatant when combat starts, whether or not any rolls happen.",
+        "Phrase": {
+          "out": {
+            "Self": "when combat starts",
+            "Other": "when combat starts"
+          }
+        }
       },
       "turnStart": {
         "Label": "Turn start",
@@ -1092,9 +1114,12 @@
         "Summary": "Show a note: in the roll dialog, or in chat where there is none.",
         "Help": "Nothing is applied automatically. Example: \"You have advantage against being charmed.\"",
         "Phrase": "remind: “{text}”",
+        "PhraseAudience": "remind ({audience}): “{text}”",
         "Field": {
+          "audience": "Show to",
+          "audienceHint": "Who sees this note: in the roll dialog or as a chat message.",
           "text": "Text",
-          "textHint": "Shown to the player while rolling."
+          "textHint": "Shown during the roll or posted to chat."
         }
       },
       "rider": {
@@ -1123,6 +1148,19 @@
           "durationHint": "When the change expires if it is not used.",
           "unit": "Unit",
           "value": "Amount"
+        }
+      },
+      "rollAdvantage": {
+        "Label": "Roll advantage",
+        "Summary": "Give a roll advantage or disadvantage.",
+        "Help": "Combines with any advantage or disadvantage already on the roll under D&D 5e rules.",
+        "Phrase": {
+          "advantage": "roll with advantage",
+          "disadvantage": "roll with disadvantage"
+        },
+        "Field": {
+          "mode": "Mode",
+          "modeHint": "Combines with existing advantage or disadvantage (mutual cancellation applies)."
         }
       },
       "applyEffect": {

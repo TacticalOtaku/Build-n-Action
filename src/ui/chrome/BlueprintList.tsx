@@ -4,7 +4,7 @@ import { describeBlueprint } from "../../core/phrase/describe";
 import { Icon } from "../icons";
 import { useServices, useT } from "../services";
 import { matchesSearch } from "../text-search";
-import { parseDragText } from "../transfer";
+import { parseDragText } from "../../runtime/editor-host";
 
 export interface BlueprintListProps {
   blueprints: readonly BlueprintSource[];

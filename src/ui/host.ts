@@ -1,5 +1,5 @@
 import type { BlueprintSource, CounterDef, CounterScope } from "../core/blueprint/types";
-import type { EffectReference } from "../core/facts/effects";
+import type { EffectReference } from "../core/facts/types";
 import type { BlueprintRun } from "../core/engine/interpreter";
 import type { LintEnv } from "../core/engine/lint";
 import type { EventType, PinId } from "../core/registry/constants";
@@ -139,6 +139,8 @@ export interface EffectsHost {
 export interface EffectSelectionHost {
   choices(): readonly EffectReference[];
   resolve(uuid: string): Promise<EffectReference | null>;
+  /** Parse a dragged text/plain payload for an ActiveEffect reference; null when the drop is unrelated. */
+  parseDrop?(raw: string): { uuid: string; valid: boolean } | null;
 }
 
 /** What a host (the playground or Foundry) lends the editor; every part is optional. */

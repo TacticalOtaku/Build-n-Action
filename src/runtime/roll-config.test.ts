@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, injectTargetData,
-  joinFormula, sanitizeCritical, type ProcessConfig
+  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, applyAdvantageMode,
+  injectTargetData, joinFormula, resolvedAdvantageMode, sanitizeCritical, type ProcessConfig
 } from "./roll-config";
 
 function damageConfig(): ProcessConfig {
@@ -125,5 +125,27 @@ describe("damage parts", () => {
     expect(joinFormula("", "1d4")).toBe("1d4");
     expect(joinFormula("1d4", "")).toBe("1d4");
     expect(joinFormula("1d4", "2")).toBe("1d4 + 2");
+  });
+});
+
+describe("advantage and disadvantage", () => {
+  it("sets advantage or disadvantage on config and rolls, and resolves 5e mutual cancellation", () => {
+    const config: ProcessConfig = { rolls: [{ parts: ["1d20"] }] };
+    applyAdvantageMode(config, "advantage");
+    expect(config).toMatchObject({ advantage: true, disadvantage: false, rolls: [{ options: { advantage: true, disadvantage: false, advantageMode: 1 } }] });
+    expect(resolvedAdvantageMode(config)).toBe("advantage");
+
+    // Adding disadvantage cancels out existing advantage (stays normal even if another advantage arrives).
+    applyAdvantageMode(config, "disadvantage");
+    expect(config).toMatchObject({ advantage: true, disadvantage: true, rolls: [{ options: { advantage: true, disadvantage: true, advantageMode: 0 } }] });
+    expect(resolvedAdvantageMode(config)).toBe("normal");
+    applyAdvantageMode(config, "advantage");
+    expect(resolvedAdvantageMode(config)).toBe("normal");
+
+    // Existing roll.options disadvantage also cancels a new advantage.
+    const proneRoll: ProcessConfig = { rolls: [{ parts: ["1d20"], options: { advantageMode: -1 } }] };
+    applyAdvantageMode(proneRoll, "advantage");
+    expect(resolvedAdvantageMode(proneRoll)).toBe("normal");
+    expect(proneRoll.rolls?.[0]?.options?.advantageMode).toBe(0);
   });
 });

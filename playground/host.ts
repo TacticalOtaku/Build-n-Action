@@ -1,12 +1,13 @@
 import type { BlueprintSource } from "../src/core/blueprint/types";
-import { runBlueprint, type BlueprintEnv } from "../src/core/engine/interpreter";
-import { blueprintSignals } from "../src/core/engine/lint";
+import { compileBlueprint } from "../src/core/engine/compile";
+import type { BlueprintEnv, ChainEntry } from "../src/core/engine/interpreter";
 import { passed } from "../src/core/engine/reasons";
 import type { ActivityFacts, ActorFacts, CreatureFacts, ItemFacts, RollFacts } from "../src/core/facts/types";
 import { exportBlueprints, importBlueprints, readLibrary, withLibraryEntry, withoutLibraryEntry } from "../src/core/storage/library";
 import { activityFacts, actorFacts, creatureFacts, itemFacts, rollDetails } from "../src/core/testing/facts";
-import { read } from "../src/runtime/read";
+import { createEditorHost, defaultDragData, readDroppedBlueprint } from "../src/runtime/editor-host";
 import { rollDataPaths } from "../src/runtime/paths";
+import { read } from "../src/runtime/read";
 import type { EditorHost, LibraryHost, SimulationRequest } from "../src/ui/host";
 
 type Language = "en" | "ru";
@@ -114,7 +115,7 @@ function looksLikeFormula(formula: string): boolean {
   return depth === 0;
 }
 
-function run(blueprint: BlueprintSource, request: SimulationRequest) {
+function prepare(blueprint: BlueprintSource, request: SimulationRequest) {
   const actor = ACTORS.find(entry => entry.uuid === request.actorUuid);
   if (!actor) return null;
   const item = actor.items.find(entry => entry.uuid === request.itemUuid) ?? null;
@@ -146,8 +147,8 @@ function run(blueprint: BlueprintSource, request: SimulationRequest) {
     reach: () => passed("matched"),
     limitAvailable: () => true
   };
-  const trigger = { event: request.event, pins: request.pins, ...(request.signal ? { signal: request.signal } : {}) };
-  return { run: runBlueprint(blueprint, trigger, facts, env), notes: [] };
+  const entry: ChainEntry = { compiled: compileBlueprint(blueprint), env, documentUuid: CARRIER, actorUuid: actor.uuid };
+  return { entry, facts, suppressed: false, hasToken: true };
 }
 
 const LIBRARY_KEY = "bna.library";
@@ -197,17 +198,24 @@ function createLibrary(): LibraryHost {
 
 /** The playground's host: the real engine on fixture actors, items and targets. */
 export function createPlaygroundHost(language: Language, blueprints: () => readonly BlueprintSource[]): EditorHost {
-  return {
-    effectSelection: { choices: () => EFFECTS, resolve: async uuid => EFFECTS.find(effect => effect.uuid === uuid) ?? null },
+  return createEditorHost({
     library: createLibrary(),
-    lintEnv: blueprint => {
-      const { sent, received } = blueprintSignals([...blueprints().filter(entry => entry.id !== blueprint.id), blueprint]);
-      return {
-        validateFormula: looksLikeFormula,
-        hasPath: path => PATH_SET.has(path),
-        signalsSent: sent,
-        signalsReceived: received
-      };
+    lint: {
+      neighbourBlueprints: id => blueprints().filter(entry => entry.id !== id),
+      validateFormula: looksLikeFormula,
+      hasKnownPath: path => PATH_SET.has(path)
+    },
+    formula: {
+      paths: () => PATHS,
+      preview: formula => (looksLikeFormula(formula) ? replacePaths(formula) : null)
+    },
+    effectSelection: {
+      choices: () => EFFECTS,
+      resolve: async uuid => EFFECTS.find(effect => effect.uuid === uuid) ?? null
+    },
+    transfer: {
+      dragData: defaultDragData,
+      resolveDrop: async data => readDroppedBlueprint(data)
     },
     simulator: {
       actors: () => ACTORS.map(actor => ({ value: actor.uuid, label: name(actor.name, language) })),
@@ -218,11 +226,7 @@ export function createPlaygroundHost(language: Language, blueprints: () => reado
       })),
       targets: () => TARGETS.map(target => ({ value: target.uuid, label: name(target.name, language) })),
       defaults: () => ({ actorUuid: "Actor.aria", itemUuid: CARRIER, targetUuid: TARGETS[0]?.uuid ?? null }),
-      run
-    },
-    formula: {
-      paths: () => PATHS,
-      preview: formula => (looksLikeFormula(formula) ? replacePaths(formula) : null)
+      prepare
     },
     preferences: {
       coachSeen: () => {
@@ -240,5 +244,5 @@ export function createPlaygroundHost(language: Language, blueprints: () => reado
         }
       }
     }
-  };
+  });
 }

@@ -213,5 +213,26 @@ describe("describeBlueprint", () => {
       ru: [expect.stringMatching(/^Когда враждебное существо входит в этот регион: /)]
     });
     expect(sentences([makeNode("event", "longRest", "ev"), bonus], edges).en[0]).toMatch(/^When I finish a long rest: /);
+    expect(sentences([makeNode("event", "combatStart", "ev"), bonus], edges)).toEqual({
+      en: ["When combat starts: remind: “Heal”."],
+      ru: ["Когда начинается бой: напомнить: «Heal»."]
+    });
+  });
+
+  it("phrases rollAdvantage and audience-filtered reminders", () => {
+    expect(sentences(
+      [makeNode("event", "attackRoll", "ev"), makeNode("result", "rollAdvantage", "adv", { mode: "disadvantage" })],
+      [makeEdge("ev", "out", "adv")]
+    )).toEqual({
+      en: ["When I make an attack roll: roll with disadvantage."],
+      ru: ["Когда я совершаю бросок атаки: бросок с помехой."]
+    });
+    expect(sentences(
+      [makeNode("event", "combatStart", "ev"), makeNode("result", "reminder", "rem", { audience: "gm", text: "Check aura" })],
+      [makeEdge("ev", "out", "rem")]
+    )).toEqual({
+      en: ["When combat starts: remind (GM only): “Check aura”."],
+      ru: ["Когда начинается бой: напомнить (Только мастеру): «Check aura»."]
+    });
   });
 });

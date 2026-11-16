@@ -27,4 +27,14 @@ describe("applyRollIntents", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
+
+  it("applies rollAdvantage onto roll config and preserves mutual cancellation", () => {
+    const adv: ChainIntent = { type: "rollAdvantage", data: { mode: "advantage" }, blueprintId: "bp", nodeId: "adv", entry: {}, common: {} } as unknown as ChainIntent;
+    const dis: ChainIntent = { type: "rollAdvantage", data: { mode: "disadvantage" }, blueprintId: "bp", nodeId: "dis", entry: {}, common: {} } as unknown as ChainIntent;
+    const config = { rolls: [{ parts: ["1d20"] }] } as Record<string, unknown>;
+    applyRollIntents(config, [adv], ctx, { active: [], halted: new Set() });
+    expect(config).toMatchObject({ advantage: true, disadvantage: false, rolls: [{ options: { advantageMode: 1 } }] });
+    applyRollIntents(config, [dis], ctx, { active: [], halted: new Set() });
+    expect(config).toMatchObject({ advantage: true, disadvantage: true, rolls: [{ options: { advantageMode: 0 } }] });
+  });
 });

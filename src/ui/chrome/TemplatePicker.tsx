@@ -1,13 +1,15 @@
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent } from "react";
 import { duplicateBlueprint } from "../../core/blueprint/factory";
 import type { BlueprintSource } from "../../core/blueprint/types";
 import { describeBlueprint } from "../../core/phrase/describe";
 import { PRESETS, instantiatePreset } from "../../core/presets/presets";
 import { Icon } from "../icons";
-import { useLibrary } from "../library/useLibrary";
 import { useHost, useServices, useT } from "../services";
 import { matchesSearch } from "../text-search";
+
+const NO_LIBRARY: readonly BlueprintSource[] = [];
+const NO_SUBSCRIPTION = () => () => {};
 
 export type PickerTab = "presets" | "library";
 
@@ -32,7 +34,7 @@ export function TemplatePicker({ initialTab, onPick, onClose }: TemplatePickerPr
   const t = useT();
   const { fmt } = useServices();
   const { library } = useHost();
-  const entries = useLibrary();
+  const entries = useSyncExternalStore(library?.subscribe ?? NO_SUBSCRIPTION, () => library?.entries() ?? NO_LIBRARY);
   const [tab, setTab] = useState<PickerTab>(library ? initialTab : "presets");
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);

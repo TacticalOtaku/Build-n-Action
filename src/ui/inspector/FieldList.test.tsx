@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { defaultsFor, type FieldSpec } from "../../core/registry/fields";
 import { getCheck, getEvent, getResult } from "../../core/registry/index";
 import { renderWithServices } from "../testing/render";
-import { FieldList } from "./FieldList";
+import { FieldList, slugify } from "./FieldList";
 
 function renderFields(fields: readonly FieldSpec[], data: Record<string, unknown>, upstream: string[] = []) {
   const onChange = vi.fn();
@@ -141,5 +141,18 @@ describe("FieldList", () => {
     await userEvent.type(screen.getByLabelText("Bonus"), "@pr");
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(onChange).toHaveBeenLastCalledWith(["formula"], "@pr");
+  });
+});
+
+describe("slugify", () => {
+  it.each([
+    ["Long Sword", "long-sword"],
+    ["  fire-bolt  ", "fire-bolt"],
+    ["Hunter's Mark!", "hunters-mark"],
+    ["метка  охотника", "метка-охотника"],
+    ["--a---b--", "a-b"],
+    ["!!!", ""]
+  ])("turns %j into %j", (input, expected) => {
+    expect(slugify(input)).toBe(expected);
   });
 });

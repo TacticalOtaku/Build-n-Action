@@ -2,13 +2,19 @@ import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createBlueprint } from "../../core/blueprint/factory";
+import type { BlueprintSource } from "../../core/blueprint/types";
 import { runBlueprint, type BlueprintEnv } from "../../core/engine/interpreter";
 import { passed } from "../../core/engine/reasons";
+import { createTranslator } from "../../core/i18n";
+import { createPhraseFormatter } from "../../core/phrase/formatter";
 import { creatureFacts, rollFacts } from "../../core/testing/facts";
 import { makeCondition, makeEdge, makeNode } from "../../core/testing/graph";
+import en from "../../lang/en.json";
 import type { SimulationRequest, SimulatorHost } from "../host";
 import { renderWithServices } from "../testing/render";
-import { SimulatorPanel } from "./SimulatorPanel";
+import {
+  SimulatorPanel, checkChoices, eventOptions, outcomeOptions, reasonText, subjectStore, summarizeRun
+} from "./SimulatorPanel";
 
 const env: BlueprintEnv = {
   evaluateNumber: () => null,
@@ -155,5 +161,108 @@ describe("SimulatorPanel", () => {
       <SimulatorPanel blueprint={blueprint} simulator={simulator({ actors: () => [], defaults: () => ({ actorUuid: null, itemUuid: null, targetUuid: null }) })} onTrace={vi.fn()} onFocus={vi.fn()} />
     );
     expect(screen.getByText("Add an actor to the world to test with.")).toBeInTheDocument();
+  });
+});
+
+describe("simulator helpers", () => {
+  it("lists outcome pins per reaction event and extracts unique events & signals", () => {
+    expect(outcomeOptions("afterAttack")).toEqual([
+      { id: "hit", pins: ["hit"] }, { id: "crit", pins: ["hit", "crit"] }, { id: "miss", pins: ["miss"] }, { id: "fumble", pins: ["miss", "fumble"] }
+    ]);
+    expect(outcomeOptions("afterDamage").map(option => option.pins)).toEqual([["dealt"], ["dealt", "dropped"]]);
+    expect(outcomeOptions("afterTargetSave").map(option => option.id)).toEqual(["failed", "succeeded"]);
+    expect(outcomeOptions("afterCheck").map(option => option.id)).toEqual(["success", "failure"]);
+    expect(outcomeOptions("damageRoll")).toEqual([]);
+    expect(outcomeOptions("signal")).toEqual([]);
+
+    const source = createBlueprint({
+      nodes: [
+        makeNode("event", "damageRoll", "a"),
+        makeNode("event", "damageRoll", "b"),
+        makeNode("event", "signal", "s1", { name: "smite" }),
+        makeNode("event", "signal", "s2", { name: "smite" }),
+        makeNode("event", "signal", "s3", { name: "" }),
+        makeNode("result", "rollBonus", "r")
+      ]
+    });
+    expect(eventOptions(source)).toEqual([
+      { key: "damageRoll", event: "damageRoll", signal: null },
+      { key: "signal:smite", event: "signal", signal: "smite" }
+    ]);
+  });
+
+  it("caches subject lists by host revision and delegates subscriptions", () => {
+    let revision = 0;
+    const actors = vi.fn(() => [{ value: "Actor.aria", label: "Aria" }]);
+    const targets = vi.fn(() => [{ value: "Token.lich", label: "Lich" }]);
+    const simHost: SimulatorHost = {
+      actors, items: () => [], targets,
+      defaults: () => ({ actorUuid: null, itemUuid: null, targetUuid: null }), run: () => null,
+      revision: () => revision
+    };
+    const store = subjectStore(simHost);
+    const first = store.getSnapshot();
+    expect(store.getSnapshot()).toBe(first);
+    revision = 1;
+    const second = store.getSnapshot();
+    expect(second).not.toBe(first);
+    expect(actors).toHaveBeenCalledTimes(2);
+    expect(targets).toHaveBeenCalledTimes(2);
+
+    const noRev = simulator();
+    const noRevStore = subjectStore(noRev);
+    expect(noRevStore.getSnapshot()).toBe(noRevStore.getSnapshot());
+    const unsub = vi.fn();
+    const subscribe = vi.fn(() => unsub);
+    subjectStore(simulator({ subscribe })).subscribe(vi.fn())();
+    expect(unsub).toHaveBeenCalled();
+  });
+
+  it("summarizes steps in reading order and reports disabled, outOfReach, and check failures", () => {
+    const at = <T extends { position: { x: number; y: number } }>(node: T, x: number, y = 0): T => ({ ...node, position: { x, y } });
+    const source: BlueprintSource = createBlueprint({
+      id: "aB3dE5gH7jK9mN1p",
+      nodes: [
+        at(makeNode("result", "rollBonus", "fire", { formula: "1d6" }), 600),
+        at(makeCondition("undead", [{ id: "c1", type: "thisItem", data: {} }, { id: "c2", type: "creatureTypes", data: { values: ["undead"] } }]), 300),
+        at(makeNode("event", "damageRoll", "ev"), 0),
+        at(makeNode("result", "rollBonus", "unused"), 600, 200)
+      ],
+      edges: [makeEdge("ev", "out", "undead"), makeEdge("undead", "yes", "fire")]
+    });
+    const okRun = runBlueprint(source, { event: "damageRoll", pins: ["out"] }, rollFacts({ target: creatureFacts({ creatureTypes: ["undead"] }) }), env);
+    const okSummary = summarizeRun(source, okRun);
+    expect(okSummary.steps.map(s => [s.nodeId, s.status])).toEqual([["ev", "passed"], ["undead", "passed"], ["fire", "passed"]]);
+    expect(okSummary.trace.nodes).toEqual({ ev: "passed", undead: "passed", fire: "passed", unused: "skipped" });
+    expect([...okSummary.trace.edges].sort()).toEqual(["ev-out-undead", "undead-yes-fire"]);
+    expect(okSummary.firstFailure).toBeNull();
+
+    const failSummary = summarizeRun(source, runBlueprint(source, { event: "damageRoll", pins: ["out"] }, rollFacts(), env));
+    expect(failSummary.firstFailure).toEqual({ nodeId: "undead", checkId: "c2", reason: { code: "notMatched", values: expect.any(Object) as unknown } });
+
+    const off = { ...source, enabled: false };
+    expect(summarizeRun(off, runBlueprint(off, { event: "damageRoll", pins: ["out"] }, rollFacts(), env)).firstFailure)
+      .toEqual({ nodeId: null, checkId: null, reason: { code: "disabled" } });
+
+    const far = { ...env, reach: () => ({ pass: false, reason: { code: "outOfReach" as const, values: { actual: "30 ft" } } }) };
+    expect(summarizeRun(source, runBlueprint(source, { event: "damageRoll", pins: ["out"] }, rollFacts(), far)).firstFailure)
+      .toEqual({ nodeId: "ev", checkId: null, reason: { code: "outOfReach", values: { actual: "30 ft" } } });
+  });
+
+  it("formats failure reasons with choice labels and leaves activeEffects/attackModes raw", () => {
+    const translator = createTranslator(en);
+    const t = (key: string, data?: Record<string, string | number>) => translator.t(key, data);
+    const fmt = createPhraseFormatter(translator, {
+      choices: () => [{ value: "humanoid", label: "Humanoid" }, { value: "undead", label: "Undead" }, { value: "fiend", label: "Fiend" }]
+    });
+    expect(reasonText({ code: "notMatched", values: { actual: "humanoid", expected: "undead, fiend" } }, t, fmt, checkChoices("creatureTypes")))
+      .toBe("Humanoid is not one of: Undead, Fiend.");
+    expect(reasonText({ code: "notMatched", values: { actual: "—", expected: "undead" } }, t, fmt, null)).toBe("— is not one of: undead.");
+    expect(reasonText({ code: "noTarget" }, t)).toBe("There is no target.");
+    expect(checkChoices("creatureTypes")).not.toBeNull();
+    expect(checkChoices("actorActiveEffects")).toBeNull();
+    expect(checkChoices("attackModes")).toBeNull();
+    expect(checkChoices("customScripts")).toBeNull();
+    expect(checkChoices("unknown")).toBeNull();
   });
 });

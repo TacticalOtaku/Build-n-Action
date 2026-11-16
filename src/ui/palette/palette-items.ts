@@ -1,5 +1,6 @@
 import { CONDITION_NODE_TYPE, type EventType, type NodeKind } from "../../core/registry/constants";
 import { EVENTS, RESULTS } from "../../core/registry/index";
+import { normalizeSearch } from "../text-search";
 
 export interface PaletteItem {
   key: string;
@@ -63,10 +64,6 @@ function allowed(item: PaletteItem, context: PaletteContext): boolean {
   return true;
 }
 
-function normalize(text: string): string {
-  return text.toLocaleLowerCase().replaceAll("ё", "е").trim();
-}
-
 function isSubsequence(query: string, text: string): boolean {
   let index = 0;
   for (const char of text) if (char === query[index]) index++;
@@ -88,10 +85,10 @@ export function filterPaletteItems(
   t: (key: string) => string
 ): PaletteItem[] {
   const visible = items.filter(item => allowed(item, context));
-  const needle = normalize(query);
+  const needle = normalizeSearch(query);
   if (!needle) return visible;
   return visible
-    .map(item => ({ item, rank: score(needle, normalize(t(item.labelKey)), normalize(t(item.summaryKey))) }))
+    .map(item => ({ item, rank: score(needle, normalizeSearch(t(item.labelKey)), normalizeSearch(t(item.summaryKey))) }))
     .filter(entry => entry.rank > 0)
     .sort((a, b) => b.rank - a.rank)
     .map(entry => entry.item);

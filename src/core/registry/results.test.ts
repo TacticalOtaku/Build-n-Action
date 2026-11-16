@@ -5,10 +5,10 @@ import { getResult, hasDefinition } from "./index";
 import { COMMON_RESULT_FIELDS, RESULTS, ROLL_RESULT_TYPES } from "./results";
 
 describe("result definitions", () => {
-  it("defines 14 uniquely named results", () => {
+  it("defines 15 uniquely named results", () => {
     const types = RESULTS.map(result => result.type);
     expect(types).toEqual([
-      "rollBonus", "dcBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds", "reminder",
+      "rollBonus", "dcBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds", "rollAdvantage", "reminder",
       "rider", "applyEffect", "removeEffect", "resource", "signal", "demandSave", "counter"
     ]);
   });
@@ -56,7 +56,7 @@ describe("result definitions", () => {
   it("marks which results can be optional", () => {
     const optional = RESULTS.filter(result => result.supportsOptional).map(result => result.type);
     expect(optional).toEqual([
-      "rollBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds",
+      "rollBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds", "rollAdvantage",
       "rider", "applyEffect", "removeEffect", "resource", "signal", "counter"
     ]);
   });

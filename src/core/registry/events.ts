@@ -85,6 +85,7 @@ export const EVENTS: readonly EventDefinition[] = [
   post("afterTargetSave", "shield-x", ["failed", "succeeded"]),
   post("afterDamage", "skull", ["dealt", "dropped"]),
   post("afterCheck", "check-check", ["success", "failure"]),
+  trigger("combatStart", "swords", []),
   trigger("turnStart", "play", [TURN_REACH]),
   trigger("turnEnd", "square", [TURN_REACH]),
   trigger("regionEnter", "log-in", [REGION_TOKENS]),

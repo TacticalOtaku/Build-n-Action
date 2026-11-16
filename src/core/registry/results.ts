@@ -18,7 +18,7 @@ const WHO: ChoiceSpec = { static: STATIC.who };
 
 /** Result types that change a roll; a rider can carry any of them to a later roll. */
 export const ROLL_RESULT_TYPES: readonly string[] = [
-  "rollBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds", "reminder"
+  "rollBonus", "diceModifiers", "critRange", "critDamage", "saveThresholds", "rollAdvantage", "reminder"
 ];
 
 function formula(key: string, label: string, hint?: string, initial = ""): FieldSpec {
@@ -258,6 +258,25 @@ const saveThresholds: ResultDefinition = {
 
 const REMINDER_PREVIEW = 48;
 
+const AUDIENCE: ChoiceSpec = { static: STATIC.reminderAudience };
+
+const rollAdvantage: ResultDefinition = {
+  kind: "result",
+  type: "rollAdvantage",
+  category: "roll",
+  icon: "scale",
+  supportsOptional: true,
+  compatibleEvents: ["attackRoll", "savingThrow", "abilityCheck", "signal"],
+  fields: [{
+    key: "mode", kind: "select", label: "BNA.Result.rollAdvantage.Field.mode",
+    hint: "BNA.Result.rollAdvantage.Field.modeHint", choices: { static: STATIC.advantageType }, default: "advantage"
+  }],
+  flavor: () => [],
+  phrase: (data, fmt) => fmt.t(
+    `BNA.Result.rollAdvantage.Phrase.${(asString(data.mode, "advantage") === "disadvantage") ? "disadvantage" : "advantage"}`
+  )
+};
+
 const reminder: ResultDefinition = {
   kind: "result",
   type: "reminder",
@@ -265,15 +284,27 @@ const reminder: ResultDefinition = {
   icon: "sticky-note",
   supportsOptional: false,
   compatibleEvents: [...DIALOG_ROLLS, ...TRIGGERS, ...AFTER_RESULT],
-  fields: [{
-    key: "text", kind: "text", multiline: true, label: "BNA.Result.reminder.Field.text",
-    hint: "BNA.Result.reminder.Field.textHint", default: ""
-  }],
+  fields: [
+    {
+      key: "audience", kind: "select", label: "BNA.Result.reminder.Field.audience",
+      hint: "BNA.Result.reminder.Field.audienceHint", choices: AUDIENCE, default: "auto"
+    },
+    {
+      key: "text", kind: "text", multiline: true, label: "BNA.Result.reminder.Field.text",
+      hint: "BNA.Result.reminder.Field.textHint", default: ""
+    }
+  ],
   flavor: () => [],
   phrase: (data, fmt) => {
     const text = asString(data.text).trim();
     const preview = (text.length > REMINDER_PREVIEW) ? `${text.slice(0, REMINDER_PREVIEW - 1)}…` : text;
-    return fmt.t("BNA.Result.reminder.Phrase", { text: preview || fmt.t("BNA.Phrase.Unset") });
+    const body = preview || fmt.t("BNA.Phrase.Unset");
+    const audience = asString(data.audience, "auto");
+    if (!audience || (audience === "auto")) return fmt.t("BNA.Result.reminder.Phrase", { text: body });
+    return fmt.t("BNA.Result.reminder.PhraseAudience", {
+      audience: fmt.choice(audience, AUDIENCE),
+      text: body
+    });
   }
 };
 
@@ -525,6 +556,10 @@ const counter: ResultDefinition = {
     whoField("counter", "self")
   ],
   flavor: () => [],
+  counterRef: data => {
+    const name = counterName(asString(data.name));
+    return name ? { name } : null;
+  },
   phrase: (data, fmt) => {
     const who = (asString(data.who) === "target") ? "target" : "self";
     return fmt.t(`BNA.Result.counter.Phrase.${who}.${asString(data.action, "add")}`, {
@@ -535,7 +570,7 @@ const counter: ResultDefinition = {
 };
 
 export const RESULTS: readonly ResultDefinition[] = [
-  rollBonus, dcBonus, diceModifiers, critRange, critDamage, saveThresholds, reminder,
+  rollBonus, dcBonus, diceModifiers, critRange, critDamage, saveThresholds, rollAdvantage, reminder,
   rider, applyEffect, removeEffect, resource, signal, demandSave, counter
 ];
 

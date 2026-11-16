@@ -1,11 +1,12 @@
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { AnimatePresence, MotionConfig } from "motion/react";
 import {
-  useCallback, useEffect, useMemo, useReducer, useRef, useState,
+  useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState,
   type Dispatch, type DragEvent, type KeyboardEvent, type PointerEvent, type RefObject
 } from "react";
 import { createNode, duplicateBlueprint } from "../core/blueprint/factory";
 import type { BlueprintSource } from "../core/blueprint/types";
+import { lintBlueprint, type LintIssue } from "../core/engine/lint";
 import { BlueprintCanvas, GRID, type PaletteRequest } from "./canvas/BlueprintCanvas";
 import { fitOptions } from "./canvas/fit";
 import type { Size } from "./canvas/flow-mapping";
@@ -23,13 +24,12 @@ import { Drawer, type DrawerTab } from "./drawer/Drawer";
 import { IssuesPanel } from "./drawer/IssuesPanel";
 import { SimulatorPanel } from "./drawer/SimulatorPanel";
 import { lintCounts, nodeLints } from "./lint/lint-view";
-import { useLint } from "./lint/useLint";
 import { CommandPalette } from "./palette/CommandPalette";
 import type { PaletteItem } from "./palette/palette-items";
 import type { EffectStatus } from "./host";
 import { useHost, useT } from "./services";
 import { createEditorState, editorReducer, type EditorAction } from "./state/editor-state";
-import { defaultDragData, readDroppedBlueprint } from "./transfer";
+import { defaultDragData, readDroppedBlueprint } from "../runtime/editor-host";
 import { ThemeContext, type ThemeName } from "./theme/theme";
 import { log } from "../core/log";
 
@@ -239,11 +239,20 @@ function ActiveEditor({
   const { fitView, screenToFlowPosition } = useReactFlow();
   const { blueprint } = state;
   const [drawer, setDrawer] = useState<DrawerTab | null>(null);
-  const { simulator } = useHost();
+  const host = useHost();
+  const { simulator } = host;
+  const deferredBlueprint = useDeferredValue(blueprint);
+  const issues = useMemo<LintIssue[]>(() => {
+    try {
+      return lintBlueprint(deferredBlueprint, host.lintEnv?.(deferredBlueprint) ?? {});
+    } catch (error) {
+      log.warn("the linter failed on this blueprint", error);
+      return [];
+    }
+  }, [deferredBlueprint, host]);
   const [simTrace, setSimTrace] = useState<CanvasTrace | null>(null);
   const trace = (drawer === "test") ? simTrace : null;
   const toggleTest = useCallback(() => setDrawer(open => ((open === "test") ? null : "test")), []);
-  const issues = useLint(blueprint);
   const lints = useMemo(() => nodeLints(issues, t), [issues, t]);
   const counts = useMemo(() => lintCounts(issues), [issues]);
 

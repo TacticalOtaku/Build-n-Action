@@ -2,10 +2,10 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { getCheck } from "../../core/registry/index";
-import { evaluateCheck } from "../../core/engine/evaluators";
+import { evaluateCheck, getCheck } from "../../core/registry/index";
 import { rollFacts } from "../../core/testing/facts";
-import type { EffectReference } from "../../core/facts/effects";
+import type { EffectReference } from "../../core/facts/types";
+import { parseEffectDrop } from "../../runtime/editor-host";
 import type { EditorHost } from "../host";
 import { renderWithServices } from "../testing/render";
 import { FieldList } from "./FieldList";
@@ -16,7 +16,13 @@ function Controlled({ changed, initial = first }: { changed: (value: unknown) =>
   const [source, setSource] = useState<unknown>(initial);
   return <FieldList fields={getCheck("actorActiveEffects")!.fields} data={{ match: "source", source }} path={[]} upstream={[]} onChange={(_path, value) => { changed(value); setSource(value); }} />;
 }
-const host: EditorHost = { effectSelection: { choices: () => [first, second], resolve: async uuid => [first, second].find(ref => ref.uuid === uuid) ?? null } };
+const host: EditorHost = {
+  effectSelection: {
+    choices: () => [first, second],
+    resolve: async uuid => [first, second].find(ref => ref.uuid === uuid) ?? null,
+    parseDrop: parseEffectDrop
+  }
+};
 function setup(selection = host, initial: unknown = first) {
   const changed = vi.fn();
   const view = renderWithServices(<Controlled changed={changed} initial={initial} />, { host: selection });
@@ -57,17 +63,18 @@ describe("effect reference field", () => {
   it("records an explicitly invalid UUID instead of leaving a new check unrestricted", async () => {
     const { changed } = setup(host, null);
     await enter("Item.staff");
-    expect(changed).toHaveBeenLastCalledWith({ uuid: "Item.staff", name: "", invalid: true });
+    expect(changed).toHaveBeenLastCalledWith({ uuid: "Item.staff", name: "" });
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
-  it("records a malformed ActiveEffect drop on a new check as invalid", async () => {
+  it("records a malformed ActiveEffect drop on a new check as invalid without setting legacy sentinel flags", async () => {
     const { changed } = setup(host, null);
     drop({ type: "ActiveEffect", uuid: "Item.staff" });
-    expect(changed).toHaveBeenLastCalledWith({ uuid: "Item.staff", name: "", invalid: true });
+    expect(changed).toHaveBeenLastCalledWith({ uuid: "Item.staff", name: "" });
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    expect(evaluateCheck("actorActiveEffects", { match: "source", source: changed.mock.calls.at(-1)?.[0] }, rollFacts(), {
-      evaluateNumber: () => null, replaceData: text => text, runScript: () => null, carrierItemUuid: null
-    }).pass).toBe(false);
+    const env = { evaluateNumber: () => null, replaceData: (text: string) => text, runScript: () => null, carrierItemUuid: null };
+    expect(evaluateCheck("actorActiveEffects", { match: "source", source: changed.mock.calls.at(-1)?.[0] }, rollFacts(), env).pass).toBe(false);
+    // Legacy v2.3.2 saves containing invalid: true are still ignored as non-matching references.
+    expect(evaluateCheck("actorActiveEffects", { match: "source", source: { uuid: first.uuid, name: "", invalid: true } }, rollFacts(), env).pass).toBe(false);
   });
   it("keeps the last request when lookups finish out of order", async () => {
     const pending = new Map<string, (value: EffectReference | null) => void>();

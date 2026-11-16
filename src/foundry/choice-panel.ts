@@ -1,22 +1,18 @@
 import type { ChainIntent } from "../core/engine/interpreter";
 import { createPhraseFormatter } from "../core/phrase/formatter";
-import { asNumber, asString, asStrings } from "../core/registry/data";
+import { asNumber, asRecord, asString, asStrings } from "../core/registry/data";
 import { getResult } from "../core/registry/index";
 import type { PhraseFormatter } from "../core/registry/types";
-import { MODULE_SCOPE } from "../core/storage/repository";
-import { costAvailable, costOptions, costScales, resolveCost, type Choice, type CostOption, type ResolvedCost, type SortedIntents } from "../runtime/choices";
+import { costAvailable, costOptions, costScales, resolveCost, type Choice, type CostOption, type ResolvedCost } from "../runtime/choices";
+import { reminderKey, type EvaluationContext, type PendingRoll } from "../runtime/play";
 import { read } from "../runtime/read";
-import type { ProcessConfig } from "../runtime/roll-config";
-import { applyModifiers, applyRollIntents } from "./apply";
+import { resolvedAdvantageMode, type ProcessConfig } from "../runtime/roll-config";
+import { applyModifiers, applyRollIntents, type ApplyContext } from "./apply";
 import { foundryChoices, foundryTranslator } from "./choices";
 import { sourceLabel, type SourceInfo } from "./collect";
-import { costState, payCost } from "./consume";
-import { originRollData, rollDataOf } from "./documents";
+import { originRollData, recordUsage, rollDataOf } from "./documents";
 import { scaledFormula, simplifyNumber } from "./formulas";
-import type { ApplyContext } from "./apply";
-import { announceApplied, guarded } from "./evaluate";
-import { pendingRoll, type PendingRoll } from "./roll-state";
-import { recordUsage } from "./usage";
+import { costState, payCost, reminderRecipients } from "./operations";
 import { log } from "../core/log";
 
 const RESOURCE_LABELS: Readonly<Record<string, string>> = {
@@ -71,7 +67,18 @@ export function choiceData(info: SourceInfo, ctx: ApplyContext, scale: number): 
   return data;
 }
 
-function applyChoice(pending: PendingRoll, choice: Choice, info: SourceInfo, scale: number, damageType: string | undefined, app: unknown): void {
+type FoundryPendingRoll = PendingRoll<FoundryDocument, FoundryDocument, FoundryDocument, TokenPlaceable>;
+type AnnounceFn = (intents: readonly ChainIntent[], context: EvaluationContext<FoundryDocument, FoundryDocument>) => void;
+
+function applyChoice(
+  pending: FoundryPendingRoll,
+  choice: Choice,
+  info: SourceInfo,
+  scale: number,
+  damageType: string | undefined,
+  app: unknown,
+  announce: AnnounceFn
+): void {
   const config = read(app, "config") as ProcessConfig | undefined;
   if (!config) return;
   const { ctx, tracker } = pending;
@@ -88,9 +95,15 @@ function applyChoice(pending: PendingRoll, choice: Choice, info: SourceInfo, sca
   });
   const criticalChanged = (config.critical?.bonusDamage ?? "") !== criticalBefore;
   for (const intent of earlier) applyModifiers(config, intent, ctx, tracker, start, criticalChanged);
+  const changedAdvantage = choice.intents.some(intent => intent.type === "rollAdvantage");
+  if (changedAdvantage) syncDialogAdvantage(app, config);
   const rebuild = read(app, "rebuild");
   if (typeof rebuild === "function") rebuild.call(app);
-  announceApplied(choice.intents, pending.context);
+  if (changedAdvantage) {
+    const render = read(app, "render");
+    if (typeof render === "function") void render.call(app, { parts: ["buttons"] });
+  }
+  announce(choice.intents, pending.context);
   pending.chosen.push(...choice.intents);
 }
 
@@ -202,7 +215,7 @@ function choiceSection(choice: Choice, host: ChoiceHost, fmt: PhraseFormatter): 
 }
 
 /** The "Build-n-Action" fieldset with reminders and choices; null when there is nothing to offer. */
-export function renderChoices(host: ChoiceHost, sorted: Pick<SortedIntents, "choices" | "reminders">): HTMLFieldSetElement | null {
+export function renderChoices(host: ChoiceHost, sorted: { choices: readonly Choice[]; reminders: readonly ChainIntent[] }): HTMLFieldSetElement | null {
   const fmt = createPhraseFormatter(foundryTranslator, provider);
   const panel = element("fieldset", "bna-surface bna-panel");
   panel.append(element("legend", "", "Build-n-Action"));
@@ -214,22 +227,70 @@ export function renderChoices(host: ChoiceHost, sorted: Pick<SortedIntents, "cho
   return (panel.children.length > 1) ? panel : null;
 }
 
-function renderPanel(app: unknown): void {
-  const pending = pendingRoll(read(app, `options.${MODULE_SCOPE}.pending`));
+/** Keep the roll dialog's highlighted button and advantage mode aligned with updated config flags. */
+export function syncDialogAdvantage(dialog: unknown, config: ProcessConfig): void {
+  if (!dialog || (typeof dialog !== "object")) return;
+  const holder = dialog as Record<string, unknown>;
+  const existing = holder.options;
+  const record = (existing && (typeof existing === "object") && !Array.isArray(existing))
+    ? existing as Record<string, unknown>
+    : null;
+  const resolved = resolvedAdvantageMode(config);
+  const numericMode = (resolved === "advantage") ? 1 : ((resolved === "disadvantage") ? -1 : 0);
+  if (record && !Object.isFrozen(record)) {
+    record.defaultButton = resolved;
+    if ("advantageMode" in record) record.advantageMode = numericMode;
+    return;
+  }
+  const updated: Record<string, unknown> = { ...(record ?? {}), defaultButton: resolved };
+  if ("advantageMode" in updated) updated.advantageMode = numericMode;
+  try {
+    holder.options = (record && Object.isFrozen(record)) ? Object.freeze(updated) : updated;
+  } catch {
+    // Custom dialog shims with read-only getter options keep roll.options as the fallback source.
+  }
+}
+
+function dialogReminderVisible(intent: ChainIntent, actor: FoundryDocument): boolean {
+  const audience = asString(intent.data.audience, "auto");
+  if ((audience === "all") || (audience === "target")) return false;
+  if (audience === "gm") return game.user.isGM;
+  if (audience === "self") return reminderRecipients("self", actor)?.includes(game.user.id) ?? false;
+  return true;
+}
+
+/** Show the "Build-n-Action" panel inside a Foundry roll configuration dialog when pending choices exist. */
+export function renderRollPanel(pending: FoundryPendingRoll | null, app: unknown, announce: AnnounceFn): void {
   const root = read(app, "element");
   if (!pending || !(root instanceof HTMLElement) || root.querySelector(".bna-panel")) return;
+  const visibleReminders = pending.sorted.reminders.filter(reminder => dialogReminderVisible(reminder, pending.ctx.roller.actor));
   const host: ChoiceHost = {
     ctx: pending.ctx,
     applied: pending.applied,
-    apply: (choice, info, scale, damageType) => applyChoice(pending, choice, info, scale, damageType, app)
+    apply: (choice, info, scale, damageType) => applyChoice(pending, choice, info, scale, damageType, app, announce)
   };
-  const panel = renderChoices(host, pending.sorted);
+  const panel = renderChoices(host, { ...pending.sorted, reminders: visibleReminders });
   if (!panel) return;
+  for (const reminder of visibleReminders) pending.shownReminders.add(reminderKey(reminder));
   const anchor = root.querySelector('fieldset[data-application-part="configuration"]');
   if (anchor) anchor.after(panel);
   else (root.querySelector(".window-content") ?? root).append(panel);
 }
 
-export function registerChoicePanel(): void {
-  Hooks.on("renderRollConfigurationDialog", (app: unknown) => guarded("roll dialog", () => renderPanel(app)));
+/** Prompt the player with optional reaction choices inside a dialog. */
+export async function promptChoices(choices: readonly Choice[], ctx: ApplyContext, apply: ChoiceHost["apply"]): Promise<void> {
+  const host: ChoiceHost = { ctx, applied: new Set(), apply };
+  const panel = renderChoices(host, { choices, reminders: [] });
+  if (!panel) return;
+  await foundry.applications.api.DialogV2.wait({
+    window: { title: game.i18n.format("BNA.Reaction.Title", { name: ctx.roller.actor.name }), icon: "fa-solid fa-diagram-project" },
+    position: { width: 420 },
+    content: "<div class=\"bna-reaction\"></div>",
+    buttons: [{ action: "done", label: game.i18n.localize("BNA.Reaction.Done"), default: true }],
+    rejectClose: false,
+    render: (_event: unknown, dialog: unknown) => {
+      const element = asRecord(dialog).element;
+      if (element instanceof HTMLElement) element.querySelector(".bna-reaction")?.append(panel);
+    }
+  });
 }

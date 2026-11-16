@@ -18,7 +18,7 @@ describe("CommandPalette", () => {
     renderWithServices(<CommandPalette request={request()} blueprint={blueprint} onPick={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByRole("combobox", { name: "Search nodes" })).toHaveFocus();
     expect(screen.getByText("Before a roll")).toBeInTheDocument();
-    expect(screen.getAllByRole("option")).toHaveLength(32);
+    expect(screen.getAllByRole("option")).toHaveLength(34);
   });
 
   it("filters as you type and picks with Enter", async () => {

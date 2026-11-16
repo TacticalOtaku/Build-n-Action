@@ -1,9 +1,8 @@
 import { MODULE_SCOPE } from "../core/storage/repository";
+import { needsRegionBehavior } from "../runtime/play";
 import { read } from "../runtime/read";
-import { needsRegionBehavior } from "../runtime/triggers";
 import { documentBlueprints, isDocument, touchesBlueprints } from "./documents";
-import { guardedAsync } from "./evaluate";
-import { runTrigger } from "./triggers";
+import { guardedAsync, runTrigger } from "./play";
 
 export const REGION_BEHAVIOR_TYPE = `${MODULE_SCOPE}.blueprints`;
 

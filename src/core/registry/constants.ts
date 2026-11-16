@@ -9,6 +9,7 @@ export const EVENT_TYPES = [
   "afterTargetSave",
   "afterDamage",
   "afterCheck",
+  "combatStart",
   "turnStart",
   "turnEnd",
   "regionEnter",
@@ -27,8 +28,8 @@ export const REACTION_EVENTS: readonly EventType[] = [
   "afterAttack", "afterTargetSave", "afterDamage", "afterCheck"
 ];
 
-/** Events that start without a roll: turns, regions, rests. */
-export const TRIGGER_EVENTS: readonly EventType[] = ["turnStart", "turnEnd", "regionEnter", "regionExit", "shortRest", "longRest"];
+/** Events that start without a roll: combat start, turns, regions, rests. */
+export const TRIGGER_EVENTS: readonly EventType[] = ["combatStart", "turnStart", "turnEnd", "regionEnter", "regionExit", "shortRest", "longRest"];
 
 /** Events whose context always carries the item (and activity) being used. */
 export const ITEM_EVENTS: readonly EventType[] = [
