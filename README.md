@@ -16,6 +16,12 @@ Everything works with plain dnd5e rolls. With Midi QOL, reactions follow its wor
 Install from the manifest URL:
 `https://github.com/TacticalOtaku/Build-n-Action/releases/latest/download/module.json`
 
+## Screenshots
+
+![Visual When → If → Then blueprint editor and inspector](docs/screenshots/editor-graph.png)
+![Built-in Test simulator showing evaluated steps and applied bonuses](docs/screenshots/editor-test-simulator.png)
+![Built-in template gallery with 14 D&D 5e presets](docs/screenshots/editor-templates.png)
+
 ## Quick start
 
 1. **Open the editor.** Open an actor, item, effect or region sheet, and choose **Build-n-Action** in its header menu (its icon lights up while a blueprint on the document works). The setting *Show the Build-n-Action button in the title bar* adds a button to the title bar.

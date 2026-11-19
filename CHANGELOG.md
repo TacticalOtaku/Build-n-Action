@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.1
+
+### Changed
+- **License & Notices**: Adopted **GNU GPL v3.0** (`GPL-3.0-only`) and bundled `LICENSE` and `THIRD-PARTY-NOTICES.txt` directly inside the Foundry release package.
+- **Manifest & Compatibility**: Removed the `dnd5e` `maximum: "5.3.3"` compatibility cap so newer `5.3.x` updates are not blocked, moved the manifest URL to `releases/latest/download/module.json`, and added `readme`, `changelog`, `bugs`, `license`, and `media` screenshot metadata.
+- **Release Pipeline & Docs**: Added automated GitHub Release publishing (`release.yml`), issue forms, `CONTRIBUTING.md`, and editor screenshots to `README.md`.
+
 ## 2.4.0
 
 ### Added

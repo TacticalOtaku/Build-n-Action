@@ -19,6 +19,23 @@ describe("createManifest", () => {
       license: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/LICENSE",
       socket: true
     });
+    expect(manifest.media).toEqual([
+      {
+        type: "cover",
+        url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-graph.png",
+        caption: "Visual When → If → Then blueprint editor and inspector in dark theme"
+      },
+      {
+        type: "screenshot",
+        url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-test-simulator.png",
+        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses"
+      },
+      {
+        type: "screenshot",
+        url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-templates.png",
+        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets"
+      }
+    ]);
     expect(manifest.relationships.systems).toEqual([
       { id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } }
     ]);

@@ -1,7 +1,8 @@
 /** Version used by the built package and the generated root module.json. */
-export const MODULE_VERSION = "2.4.0";
+export const MODULE_VERSION = "2.4.1";
 
 const REPOSITORY = "https://github.com/TacticalOtaku/Build-n-Action";
+const SCREENSHOTS_BASE = "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots";
 
 /** The Foundry manifest of the built package. */
 export function createManifest(version = MODULE_VERSION) {
@@ -32,6 +33,23 @@ export function createManifest(version = MODULE_VERSION) {
     changelog: `${REPOSITORY}/blob/main/CHANGELOG.md`,
     bugs: `${REPOSITORY}/issues`,
     license: `${REPOSITORY}/blob/main/LICENSE`,
+    media: [
+      {
+        type: "cover",
+        url: `${SCREENSHOTS_BASE}/editor-graph.png`,
+        caption: "Visual When → If → Then blueprint editor and inspector in dark theme"
+      },
+      {
+        type: "screenshot",
+        url: `${SCREENSHOTS_BASE}/editor-test-simulator.png`,
+        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses"
+      },
+      {
+        type: "screenshot",
+        url: `${SCREENSHOTS_BASE}/editor-templates.png`,
+        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets"
+      }
+    ],
     socket: true,
     documentTypes: { RegionBehavior: { blueprints: {} } }
   };
