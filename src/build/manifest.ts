@@ -10,12 +10,12 @@ export function createManifest(version = MODULE_VERSION) {
     title: "Build-n-Action",
     description: "Blueprints: When → If → Then graphs that change rolls and react to their outcome.",
     version,
-    authors: [{ name: "TacticalOtaku" }],
+    authors: [{ name: "TacticalOtaku", url: "https://github.com/TacticalOtaku" }],
     compatibility: { minimum: "14.367", verified: "14.367", maximum: "14" },
     esmodules: ["module.mjs"],
     styles: ["module.css"],
     relationships: {
-      systems: [{ id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3", maximum: "5.3.3" } }],
+      systems: [{ id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } }],
       recommends: [
         { id: "midi-qol", type: "module", compatibility: { minimum: "14.0.12", verified: "14.0.12" } },
         { id: "dae", type: "module", compatibility: { minimum: "14.0.14", verified: "14.0.14" } }
@@ -26,8 +26,12 @@ export function createManifest(version = MODULE_VERSION) {
       { lang: "ru", name: "Русский", path: "lang/ru.json", flags: {} }
     ],
     url: REPOSITORY,
-    manifest: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
+    manifest: `${REPOSITORY}/releases/latest/download/module.json`,
     download: `${REPOSITORY}/releases/download/v${version}/build-n-action-v${version}.zip`,
+    readme: `${REPOSITORY}/blob/main/README.md`,
+    changelog: `${REPOSITORY}/blob/main/CHANGELOG.md`,
+    bugs: `${REPOSITORY}/issues`,
+    license: `${REPOSITORY}/blob/main/LICENSE`,
     socket: true,
     documentTypes: { RegionBehavior: { blueprints: {} } }
   };

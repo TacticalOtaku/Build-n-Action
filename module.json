@@ -5,7 +5,8 @@
   "version": "2.4.0",
   "authors": [
     {
-      "name": "TacticalOtaku"
+      "name": "TacticalOtaku",
+      "url": "https://github.com/TacticalOtaku"
     }
   ],
   "compatibility": {
@@ -26,8 +27,7 @@
         "type": "system",
         "compatibility": {
           "minimum": "5.3.3",
-          "verified": "5.3.3",
-          "maximum": "5.3.3"
+          "verified": "5.3.3"
         }
       }
     ],
@@ -65,8 +65,12 @@
     }
   ],
   "url": "https://github.com/TacticalOtaku/Build-n-Action",
-  "manifest": "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json",
+  "manifest": "https://github.com/TacticalOtaku/Build-n-Action/releases/latest/download/module.json",
   "download": "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.4.0/build-n-action-v2.4.0.zip",
+  "readme": "https://github.com/TacticalOtaku/Build-n-Action/blob/main/README.md",
+  "changelog": "https://github.com/TacticalOtaku/Build-n-Action/blob/main/CHANGELOG.md",
+  "bugs": "https://github.com/TacticalOtaku/Build-n-Action/issues",
+  "license": "https://github.com/TacticalOtaku/Build-n-Action/blob/main/LICENSE",
   "socket": true,
   "documentTypes": {
     "RegionBehavior": {

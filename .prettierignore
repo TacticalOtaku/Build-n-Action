@@ -3,3 +3,6 @@ node_modules/
 package-lock.json
 docs/
 src/lang/
+AGENTS.md
+release-notes/
+.claude/

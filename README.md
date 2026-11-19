@@ -14,7 +14,7 @@ Blueprints for Foundry VTT and dnd5e: small graphs that read **When → If → T
 Everything works with plain dnd5e rolls. With Midi QOL, reactions follow its workflows. With DAE, blueprints on effects follow its conditions and special durations.
 
 Install from the manifest URL:
-`https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/module.json`
+`https://github.com/TacticalOtaku/Build-n-Action/releases/latest/download/module.json`
 
 ## Quick start
 
@@ -168,3 +168,9 @@ npm run release     # check, then dist/build-n-action-v<version>.zip and the roo
 ```
 
 `npm run release` refuses to replace an existing archive. Instead of deploying you can link `dist/module` into Foundry's `Data/modules/build-n-action`. `tests/live/` holds scripts that check a running Foundry world from the browser console. The *Debug logging* client setting turns on `log.debug` output (`src/core/log.ts`).
+
+## Contributing & License
+
+Pull Requests are disabled on this repository; bug reports and feature suggestions are welcome via [GitHub Issues](https://github.com/TacticalOtaku/Build-n-Action/issues) (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
+Licensed under the **GNU General Public License v3.0** ([LICENSE](LICENSE)). Third-party dependency notices are listed in [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt).

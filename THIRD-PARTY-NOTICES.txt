@@ -1,0 +1,28 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+Build-n-Action bundles or incorporates the following third-party open-source components:
+
+1. elkjs (Eclipse Layout Kernel for JavaScript)
+   - License: Eclipse Public License 2.0 (EPL-2.0) OR GNU General Public License v3.0 or later (GPL-3.0-or-later)
+   - Selected compatible license under GPL-3.0 distribution: GPL-3.0-or-later (EPL-2.0 source availability also preserved)
+   - Source repository: https://github.com/kieler/elkjs
+
+2. React & React DOM (react, react-dom)
+   - License: MIT
+   - Source repository: https://github.com/facebook/react
+
+3. React Flow (@xyflow/react)
+   - License: MIT
+   - Source repository: https://github.com/xyflow/xyflow
+
+4. Motion (motion)
+   - License: MIT
+   - Source repository: https://github.com/motiondivision/motion
+
+5. Lucide React (lucide-react)
+   - License: ISC
+   - Source repository: https://github.com/lucide-icons/lucide
+
+6. Fontsource Geologica & JetBrains Mono (@fontsource-variable/geologica, @fontsource-variable/jetbrains-mono)
+   - License: SIL Open Font License 1.1 (OFL-1.1)
+   - Source repositories: https://github.com/fontsource/font-files

@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Build-n-Action",
   "author": "TacticalOtaku",
+  "license": "GPL-3.0-only",
   "engines": {
     "node": ">=24"
   },

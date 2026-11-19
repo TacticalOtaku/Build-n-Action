@@ -25,3 +25,9 @@ coverage/
 
 # Private assistant instructions, at every depth and in every case
 [Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]
+AGENTS.md
+docs/agents/
+docs/plans/
+docs/superpowers/
+release-notes/
+.claude/

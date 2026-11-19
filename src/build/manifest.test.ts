@@ -8,13 +8,19 @@ describe("createManifest", () => {
     expect(manifest).toMatchObject({
       id: "build-n-action",
       version: MODULE_VERSION,
+      authors: [{ name: "TacticalOtaku", url: "https://github.com/TacticalOtaku" }],
       compatibility: { minimum: "14.367", verified: "14.367" },
       esmodules: ["module.mjs"],
       styles: ["module.css"],
+      manifest: "https://github.com/TacticalOtaku/Build-n-Action/releases/latest/download/module.json",
+      readme: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/README.md",
+      changelog: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/CHANGELOG.md",
+      bugs: "https://github.com/TacticalOtaku/Build-n-Action/issues",
+      license: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/LICENSE",
       socket: true
     });
     expect(manifest.relationships.systems).toEqual([
-      { id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3", maximum: "5.3.3" } }
+      { id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } }
     ]);
   });
 

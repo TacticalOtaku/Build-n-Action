@@ -19,6 +19,13 @@ function foundryPackage(): Plugin {
       this.emitFile({ type: "asset", fileName: "module.json", source: manifest });
       // Every build keeps it in step with the version, so `npm run check` passes right after a version bump.
       writeFileSync(join(ROOT, "module.json"), manifest);
+      for (const extra of ["LICENSE", "THIRD-PARTY-NOTICES.txt"]) {
+        this.emitFile({
+          type: "asset",
+          fileName: extra,
+          source: readFileSync(new URL(`./${extra}`, import.meta.url), "utf8")
+        });
+      }
       for (const lang of ["en", "ru"]) {
         this.emitFile({
           type: "asset",

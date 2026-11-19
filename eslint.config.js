@@ -8,7 +8,7 @@ export default defineConfig([
   globalIgnores([
     "node_modules/**",
     "dist/**",
-    "tests/**"
+    "tests/**", "docs/**", ".claude/**"
   ]),
   {
     files: ["**/*.{ts,tsx}"],
