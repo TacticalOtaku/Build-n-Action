@@ -2,7 +2,12 @@ import { duplicateBlueprint } from "../core/blueprint/factory";
 import type { BlueprintSource } from "../core/blueprint/types";
 import { validateBlueprintSource } from "../core/blueprint/validate";
 import {
-  exportBlueprints, importBlueprints, readLibrary, withLibraryEntry, withoutLibraryEntry, type ImportResult
+  exportBlueprints,
+  importBlueprints,
+  readLibrary,
+  withLibraryEntry,
+  withoutLibraryEntry,
+  type ImportResult,
 } from "../core/storage/library";
 import { MODULE_SCOPE } from "../core/storage/repository";
 import { read } from "../runtime/read";
@@ -24,8 +29,8 @@ export function registerLibrary(): void {
     default: { blueprints: [] },
     onChange: () => {
       cache = null;
-      listeners.forEach(listener => listener());
-    }
+      listeners.forEach((listener) => listener());
+    },
   });
 }
 
@@ -49,8 +54,10 @@ async function store(entries: readonly BlueprintSource[]): Promise<void> {
 }
 
 function download(blueprints: readonly BlueprintSource[]): void {
-  const single = (blueprints.length === 1) ? blueprints[0] : undefined;
-  const name = single ? `blueprint-${(single.name || single.id).replace(/[^\p{L}\p{N}-]+/gu, "-").toLowerCase()}` : "blueprint-library";
+  const single = blueprints.length === 1 ? blueprints[0] : undefined;
+  const name = single
+    ? `blueprint-${(single.name || single.id).replace(/[^\p{L}\p{N}-]+/gu, "-").toLowerCase()}`
+    : "blueprint-library";
   foundry.utils.saveDataToFile(exportBlueprints(blueprints), "application/json", `${name}.json`);
 }
 
@@ -61,7 +68,9 @@ async function importInto(text: string): Promise<ImportResult> {
     return result;
   }
   await store(result.blueprints.reduce<BlueprintSource[]>(withLibraryEntry, [...libraryEntries()]));
-  ui.notifications.info(game.i18n.format("BNA.Library.imported", { count: result.blueprints.length, rejected: result.rejected }));
+  ui.notifications.info(
+    game.i18n.format("BNA.Library.imported", { count: result.blueprints.length, rejected: result.rejected }),
+  );
   return result;
 }
 
@@ -72,21 +81,25 @@ export function libraryHost(): LibraryHost {
   host ??= {
     entries: libraryEntries,
     canEdit: () => game.user.isGM,
-    add: blueprint => store(withLibraryEntry(libraryEntries(), blueprint)),
-    remove: id => store(withoutLibraryEntry(libraryEntries(), id)),
+    add: (blueprint) => store(withLibraryEntry(libraryEntries(), blueprint)),
+    remove: (id) => store(withoutLibraryEntry(libraryEntries(), id)),
     import: importInto,
     download,
-    subscribe: listener => {
+    subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
-    }
+    },
   };
   return host;
 }
 
 /** Add a copy of a library entry (by id or as a blueprint) to a document. */
-export async function applyLibraryEntry(entry: string | BlueprintSource, document: FoundryDocument): Promise<BlueprintSource> {
-  const source = (typeof entry === "string") ? libraryEntries().find(candidate => candidate.id === entry) : entry;
+export async function applyLibraryEntry(
+  entry: string | BlueprintSource,
+  document: FoundryDocument,
+): Promise<BlueprintSource> {
+  const source =
+    typeof entry === "string" ? libraryEntries().find((candidate) => candidate.id === entry) : entry;
   if (!source) throw new Error(`Build-n-Action | no library entry "${String(entry)}"`);
   return saveBlueprint(document, duplicateBlueprint(source, source.name));
 }
@@ -102,7 +115,8 @@ export function createLibraryApi() {
     },
     remove: (id: string) => library.remove(id),
     apply: applyLibraryEntry,
-    export: (ids?: readonly string[]) => exportBlueprints(ids ? libraryEntries().filter(entry => ids.includes(entry.id)) : libraryEntries()),
-    import: (text: string) => importInto(text)
+    export: (ids?: readonly string[]) =>
+      exportBlueprints(ids ? libraryEntries().filter((entry) => ids.includes(entry.id)) : libraryEntries()),
+    import: (text: string) => importInto(text),
   };
 }

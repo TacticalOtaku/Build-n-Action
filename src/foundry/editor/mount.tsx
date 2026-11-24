@@ -43,12 +43,12 @@ function selectionStore(initial: string | null) {
     get: () => state,
     set: (id: string) => {
       state = { id, request: state.request + 1 };
-      listeners.forEach(listener => listener());
+      listeners.forEach((listener) => listener());
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
-    }
+    },
   };
 }
 
@@ -65,26 +65,40 @@ function injectFonts(): void {
 
 function storedTheme(): ThemeName {
   const applications = read(game.settings.get("core", "uiConfig"), "colorScheme.applications");
-  return resolveEditorTheme(clientSetting(CLIENT_SETTINGS.editorTheme), applications, window.matchMedia("(prefers-color-scheme: light)").matches);
+  return resolveEditorTheme(
+    clientSetting(CLIENT_SETTINGS.editorTheme),
+    applications,
+    window.matchMedia("(prefers-color-scheme: light)").matches,
+  );
 }
 
 function storedFx(): FxLevel {
   const value = clientSetting(CLIENT_SETTINGS.editorEffects);
-  return FX_LEVELS.includes(value as FxLevel) ? value as FxLevel : "full";
+  return FX_LEVELS.includes(value as FxLevel) ? (value as FxLevel) : "full";
 }
 
 function remember(key: (typeof CLIENT_SETTINGS)[keyof typeof CLIENT_SETTINGS], value: unknown): void {
-  setClientSetting(key, value).catch(error => log.warn("could not store an editor preference", error));
+  setClientSetting(key, value).catch((error) => log.warn("could not store an editor preference", error));
 }
 
 function upsert(list: readonly BlueprintSource[], blueprint: BlueprintSource): BlueprintSource[] {
-  return list.some(entry => entry.id === blueprint.id)
-    ? list.map(entry => ((entry.id === blueprint.id) ? blueprint : entry))
+  return list.some((entry) => entry.id === blueprint.id)
+    ? list.map((entry) => (entry.id === blueprint.id ? blueprint : entry))
     : [...list, blueprint];
 }
 
-function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument; selection: Selection; close(): void }) {
-  const [blueprints, setBlueprints] = useState<readonly BlueprintSource[]>(() => documentBlueprints(carrier).blueprints);
+function FoundryEditor({
+  carrier,
+  selection,
+  close,
+}: {
+  carrier: FoundryDocument;
+  selection: Selection;
+  close(): void;
+}) {
+  const [blueprints, setBlueprints] = useState<readonly BlueprintSource[]>(
+    () => documentBlueprints(carrier).blueprints,
+  );
   const [theme, setTheme] = useState<ThemeName>(storedTheme);
   // Foundry's colour scheme can change while the editor is open; "auto" follows it.
   useEffect(() => {
@@ -99,7 +113,7 @@ function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument
   const requested = useSyncExternalStore(selection.subscribe, selection.get);
   const services = useMemo(
     () => createEditorServices(foundryTranslator, foundryChoices(carrier), createFoundryHost(carrier)),
-    [carrier]
+    [carrier],
   );
 
   useEffect(() => {
@@ -114,11 +128,12 @@ function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument
     });
     // An effect on an item is suppressed or not with the item's equipped state.
     const owner = isEffect ? carrier.parent : null;
-    const ownerUpdated = (owner?.documentName === "Item")
-      ? Hooks.on("updateItem", (document: unknown) => {
-        if (document === owner) setEffect(effectStatus(carrier));
-      })
-      : null;
+    const ownerUpdated =
+      owner?.documentName === "Item"
+        ? Hooks.on("updateItem", (document: unknown) => {
+            if (document === owner) setEffect(effectStatus(carrier));
+          })
+        : null;
     return () => {
       Hooks.off(`update${name}`, updated);
       Hooks.off(`delete${name}`, deleted);
@@ -131,22 +146,31 @@ function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument
     ui.notifications.error(game.i18n.localize("BNA.Editor.saveFailed"));
   }, []);
 
-  const onSave = useCallback((blueprint: BlueprintSource) => {
-    setBlueprints(list => upsert(list, blueprint));
-    saveBlueprint(carrier, blueprint).catch(failed);
-  }, [carrier, failed]);
+  const onSave = useCallback(
+    (blueprint: BlueprintSource) => {
+      setBlueprints((list) => upsert(list, blueprint));
+      saveBlueprint(carrier, blueprint).catch(failed);
+    },
+    [carrier, failed],
+  );
 
-  const onCreate = useCallback((source?: BlueprintSource) => {
-    const blueprint = source ?? createBlueprint();
-    setBlueprints(list => [...list, blueprint]);
-    saveBlueprint(carrier, blueprint).catch(failed);
-    return blueprint;
-  }, [carrier, failed]);
+  const onCreate = useCallback(
+    (source?: BlueprintSource) => {
+      const blueprint = source ?? createBlueprint();
+      setBlueprints((list) => [...list, blueprint]);
+      saveBlueprint(carrier, blueprint).catch(failed);
+      return blueprint;
+    },
+    [carrier, failed],
+  );
 
-  const onDelete = useCallback((id: string) => {
-    setBlueprints(list => list.filter(entry => entry.id !== id));
-    removeBlueprint(carrier, id).catch(failed);
-  }, [carrier, failed]);
+  const onDelete = useCallback(
+    (id: string) => {
+      setBlueprints((list) => list.filter((entry) => entry.id !== id));
+      removeBlueprint(carrier, id).catch(failed);
+    },
+    [carrier, failed],
+  );
 
   return (
     <ServicesProvider services={services}>
@@ -156,7 +180,7 @@ function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument
         document={{ label: carrier.name, blueprints, effect, itemCarrier: carrierItem(carrier) !== null }}
         theme={theme}
         onToggleTheme={() => {
-          const next = (theme === "dark") ? "light" : "dark";
+          const next = theme === "dark" ? "light" : "dark";
           setTheme(next);
           remember(CLIENT_SETTINGS.editorTheme, next);
         }}
@@ -174,7 +198,11 @@ function FoundryEditor({ carrier, selection, close }: { carrier: FoundryDocument
   );
 }
 
-export async function mountEditor(container: HTMLElement, carrier: FoundryDocument, options: MountOptions): Promise<MountedEditor> {
+export async function mountEditor(
+  container: HTMLElement,
+  carrier: FoundryDocument,
+  options: MountOptions,
+): Promise<MountedEditor> {
   injectFonts();
   const host = globalThis.document.createElement("div");
   host.className = "bna-editor-host";
@@ -198,11 +226,11 @@ export async function mountEditor(container: HTMLElement, carrier: FoundryDocume
     root.render(
       <StrictMode>
         <FoundryEditor carrier={carrier} selection={selection} close={options.close} />
-      </StrictMode>
+      </StrictMode>,
     );
   });
   return {
     unmount: () => root.unmount(),
-    select: id => selection.set(id)
+    select: (id) => selection.set(id),
   };
 }

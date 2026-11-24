@@ -7,7 +7,7 @@ export function OutputPins({ pins }: { pins: readonly PinId[] }) {
   const t = useT();
   return (
     <ul className="bna-pins">
-      {pins.map(pin => (
+      {pins.map((pin) => (
         <li key={pin} className="bna-pins__row" data-pin={pin} title={t(`BNA.Pin.${pin}.Hint`)}>
           {t(`BNA.Pin.${pin}.Label`)}
           <Handle type="source" position={Position.Right} id={pin} className="bna-pin" />

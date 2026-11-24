@@ -5,27 +5,23 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores([
-    "node_modules/**",
-    "dist/**",
-    "tests/**", "docs/**", ".claude/**"
-  ]),
+  globalIgnores(["node_modules/**", "dist/**", "tests/**", "docs/**", ".claude/**"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: {
-      globals: globals.browser
-    }
+      globals: globals.browser,
+    },
   },
   {
     files: ["**/*.tsx"],
-    extends: [reactHooks.configs.flat.recommended]
+    extends: [reactHooks.configs.flat.recommended],
   },
   {
     files: ["eslint.config.js"],
     extends: [js.configs.recommended],
     languageOptions: {
-      globals: globals.node
-    }
-  }
+      globals: globals.node,
+    },
+  },
 ]);

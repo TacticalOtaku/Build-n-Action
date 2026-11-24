@@ -26,18 +26,24 @@ export interface SourceContext {
 
 export function matchDisposition(wanted: string, source: number | null, roller: number | null): boolean {
   if (wanted === "2") return true;
-  if ((source === null) || (roller === null)) return false;
+  if (source === null || roller === null) return false;
   if (wanted === "1") return source === roller;
   if (wanted === "-1") {
-    return ((source === DISPOSITION.FRIENDLY) && (roller === DISPOSITION.HOSTILE))
-      || ((source === DISPOSITION.HOSTILE) && (roller === DISPOSITION.FRIENDLY));
+    return (
+      (source === DISPOSITION.FRIENDLY && roller === DISPOSITION.HOSTILE) ||
+      (source === DISPOSITION.HOSTILE && roller === DISPOSITION.FRIENDLY)
+    );
   }
   return false;
 }
 
 /** Whether any blocking status is present, ignoring statuses the creature is immune to. */
-export function isBlocked(blockers: readonly string[], statuses: readonly string[], immunities: readonly string[]): boolean {
-  return blockers.some(blocker => !immunities.includes(blocker) && statuses.includes(blocker));
+export function isBlocked(
+  blockers: readonly string[],
+  statuses: readonly string[],
+  immunities: readonly string[],
+): boolean {
+  return blockers.some((blocker) => !immunities.includes(blocker) && statuses.includes(blocker));
 }
 
 function outOfReach(actual: string): CheckOutcome {
@@ -45,7 +51,9 @@ function outOfReach(actual: string): CheckOutcome {
 }
 
 function requirements(value: unknown): string[] {
-  return Object.entries(asRecord(value)).filter(([, required]) => required === true).map(([key]) => key);
+  return Object.entries(asRecord(value))
+    .filter(([, required]) => required === true)
+    .map(([key]) => key);
 }
 
 /** Decide whether an event node's "whose roll" setting includes the current roller. */
@@ -65,11 +73,17 @@ export function reachOutcome(reachData: unknown, context: SourceContext): CheckO
     case "token": {
       if (mode !== "aura") return outOfReach(mode);
       if (blocked) return outOfReach("blocked");
-      if (!matchDisposition(asString(reach.disposition, "2"), context.sourceDisposition, context.rollerDisposition)) {
+      if (
+        !matchDisposition(
+          asString(reach.disposition, "2"),
+          context.sourceDisposition,
+          context.rollerDisposition,
+        )
+      ) {
         return outOfReach("disposition");
       }
       const range = context.evaluateRange(asString(reach.range));
-      if ((range === null) || ((range !== -1) && (range <= 0))) return outOfReach("range");
+      if (range === null || (range !== -1 && range <= 0)) return outOfReach("range");
       if (!context.withinRange(range, requirements(reach.require))) return outOfReach("range");
       return passed("matched", { actual: "aura" });
     }
@@ -78,18 +92,30 @@ export function reachOutcome(reachData: unknown, context: SourceContext): CheckO
       if (mode !== "template") return outOfReach(mode);
       if (blocked) return outOfReach("blocked");
       if (context.own) return includeSelf ? passed("matched", { actual: "template" }) : outOfReach("self");
-      return matchDisposition(asString(reach.disposition, "2"), context.sourceDisposition, context.rollerDisposition)
+      return matchDisposition(
+        asString(reach.disposition, "2"),
+        context.sourceDisposition,
+        context.rollerDisposition,
+      )
         ? passed("matched", { actual: "template" })
         : outOfReach("disposition");
 
     case "region":
-      return ((mode === "region") || (mode === "self")) ? passed("matched", { actual: "region" }) : outOfReach(mode);
+      return mode === "region" || mode === "self"
+        ? passed("matched", { actual: "region" })
+        : outOfReach(mode);
   }
 }
 
 /** Region events: whether the token that entered or left counts, by its own disposition. */
 export function regionTokensOutcome(wanted: string, rollerDisposition: number | null): CheckOutcome {
-  if (wanted === "friendly") return (rollerDisposition === DISPOSITION.FRIENDLY) ? passed("matched", { actual: "friendly" }) : outOfReach("disposition");
-  if (wanted === "hostile") return (rollerDisposition === DISPOSITION.HOSTILE) ? passed("matched", { actual: "hostile" }) : outOfReach("disposition");
+  if (wanted === "friendly")
+    return rollerDisposition === DISPOSITION.FRIENDLY
+      ? passed("matched", { actual: "friendly" })
+      : outOfReach("disposition");
+  if (wanted === "hostile")
+    return rollerDisposition === DISPOSITION.HOSTILE
+      ? passed("matched", { actual: "hostile" })
+      : outOfReach("disposition");
   return passed("matched", { actual: "any" });
 }

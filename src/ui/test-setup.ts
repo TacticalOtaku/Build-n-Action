@@ -40,6 +40,6 @@ if (!window.matchMedia) {
     addListener: () => {},
     removeListener: () => {},
     onchange: null,
-    dispatchEvent: () => false
+    dispatchEvent: () => false,
   }));
 }

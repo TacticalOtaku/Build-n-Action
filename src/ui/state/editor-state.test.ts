@@ -2,14 +2,25 @@ import { describe, expect, it } from "vitest";
 import { createBlueprint } from "../../core/blueprint/factory";
 import type { BlueprintSource } from "../../core/blueprint/types";
 import { makeCondition, makeEdge, makeNode } from "../../core/testing/graph";
-import { HISTORY_LIMIT, createEditorState, editorReducer, setIn, type EditorAction, type EditorState } from "./editor-state";
+import {
+  HISTORY_LIMIT,
+  createEditorState,
+  editorReducer,
+  setIn,
+  type EditorAction,
+  type EditorState,
+} from "./editor-state";
 
 function blueprint(): BlueprintSource {
   return createBlueprint({
     id: "aB3dE5gH7jK9mN1p",
     name: "Test",
-    nodes: [makeNode("event", "damageRoll", "ev"), makeCondition("if", []), makeNode("result", "rollBonus", "bonus")],
-    edges: [makeEdge("ev", "out", "if")]
+    nodes: [
+      makeNode("event", "damageRoll", "ev"),
+      makeCondition("if", []),
+      makeNode("result", "rollBonus", "bonus"),
+    ],
+    edges: [makeEdge("ev", "out", "if")],
   });
 }
 
@@ -20,16 +31,26 @@ function run(state: EditorState, ...actions: EditorAction[]): EditorState {
 describe("editorReducer", () => {
   it("adds a node, wires it from a pin and selects it", () => {
     const node = makeNode("result", "reminder", "note");
-    const state = run(createEditorState(blueprint()), { type: "addNode", node, connectFrom: { source: "if", sourcePin: "no" } });
-    expect(state.blueprint.nodes.map(n => n.id)).toContain("note");
-    expect(state.blueprint.edges.some(e => (e.source === "if") && (e.sourcePin === "no") && (e.target === "note"))).toBe(true);
+    const state = run(createEditorState(blueprint()), {
+      type: "addNode",
+      node,
+      connectFrom: { source: "if", sourcePin: "no" },
+    });
+    expect(state.blueprint.nodes.map((n) => n.id)).toContain("note");
+    expect(
+      state.blueprint.edges.some((e) => e.source === "if" && e.sourcePin === "no" && e.target === "note"),
+    ).toBe(true);
     expect(state.selection).toEqual(["note"]);
     expect(state.past).toHaveLength(1);
   });
 
   it("skips the wire when the connection is not allowed", () => {
     const node = makeNode("event", "attackRoll", "ev2");
-    const state = run(createEditorState(blueprint()), { type: "addNode", node, connectFrom: { source: "if", sourcePin: "yes" } });
+    const state = run(createEditorState(blueprint()), {
+      type: "addNode",
+      node,
+      connectFrom: { source: "if", sourcePin: "yes" },
+    });
     expect(state.blueprint.edges).toHaveLength(1);
   });
 
@@ -39,7 +60,7 @@ describe("editorReducer", () => {
       start,
       { type: "moveNode", id: "ev", position: { x: 10, y: 0 }, dragging: true },
       { type: "moveNode", id: "ev", position: { x: 20, y: 0 }, dragging: true },
-      { type: "moveNode", id: "ev", position: { x: 30, y: 5 }, dragging: false }
+      { type: "moveNode", id: "ev", position: { x: 30, y: 5 }, dragging: false },
     );
     expect(state.blueprint.nodes[0]?.position).toEqual({ x: 30, y: 5 });
     expect(state.past).toHaveLength(1);
@@ -50,10 +71,13 @@ describe("editorReducer", () => {
     const source = blueprint();
     const effect = makeNode("result", "applyEffect", "effect");
     const start = createEditorState({ ...source, nodes: [...source.nodes, effect] });
-    const wired = (state: EditorState) => state.blueprint.edges.some(edge => (edge.source === "bonus") && (edge.sourcePin === "then"));
-    const on = run(start,
+    const wired = (state: EditorState) =>
+      state.blueprint.edges.some((edge) => edge.source === "bonus" && edge.sourcePin === "then");
+    const on = run(
+      start,
       { type: "setNodeData", id: "bonus", path: ["common", "then"], value: true },
-      { type: "connect", source: "bonus", sourcePin: "then", target: "effect" });
+      { type: "connect", source: "bonus", sourcePin: "then", target: "effect" },
+    );
     expect(wired(on)).toBe(true);
     const off = run(on, { type: "setNodeData", id: "bonus", path: ["common", "then"], value: false });
     expect(wired(off)).toBe(false);
@@ -68,14 +92,23 @@ describe("editorReducer", () => {
   });
 
   it("removes nodes with their wires and selection", () => {
-    const state = run(createEditorState(blueprint()), { type: "select", ids: ["if", "bonus"] }, { type: "removeNodes", ids: ["if"] });
-    expect(state.blueprint.nodes.map(n => n.id)).toEqual(["ev", "bonus"]);
+    const state = run(
+      createEditorState(blueprint()),
+      { type: "select", ids: ["if", "bonus"] },
+      { type: "removeNodes", ids: ["if"] },
+    );
+    expect(state.blueprint.nodes.map((n) => n.id)).toEqual(["ev", "bonus"]);
     expect(state.blueprint.edges).toEqual([]);
     expect(state.selection).toEqual(["bonus"]);
   });
 
   it("connects only valid wires", () => {
-    const ok = run(createEditorState(blueprint()), { type: "connect", source: "if", sourcePin: "yes", target: "bonus" });
+    const ok = run(createEditorState(blueprint()), {
+      type: "connect",
+      source: "if",
+      sourcePin: "yes",
+      target: "bonus",
+    });
     expect(ok.blueprint.edges).toHaveLength(2);
     const bad = run(ok, { type: "connect", source: "bonus", sourcePin: "out", target: "if" });
     expect(bad).toBe(ok);
@@ -87,15 +120,28 @@ describe("editorReducer", () => {
   });
 
   it("edits nested node data", () => {
-    const state = run(createEditorState(blueprint()), { type: "setNodeData", id: "ev", path: ["reach", "mode"], value: "aura" });
+    const state = run(createEditorState(blueprint()), {
+      type: "setNodeData",
+      id: "ev",
+      path: ["reach", "mode"],
+      value: "aura",
+    });
     expect(state.blueprint.nodes[0]?.data.reach).toMatchObject({ mode: "aura", range: "10" });
   });
 
   it("adds, edits and removes condition checks", () => {
     const check = { id: "c1", type: "creatureTypes", data: { values: [] } };
     const added = run(createEditorState(blueprint()), { type: "addCheck", nodeId: "if", check });
-    const edited = run(added, { type: "setCheckData", nodeId: "if", checkId: "c1", path: ["values"], value: ["undead"] });
-    expect(edited.blueprint.nodes[1]?.data.checks).toEqual([{ id: "c1", type: "creatureTypes", data: { values: ["undead"] } }]);
+    const edited = run(added, {
+      type: "setCheckData",
+      nodeId: "if",
+      checkId: "c1",
+      path: ["values"],
+      value: ["undead"],
+    });
+    expect(edited.blueprint.nodes[1]?.data.checks).toEqual([
+      { id: "c1", type: "creatureTypes", data: { values: ["undead"] } },
+    ]);
     const removed = run(edited, { type: "removeCheck", nodeId: "if", checkId: "c1" });
     expect(removed.blueprint.nodes[1]?.data.checks).toEqual([]);
   });
@@ -109,8 +155,15 @@ describe("editorReducer", () => {
   });
 
   it("applies a layout in one step", () => {
-    const state = run(createEditorState(blueprint()), { type: "layout", positions: { ev: { x: 1, y: 2 }, bonus: { x: 3, y: 4 } } });
-    expect(state.blueprint.nodes.map(n => n.position)).toEqual([{ x: 1, y: 2 }, { x: 0, y: 0 }, { x: 3, y: 4 }]);
+    const state = run(createEditorState(blueprint()), {
+      type: "layout",
+      positions: { ev: { x: 1, y: 2 }, bonus: { x: 3, y: 4 } },
+    });
+    expect(state.blueprint.nodes.map((n) => n.position)).toEqual([
+      { x: 1, y: 2 },
+      { x: 0, y: 0 },
+      { x: 3, y: 4 },
+    ]);
     expect(state.past).toHaveLength(1);
   });
 
@@ -118,7 +171,7 @@ describe("editorReducer", () => {
     const node = makeNode("result", "reminder", "note");
     const added = run(createEditorState(blueprint()), { type: "addNode", node });
     const undone = run(added, { type: "undo" });
-    expect(undone.blueprint.nodes.map(n => n.id)).not.toContain("note");
+    expect(undone.blueprint.nodes.map((n) => n.id)).not.toContain("note");
     expect(undone.selection).toEqual([]);
     expect(undone.future).toHaveLength(1);
     const redone = run(undone, { type: "redo" });
@@ -128,27 +181,40 @@ describe("editorReducer", () => {
 
   it("caps the history", () => {
     let state = createEditorState(blueprint());
-    for (let i = 0; i < HISTORY_LIMIT + 10; i++) state = editorReducer(state, { type: "rename", name: `n${i}` });
+    for (let i = 0; i < HISTORY_LIMIT + 10; i++)
+      state = editorReducer(state, { type: "rename", name: `n${i}` });
     expect(state.past).toHaveLength(HISTORY_LIMIT);
   });
 
   it("loads a different blueprint with fresh history", () => {
     const other = createBlueprint({ name: "Other" });
-    const state = run(createEditorState(blueprint()), { type: "rename", name: "Hex" }, { type: "load", blueprint: other });
+    const state = run(
+      createEditorState(blueprint()),
+      { type: "rename", name: "Hex" },
+      { type: "load", blueprint: other },
+    );
     expect(state).toEqual(createEditorState(other));
   });
 
   it("duplicates selected nodes with the wires between them, offset and selected", () => {
     const blueprint = createBlueprint({
-      nodes: [makeNode("event", "damageRoll", "ev"), makeCondition("if", []), makeNode("result", "rollBonus", "r")],
-      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "r")]
+      nodes: [
+        makeNode("event", "damageRoll", "ev"),
+        makeCondition("if", []),
+        makeNode("result", "rollBonus", "r"),
+      ],
+      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "r")],
     });
-    const state = editorReducer(createEditorState(blueprint), { type: "duplicateNodes", ids: ["if", "r"], offset: { x: 36, y: 36 } });
+    const state = editorReducer(createEditorState(blueprint), {
+      type: "duplicateNodes",
+      ids: ["if", "r"],
+      offset: { x: 36, y: 36 },
+    });
     const copies = state.blueprint.nodes.slice(3);
-    expect(copies.map(node => node.type)).toEqual(["condition", "rollBonus"]);
-    expect(copies.every(node => !["if", "r"].includes(node.id))).toBe(true);
+    expect(copies.map((node) => node.type)).toEqual(["condition", "rollBonus"]);
+    expect(copies.every((node) => !["if", "r"].includes(node.id))).toBe(true);
     expect(copies[0]?.position).toEqual({ x: 36, y: 36 });
-    expect(state.selection).toEqual(copies.map(node => node.id));
+    expect(state.selection).toEqual(copies.map((node) => node.id));
     const added = state.blueprint.edges.slice(2);
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ source: copies[0]?.id, sourcePin: "yes", target: copies[1]?.id });
@@ -157,7 +223,9 @@ describe("editorReducer", () => {
 
   it("ignores duplicating nothing", () => {
     const state = createEditorState(createBlueprint());
-    expect(editorReducer(state, { type: "duplicateNodes", ids: ["missing"], offset: { x: 1, y: 1 } })).toBe(state);
+    expect(editorReducer(state, { type: "duplicateNodes", ids: ["missing"], offset: { x: 1, y: 1 } })).toBe(
+      state,
+    );
   });
 });
 

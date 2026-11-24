@@ -1,11 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Operation } from "./operations";
 import {
-  ASKER_WAIT_MS, SAVE_WAIT_MS, createTransport, createWaiter, pickSaveUser,
-  type SaveOutcome, type SaveRequest, type SaveUser, type Transport, type TransportAdapter
+  ASKER_WAIT_MS,
+  SAVE_WAIT_MS,
+  createTransport,
+  createWaiter,
+  pickSaveUser,
+  type SaveOutcome,
+  type SaveRequest,
+  type SaveUser,
+  type Transport,
+  type TransportAdapter,
 } from "./transport";
 
-const user = (id: string, extra: Partial<SaveUser> = {}): SaveUser => ({ id, isGM: false, active: true, owner: true, character: false, ...extra });
+const user = (id: string, extra: Partial<SaveUser> = {}): SaveUser => ({
+  id,
+  isGM: false,
+  active: true,
+  owner: true,
+  character: false,
+  ...extra,
+});
 
 const SAVE_REQUEST: SaveRequest = {
   actorUuid: "Actor.hero",
@@ -13,7 +28,7 @@ const SAVE_REQUEST: SaveRequest = {
   dc: 15,
   advantage: "normal",
   source: "Fireball",
-  owner: "Wizard"
+  owner: "Wizard",
 };
 
 const RESOURCE_OP: Operation = {
@@ -23,7 +38,7 @@ const RESOURCE_OP: Operation = {
   resource: "hp",
   delta: -4,
   slot: "",
-  currency: "gp"
+  currency: "gp",
 };
 
 function createCluster(activeGM: string | null = "gm") {
@@ -34,8 +49,14 @@ function createCluster(activeGM: string | null = "gm") {
   const warnings = new Map<string, unknown[][]>();
   const executed: Array<{ by: string; op: Operation }> = [];
   const triggers: Array<{ event: string; actorUuid: string; key: string }> = [];
-  const promptHooks = new Map<string, (req: SaveRequest, onReady: (close: () => void) => void) => Promise<"roll" | "declined" | "missing">>();
-  const rollHooks = new Map<string, (actorUuid: string, req: SaveRequest, configure: boolean) => Promise<SaveOutcome | null>>();
+  const promptHooks = new Map<
+    string,
+    (req: SaveRequest, onReady: (close: () => void) => void) => Promise<"roll" | "declined" | "missing">
+  >();
+  const rollHooks = new Map<
+    string,
+    (actorUuid: string, req: SaveRequest, configure: boolean) => Promise<SaveOutcome | null>
+  >();
   const localAllowed = new Set<string>(["gm"]);
   let gmId = activeGM;
 
@@ -47,28 +68,37 @@ function createCluster(activeGM: string | null = "gm") {
       isGM: () => id === "gm",
       isActiveGM: () => gmId === id,
       activeGMId: () => gmId,
-      hasUser: uid => users.has(uid),
-      emit: message => {
+      hasUser: (uid) => users.has(uid),
+      emit: (message) => {
         for (const [peerId, peer] of clients) {
           if (peerId === id) continue;
           void peer.onMessage(structuredClone(message), id);
         }
       },
       randomId: () => `id-${++seq}`,
-      notify: (level, key) => { notifies.get(id)?.push({ level, key }); },
-      warn: (...args) => { warnings.get(id)?.push(args); },
+      notify: (level, key) => {
+        notifies.get(id)?.push({ level, key });
+      },
+      warn: (...args) => {
+        warnings.get(id)?.push(args);
+      },
       canRunLocally: () => localAllowed.has(id),
-      mayRequest: op => op.actor !== "Actor.stranger",
-      executeOperation: async op => { executed.push({ by: id, op }); },
-      mayRequestTrigger: (actorUuid, senderId) => (actorUuid === "Actor.hero") && (senderId === "player"),
-      onTrigger: async (event, actorUuid, key) => { triggers.push({ event, actorUuid, key }); },
-      saveUsers: actorUuid => (actorUuid === "Actor.missing")
-        ? null
-        : [
-            user("gm", { isGM: true, owner: true }),
-            user("player", { owner: actorUuid === "Actor.hero", character: true }),
-            user("asker", { owner: false })
-          ],
+      mayRequest: (op) => op.actor !== "Actor.stranger",
+      executeOperation: async (op) => {
+        executed.push({ by: id, op });
+      },
+      mayRequestTrigger: (actorUuid, senderId) => actorUuid === "Actor.hero" && senderId === "player",
+      onTrigger: async (event, actorUuid, key) => {
+        triggers.push({ event, actorUuid, key });
+      },
+      saveUsers: (actorUuid) =>
+        actorUuid === "Actor.missing"
+          ? null
+          : [
+              user("gm", { isGM: true, owner: true }),
+              user("player", { owner: actorUuid === "Actor.hero", character: true }),
+              user("asker", { owner: false }),
+            ],
       rollSave: async (actorUuid, request, configure) => {
         const hook = rollHooks.get(id);
         if (hook) return hook(actorUuid, request, configure);
@@ -79,7 +109,7 @@ function createCluster(activeGM: string | null = "gm") {
         if (hook) return hook(request, onReady);
         return "roll";
       },
-      ...overrides
+      ...overrides,
     });
     clients.set(id, instance);
     return instance;
@@ -96,7 +126,9 @@ function createCluster(activeGM: string | null = "gm") {
     triggers,
     promptHooks,
     rollHooks,
-    setActiveGM: (next: string | null) => { gmId = next; }
+    setActiveGM: (next: string | null) => {
+      gmId = next;
+    },
   };
 }
 
@@ -107,7 +139,13 @@ describe("pickSaveUser", () => {
   });
 
   it("skips GMs, absent users and non-owners", () => {
-    expect(pickSaveUser([user("gm", { isGM: true }), user("away", { active: false }), user("other", { owner: false })])).toBeNull();
+    expect(
+      pickSaveUser([
+        user("gm", { isGM: true }),
+        user("away", { active: false }),
+        user("other", { owner: false }),
+      ]),
+    ).toBeNull();
   });
 });
 
@@ -160,7 +198,13 @@ describe("createTransport saves", () => {
     vi.useFakeTimers();
     const bus = createCluster();
     let finishRoll!: (outcome: SaveOutcome) => void;
-    bus.rollHooks.set("player", () => new Promise(resolve => { finishRoll = resolve; }));
+    bus.rollHooks.set(
+      "player",
+      () =>
+        new Promise((resolve) => {
+          finishRoll = resolve;
+        }),
+    );
 
     const pending = bus.gm.requestSave(SAVE_REQUEST);
     await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
@@ -193,8 +237,8 @@ describe("createTransport saves", () => {
       isGM: () => true,
       isActiveGM: () => true,
       activeGMId: () => "gm",
-      hasUser: uid => uid === "gm" || uid === "player" || uid === "spoof",
-      emit: msg => emitted.push(msg),
+      hasUser: (uid) => uid === "gm" || uid === "player" || uid === "spoof",
+      emit: (msg) => emitted.push(msg),
       randomId: () => "save-1",
       notify: () => {},
       warn: () => {},
@@ -205,14 +249,19 @@ describe("createTransport saves", () => {
       onTrigger: async () => {},
       saveUsers: () => [user("player", { owner: true, character: true })],
       rollSave: async (_uuid, _req, cfg) => ({ success: false, total: 7, by: cfg ? "player" : "gm" }),
-      promptSaveDialog: async () => "declined"
+      promptSaveDialog: async () => "declined",
     });
 
     const pending = gmTransport.requestSave(SAVE_REQUEST);
-    await gmTransport.onMessage({ type: "saveAnswer", id: "save-1", outcome: { success: true, total: 25, by: "player" } }, "spoof");
+    await gmTransport.onMessage(
+      { type: "saveAnswer", id: "save-1", outcome: { success: true, total: 25, by: "player" } },
+      "spoof",
+    );
     await vi.advanceTimersByTimeAsync(SAVE_WAIT_MS);
     await expect(pending).resolves.toEqual({ success: false, total: 7, by: "gm" });
-    expect(emitted).toContainEqual(expect.objectContaining({ type: "saveCancel", id: "save-1", user: "player" }));
+    expect(emitted).toContainEqual(
+      expect.objectContaining({ type: "saveCancel", id: "save-1", user: "player" }),
+    );
   });
 
   it("resolves asker request to null if the GM never replies", async () => {
@@ -233,7 +282,9 @@ describe("createTransport operations & triggers", () => {
     await expect(bus.player.performOperations([RESOURCE_OP])).resolves.toBe(true);
     expect(bus.executed).toEqual([{ by: "gm", op: RESOURCE_OP }]);
 
-    await expect(bus.player.performOperations([{ ...RESOURCE_OP, actor: "Actor.stranger" }])).resolves.toBe(false);
+    await expect(bus.player.performOperations([{ ...RESOURCE_OP, actor: "Actor.stranger" }])).resolves.toBe(
+      false,
+    );
     expect(bus.notifies.get("player")).toContainEqual({ level: "warn", key: "BNA.Runtime.RemoteFailed" });
 
     bus.setActiveGM(null);
@@ -243,9 +294,18 @@ describe("createTransport operations & triggers", () => {
 
   it("accepts triggers only for allowed event types and owned actors", async () => {
     const bus = createCluster();
-    await bus.gm.onMessage({ type: "trigger", gm: "gm", event: "shortRest", actorUuid: "Actor.hero", key: "k1" }, "player");
-    await bus.gm.onMessage({ type: "trigger", gm: "gm", event: "shortRest", actorUuid: "Actor.foe", key: "k2" }, "player");
-    await bus.gm.onMessage({ type: "trigger", gm: "gm", event: "notAnEvent", actorUuid: "Actor.hero", key: "k3" }, "player");
+    await bus.gm.onMessage(
+      { type: "trigger", gm: "gm", event: "shortRest", actorUuid: "Actor.hero", key: "k1" },
+      "player",
+    );
+    await bus.gm.onMessage(
+      { type: "trigger", gm: "gm", event: "shortRest", actorUuid: "Actor.foe", key: "k2" },
+      "player",
+    );
+    await bus.gm.onMessage(
+      { type: "trigger", gm: "gm", event: "notAnEvent", actorUuid: "Actor.hero", key: "k3" },
+      "player",
+    );
     expect(bus.triggers).toEqual([{ event: "shortRest", actorUuid: "Actor.hero", key: "k1" }]);
 
     bus.setActiveGM(null);

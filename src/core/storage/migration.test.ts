@@ -6,25 +6,36 @@ import { backupPath, planMigration } from "./migration";
 import { MODULE_SCOPE } from "./repository";
 
 /** Apply `flags.build-n-action.*` changes to a flag scope, as document.update would. */
-function applied(scope: Record<string, unknown>, changes: Record<string, unknown> | null): Record<string, unknown> {
+function applied(
+  scope: Record<string, unknown>,
+  changes: Record<string, unknown> | null,
+): Record<string, unknown> {
   const next = { ...scope };
-  for (const [key, value] of Object.entries(changes ?? {})) next[key.slice(`flags.${MODULE_SCOPE}.`.length)] = value;
+  for (const [key, value] of Object.entries(changes ?? {}))
+    next[key.slice(`flags.${MODULE_SCOPE}.`.length)] = value;
   return next;
 }
 
 describe("planMigration", () => {
   it("converts every v1 bonus, retires the originals to the backup and keeps stored blueprints", () => {
     const kept = createBlueprint({ id: "kEEp5gH7jK9mN1p0", name: "Kept" });
-    const scope = { blueprints: [kept], bonuses: [LEGACY_FIXTURES.attackAura, LEGACY_FIXTURES.damageOptional] };
+    const scope = {
+      blueprints: [kept],
+      bonuses: [LEGACY_FIXTURES.attackAura, LEGACY_FIXTURES.damageOptional],
+    };
     const plan = planMigration(scope, "item");
     expect(plan.converted).toBe(2);
     expect(plan.failed).toBe(0);
     const next = applied(scope, plan.changes);
-    const ids = (next.blueprints as { id: string }[]).map(entry => entry.id);
+    const ids = (next.blueprints as { id: string }[]).map((entry) => entry.id);
     expect(ids[0]).toBe(kept.id);
-    expect(ids.slice(1).sort()).toEqual([LEGACY_FIXTURES.attackAura.id, LEGACY_FIXTURES.damageOptional.id].sort());
+    expect(ids.slice(1).sort()).toEqual(
+      [LEGACY_FIXTURES.attackAura.id, LEGACY_FIXTURES.damageOptional.id].sort(),
+    );
     expect(next.bonuses).toEqual([]);
-    expect(Object.keys(next.legacyBackup as object).sort()).toEqual([LEGACY_FIXTURES.attackAura.id, LEGACY_FIXTURES.damageOptional.id].sort());
+    expect(Object.keys(next.legacyBackup as object).sort()).toEqual(
+      [LEGACY_FIXTURES.attackAura.id, LEGACY_FIXTURES.damageOptional.id].sort(),
+    );
   });
 
   it("is idempotent", () => {
@@ -49,19 +60,36 @@ describe("planMigration", () => {
   });
 
   it("has nothing to do without bonuses", () => {
-    expect(planMigration({ blueprints: [] }, "actor")).toEqual({ converted: 0, failed: 0, repaired: 0, issues: [], changes: null });
+    expect(planMigration({ blueprints: [] }, "actor")).toEqual({
+      converted: 0,
+      failed: 0,
+      repaired: 0,
+      issues: [],
+      changes: null,
+    });
   });
 });
 
 describe("planMigration repairs", () => {
   it("removes the hit-point check 2.0.0 added from a v1 filter that was off, using the backup", () => {
-    const original = { ...LEGACY_FIXTURES.attackAura, filters: { creatureTypes: ["undead"], healthPercentages: { value: 50, type: null } } };
+    const original = {
+      ...LEGACY_FIXTURES.attackAura,
+      filters: { creatureTypes: ["undead"], healthPercentages: { value: 50, type: null } },
+    };
     const fixed = convertLegacyBonus(original, "item").blueprint;
     if (!fixed) throw new Error("not converted");
-    const stale = { id: "c-healthPercentages", type: "healthPercentages", data: { value: 50, type: "atMost" } };
+    const stale = {
+      id: "c-healthPercentages",
+      type: "healthPercentages",
+      data: { value: 50, type: "atMost" },
+    };
     const migrated = {
       ...fixed,
-      nodes: fixed.nodes.map(node => (node.id === "condition") ? { ...node, data: { ...node.data, checks: [...(node.data.checks as unknown[]), stale] } } : node)
+      nodes: fixed.nodes.map((node) =>
+        node.id === "condition"
+          ? { ...node, data: { ...node.data, checks: [...(node.data.checks as unknown[]), stale] } }
+          : node,
+      ),
     };
     const scope = { blueprints: [migrated], bonuses: [], legacyBackup: { [original.id]: original } };
     const plan = planMigration(scope, "item");

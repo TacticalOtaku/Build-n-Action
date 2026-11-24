@@ -6,11 +6,13 @@ import { getEvent } from "./index";
 
 describe("event definitions", () => {
   it("defines every event type exactly once", () => {
-    expect(EVENTS.map(event => event.type).sort()).toEqual(EVENT_TYPES.filter(type => !CONTINUATION_EVENTS.includes(type)).sort());
+    expect(EVENTS.map((event) => event.type).sort()).toEqual(
+      EVENT_TYPES.filter((type) => !CONTINUATION_EVENTS.includes(type)).sort(),
+    );
   });
 
   it("gives pre-roll events a single out pin", () => {
-    for (const event of EVENTS.filter(e => e.phase === "pre")) expect(event.pins).toEqual(["out"]);
+    for (const event of EVENTS.filter((e) => e.phase === "pre")) expect(event.pins).toEqual(["out"]);
   });
 
   it("exposes outcome pins on reactions", () => {
@@ -30,8 +32,8 @@ describe("event definitions", () => {
         disposition: "1",
         includeSelf: true,
         blockers: [],
-        require: { sight: false, move: false, sound: false, light: false }
-      }
+        require: { sight: false, move: false, sound: false, light: false },
+      },
     });
   });
 
@@ -51,12 +53,15 @@ describe("event definitions", () => {
 
   it("lets turn events reach me or my aura, region events filter tokens, and rests stay with me", () => {
     const modes = (type: EventType) => {
-      const reach = getEvent(type)?.fields.find(field => field.key === "reach");
-      const mode = (reach && ("fields" in reach)) ? reach.fields?.find(field => field.key === "mode") : undefined;
-      return (mode && ("choices" in mode) && mode.choices && ("static" in mode.choices)) ? mode.choices.static.map(choice => choice.value) : null;
+      const reach = getEvent(type)?.fields.find((field) => field.key === "reach");
+      const mode =
+        reach && "fields" in reach ? reach.fields?.find((field) => field.key === "mode") : undefined;
+      return mode && "choices" in mode && mode.choices && "static" in mode.choices
+        ? mode.choices.static.map((choice) => choice.value)
+        : null;
     };
     expect(modes("turnStart")).toEqual(["self", "aura"]);
-    expect(getEvent("regionEnter")?.fields.map(field => field.key)).toEqual(["tokens"]);
+    expect(getEvent("regionEnter")?.fields.map((field) => field.key)).toEqual(["tokens"]);
     expect(getEvent("longRest")?.fields).toEqual([]);
   });
 });

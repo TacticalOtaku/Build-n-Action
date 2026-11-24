@@ -8,14 +8,37 @@ import { passed } from "../core/engine/reasons";
 import { actorFacts, creatureFacts, rollDetails, rollFacts } from "../core/testing/facts";
 import { makeCondition, makeEdge, makeNode } from "../core/testing/graph";
 import {
-  attackPins, checkPins, continuationStarts, createOnce, createPlay, damagePins, limitAvailable, midiAttackPins,
-  needsRegionBehavior, outcomePin, reminderKey, restEvent, saveDcFormula, saveKey, savePins, startsLater, turnTransitions,
-  usageKey, type PlayAdapter, type PlaySourceInfo, type UsageClock
+  attackPins,
+  checkPins,
+  continuationStarts,
+  createOnce,
+  createPlay,
+  damagePins,
+  limitAvailable,
+  midiAttackPins,
+  needsRegionBehavior,
+  outcomePin,
+  reminderKey,
+  restEvent,
+  saveDcFormula,
+  saveKey,
+  savePins,
+  startsLater,
+  turnTransitions,
+  usageKey,
+  type PlayAdapter,
+  type PlaySourceInfo,
+  type UsageClock,
 } from "./play";
 import type { SaveOutcome } from "./transport";
 
 const clock = (partial: Partial<UsageClock> = {}): UsageClock => ({
-  combatId: "c1", round: 2, turn: 3, shortRests: 1, longRests: 1, ...partial
+  combatId: "c1",
+  round: 2,
+  turn: 3,
+  shortRests: 1,
+  longRests: 1,
+  ...partial,
 });
 
 describe("limitAvailable & usageKey", () => {
@@ -45,10 +68,19 @@ describe("outcome pins & save helpers", () => {
   it("derives pins for attacks, Midi hits, saves, damage, checks, and demanded saves", () => {
     expect(attackPins({ total: 15, targetAc: 15, isCritical: false, isFumble: false })).toEqual(["hit"]);
     expect(attackPins({ total: 14, targetAc: 15, isCritical: false, isFumble: false })).toEqual(["miss"]);
-    expect(attackPins({ total: 3, targetAc: 30, isCritical: true, isFumble: false })).toEqual(["hit", "crit"]);
-    expect(attackPins({ total: 40, targetAc: 10, isCritical: false, isFumble: true })).toEqual(["miss", "fumble"]);
+    expect(attackPins({ total: 3, targetAc: 30, isCritical: true, isFumble: false })).toEqual([
+      "hit",
+      "crit",
+    ]);
+    expect(attackPins({ total: 40, targetAc: 10, isCritical: false, isFumble: true })).toEqual([
+      "miss",
+      "fumble",
+    ]);
     expect(attackPins({ total: 15, targetAc: null, isCritical: false, isFumble: false })).toEqual([]);
-    expect(attackPins({ total: 15, targetAc: null, isCritical: true, isFumble: false })).toEqual(["hit", "crit"]);
+    expect(attackPins({ total: 15, targetAc: null, isCritical: true, isFumble: false })).toEqual([
+      "hit",
+      "crit",
+    ]);
     expect(midiAttackPins(true, false, false)).toEqual(["hit"]);
     expect(midiAttackPins(true, true, false)).toEqual(["hit", "crit"]);
     expect(midiAttackPins(false, true, false)).toEqual(["miss"]);
@@ -66,7 +98,9 @@ describe("outcome pins & save helpers", () => {
     expect(checkPins(null, 15)).toEqual([]);
     expect(outcomePin(true)).toBe("succeeded");
     expect(outcomePin(false)).toBe("failed");
-    expect(saveKey("midi:card", "aB3dE5gH7jK9mN1p", "save", "Actor.foe")).toBe("midi:card|aB3dE5gH7jK9mN1p|save|Actor.foe");
+    expect(saveKey("midi:card", "aB3dE5gH7jK9mN1p", "save", "Actor.foe")).toBe(
+      "midi:card|aB3dE5gH7jK9mN1p|save|Actor.foe",
+    );
     expect(saveDcFormula({ dcMode: "formula", dc: " 8 + @prof " })).toBe("8 + @prof");
     expect(saveDcFormula({ dcMode: "formula", dc: "" })).toBe("10");
     expect(saveDcFormula({ dcMode: "spell", dc: "13" })).toBe("@attributes.spell.dc");
@@ -75,16 +109,24 @@ describe("outcome pins & save helpers", () => {
 
 describe("triggers & continuation pure helpers", () => {
   it("detects forward turn transitions and rests", () => {
-    expect(turnTransitions({ round: 1, turn: 0, combatantId: "a" }, { round: 1, turn: 1, combatantId: "b" })).toEqual([
+    expect(
+      turnTransitions({ round: 1, turn: 0, combatantId: "a" }, { round: 1, turn: 1, combatantId: "b" }),
+    ).toEqual([
       { event: "turnEnd", combatantId: "a", round: 1, turn: 0 },
-      { event: "turnStart", combatantId: "b", round: 1, turn: 1 }
+      { event: "turnStart", combatantId: "b", round: 1, turn: 1 },
     ]);
-    expect(turnTransitions({ round: 1, turn: 2, combatantId: "c" }, { round: 2, turn: 0, combatantId: "a" })).toHaveLength(2);
-    expect(turnTransitions({ round: 0, turn: null, combatantId: null }, { round: 1, turn: 0, combatantId: "a" })).toEqual([
-      { event: "turnStart", combatantId: "a", round: 1, turn: 0 }
-    ]);
-    expect(turnTransitions({ round: 2, turn: 1, combatantId: "b" }, { round: 2, turn: 0, combatantId: "a" })).toEqual([]);
-    expect(turnTransitions({ round: 2, turn: 1, combatantId: "b" }, { round: 2, turn: 1, combatantId: "b" })).toEqual([]);
+    expect(
+      turnTransitions({ round: 1, turn: 2, combatantId: "c" }, { round: 2, turn: 0, combatantId: "a" }),
+    ).toHaveLength(2);
+    expect(
+      turnTransitions({ round: 0, turn: null, combatantId: null }, { round: 1, turn: 0, combatantId: "a" }),
+    ).toEqual([{ event: "turnStart", combatantId: "a", round: 1, turn: 0 }]);
+    expect(
+      turnTransitions({ round: 2, turn: 1, combatantId: "b" }, { round: 2, turn: 0, combatantId: "a" }),
+    ).toEqual([]);
+    expect(
+      turnTransitions({ round: 2, turn: 1, combatantId: "b" }, { round: 2, turn: 1, combatantId: "b" }),
+    ).toEqual([]);
     expect(turnTransitions(null, null)).toEqual([]);
     expect(restEvent("short")).toBe("shortRest");
     expect(restEvent("long")).toBe("longRest");
@@ -98,7 +140,10 @@ describe("triggers & continuation pure helpers", () => {
     expect(once("b", 500)).toBe(true);
     expect(once("a", 2000)).toBe(true);
 
-    const enter = createBlueprint({ nodes: [makeNode("event", "regionEnter", "ev"), makeNode("result", "reminder", "r")], edges: [makeEdge("ev", "out", "r")] });
+    const enter = createBlueprint({
+      nodes: [makeNode("event", "regionEnter", "ev"), makeNode("result", "reminder", "r")],
+      edges: [makeEdge("ev", "out", "r")],
+    });
     const roll = createBlueprint({ nodes: [makeNode("event", "attackRoll", "ev")], edges: [] });
     expect(needsRegionBehavior([roll, enter])).toBe(true);
     expect(needsRegionBehavior([roll])).toBe(false);
@@ -109,30 +154,61 @@ describe("triggers & continuation pure helpers", () => {
       id: "aB3dE5gH7jK9mN1p",
       nodes: [
         makeNode("event", "damageRoll", "ev"),
-        makeNode("result", "rollBonus", "smite", { common: { optional: true, choiceGroup: "", cost: { type: "none" }, limit: "none", then: true } }),
+        makeNode("result", "rollBonus", "smite", {
+          common: { optional: true, choiceGroup: "", cost: { type: "none" }, limit: "none", then: true },
+        }),
         makeNode("result", "rollBonus", "plain"),
-        makeNode("result", "applyEffect", "blind")
+        makeNode("result", "applyEffect", "blind"),
       ],
-      edges: [makeEdge("ev", "out", "smite"), makeEdge("ev", "out", "plain"), makeEdge("smite", "then", "blind")]
+      edges: [
+        makeEdge("ev", "out", "smite"),
+        makeEdge("ev", "out", "plain"),
+        makeEdge("smite", "then", "blind"),
+      ],
     });
-    const entry = { compiled: compileBlueprint(blueprint), documentUuid: "Item.sword", actorUuid: "Actor.hero" } as unknown as ChainEntry;
+    const entry = {
+      compiled: compileBlueprint(blueprint),
+      documentUuid: "Item.sword",
+      actorUuid: "Actor.hero",
+    } as unknown as ChainEntry;
     const intent = (nodeId: string, then: boolean): ChainIntent => ({
-      blueprintId: blueprint.id, nodeId, type: "rollBonus", data: {}, eventNodeId: "ev", entry,
-      common: { optional: false, choiceGroup: nodeId, cost: {}, limit: "none", then }
+      blueprintId: blueprint.id,
+      nodeId,
+      type: "rollBonus",
+      data: {},
+      eventNodeId: "ev",
+      entry,
+      common: { optional: false, choiceGroup: nodeId, cost: {}, limit: "none", then },
     });
-    expect(continuationStarts([intent("smite", true), intent("plain", false), intent("plain", true)], "midi:card", "Token.foe")).toEqual([
-      { intent: intent("smite", true), key: "midi:card|Token.foe|aB3dE5gH7jK9mN1p|smite" }
-    ]);
-    expect(continuationStarts([intent("smite", true)], "ev1", null)[0]?.key).toBe("ev1|-|aB3dE5gH7jK9mN1p|smite");
+    expect(
+      continuationStarts(
+        [intent("smite", true), intent("plain", false), intent("plain", true)],
+        "midi:card",
+        "Token.foe",
+      ),
+    ).toEqual([{ intent: intent("smite", true), key: "midi:card|Token.foe|aB3dE5gH7jK9mN1p|smite" }]);
+    expect(continuationStarts([intent("smite", true)], "ev1", null)[0]?.key).toBe(
+      "ev1|-|aB3dE5gH7jK9mN1p|smite",
+    );
     expect(startsLater(intent("smite", true))).toBe(true);
     expect(startsLater(intent("plain", false))).toBe(false);
     expect(startsLater({ ...intent("plain", false), type: "demandSave" })).toBe(true);
   });
 });
 
-interface Doc { uuid: string; name: string }
-interface Token { document: Doc; actor: Doc }
-interface RollConfig { advantage?: boolean; disadvantage?: boolean; rolls?: Array<{ data?: Record<string, unknown> }> }
+interface Doc {
+  uuid: string;
+  name: string;
+}
+interface Token {
+  document: Doc;
+  actor: Doc;
+}
+interface RollConfig {
+  advantage?: boolean;
+  disadvantage?: boolean;
+  rolls?: Array<{ data?: Record<string, unknown> }>;
+}
 
 function harness(blueprints: BlueprintSource[]) {
   let idSeq = 0;
@@ -160,17 +236,26 @@ function harness(blueprints: BlueprintSource[]) {
   const makeEntry = (bp: BlueprintSource): [ChainEntry, PlaySourceInfo<Doc, Doc, Doc>] => {
     const compiled = compileBlueprint(bp);
     const entry: ChainEntry = {
-      compiled, documentUuid: sword.uuid, actorUuid: hero.uuid,
+      compiled,
+      documentUuid: sword.uuid,
+      actorUuid: hero.uuid,
       env: {
-        evaluateNumber: f => Number.isFinite(Number(f)) ? Number(f) : null,
-        replaceData: text => text,
+        evaluateNumber: (f) => (Number.isFinite(Number(f)) ? Number(f) : null),
+        replaceData: (text) => text,
         runScript: () => null,
         carrierItemUuid: sword.uuid,
         reach: () => passed("matched"),
-        limitAvailable: () => true
-      }
+        limitAvailable: () => true,
+      },
     };
-    const info: PlaySourceInfo<Doc, Doc, Doc> = { document: sword, kind: "self", blueprint: bp, owner: hero, origin: sword, carrierItem: sword };
+    const info: PlaySourceInfo<Doc, Doc, Doc> = {
+      document: sword,
+      kind: "self",
+      blueprint: bp,
+      owner: hero,
+      origin: sword,
+      carrierItem: sword,
+    };
     return [entry, info];
   };
 
@@ -182,40 +267,53 @@ function harness(blueprints: BlueprintSource[]) {
     randomId: () => `gen-${++idSeq}`,
     isActiveGM: () => activeGM,
     warn: () => {},
-    documentUuid: doc => doc.uuid,
-    documentName: doc => doc.name,
-    tokenDocumentUuid: token => token.document.uuid,
-    tokenActor: token => token.actor,
-    actorToken: actor => (actor.uuid === hero.uuid) ? heroToken : foeToken,
+    documentUuid: (doc) => doc.uuid,
+    documentName: (doc) => doc.name,
+    tokenDocumentUuid: (token) => token.document.uuid,
+    tokenActor: (token) => token.actor,
+    actorToken: (actor) => (actor.uuid === hero.uuid ? heroToken : foeToken),
     makeRoller: (actor, item, activity, target, details) => ({
-      actor, item, activity, token: heroToken, target, details, rollData: {}
+      actor,
+      item,
+      activity,
+      token: heroToken,
+      target,
+      details,
+      rollData: {},
     }),
     collect: () => ({ entries: entriesMap.map(([entry]) => entry), sources: new Map(entriesMap) }),
-    buildFacts: (event, roller) => rollFacts({
-      event,
-      actor: actorFacts({ uuid: roller.actor.uuid }),
-      target: roller.target ? creatureFacts() : null,
-      roll: rollDetails({ rollMode: roller.details.rollMode ?? null })
-    }),
+    buildFacts: (event, roller) =>
+      rollFacts({
+        event,
+        actor: actorFacts({ uuid: roller.actor.uuid }),
+        target: roller.target ? creatureFacts() : null,
+        roll: rollDetails({ rollMode: roller.details.rollMode ?? null }),
+      }),
     counterStore: (actor): CounterStore => ({ values: counterValues[actor?.uuid ?? ""] ?? {}, defs: {} }),
     callPreEvaluate: () => true,
     callEvaluate: () => {},
-    callPreApplyResult: intent => vetoResult ? vetoResult(intent) : true,
-    callApplyResult: intent => { appliedHooks.push(intent); },
-    recordUsage: async (actor, blueprintId, nodeId) => { usages.push({ actor: actor.uuid, blueprintId, nodeId }); },
+    callPreApplyResult: (intent) => (vetoResult ? vetoResult(intent) : true),
+    callApplyResult: (intent) => {
+      appliedHooks.push(intent);
+    },
+    recordUsage: async (actor, blueprintId, nodeId) => {
+      usages.push({ actor: actor.uuid, blueprintId, nodeId });
+    },
     originRollData: () => ({ prof: 3 }),
-    targetRollData: actor => ({ name: actor.name }),
+    targetRollData: (actor) => ({ name: actor.name }),
     resolveFormula: (formula, data) => formula.replace(/@prof/g, String(data.prof ?? 0)),
-    simplifyFormula: formula => {
+    simplifyFormula: (formula) => {
       if (!formula.trim()) return null;
-      const parts = formula.split("+").map(part => Number(part.trim()));
+      const parts = formula.split("+").map((part) => Number(part.trim()));
       return parts.every(Number.isFinite) ? parts.reduce((a, b) => a + b, 0) : null;
     },
     scaleFormula: (formula, _scaleFormula, _data, scale) => `${formula} + ${scale}d8`,
     injectTargetData: (config, targetData) => {
       for (const roll of config.rolls ?? []) roll.data = { ...roll.data, target: targetData };
     },
-    applyRollIntents: (config, intents) => { appliedRoll.push({ intents: [...intents], config }); },
+    applyRollIntents: (config, intents) => {
+      appliedRoll.push({ intents: [...intents], config });
+    },
     applySaveDC: () => {},
     setupRollDialog: (dialog, pendingId, hasChoices) => {
       const record = dialog as Record<string, unknown>;
@@ -226,34 +324,70 @@ function harness(blueprints: BlueprintSource[]) {
       syncedDialogs.push({ dialog, config });
     },
     useRiders: async () => {},
-    riderClock: () => ({ combatId: null, round: 0, turn: 0, shortRests: 0, longRests: 0, time: clockMs, combatants: 1 }),
-    performOperations: async ops => { performed.push(...ops); return true; },
+    riderClock: () => ({
+      combatId: null,
+      round: 0,
+      turn: 0,
+      shortRests: 0,
+      longRests: 0,
+      time: clockMs,
+      combatants: 1,
+    }),
+    performOperations: async (ops) => {
+      performed.push(...ops);
+      return true;
+    },
     whisperReminders: async (reminders, ctx) => {
       for (const intent of reminders) {
         whispered.push({ text: String(intent.data.text ?? ""), actor: ctx.roller.actor.uuid });
         whisperedDetails.push({
           text: String(intent.data.text ?? ""),
           audience: String(intent.data.audience ?? "auto"),
-          actor: ctx.roller.actor.uuid
+          actor: ctx.roller.actor.uuid,
         });
       }
     },
-    saversFor: (_intent, ctx) => ctx.roller.target ? [ctx.roller.target] : [foeToken],
+    saversFor: (_intent, ctx) => (ctx.roller.target ? [ctx.roller.target] : [foeToken]),
     requestSave: async () => saveOutcome,
-    resetCounters: async (actor, event) => { resetCalls.push({ actor: actor.uuid, event }); },
-    sendTrigger: (event, actorUuid, key) => { triggersSent.push({ event, actorUuid, key }); },
+    resetCounters: async (actor, event) => {
+      resetCalls.push({ actor: actor.uuid, event });
+    },
+    sendTrigger: (event, actorUuid, key) => {
+      triggersSent.push({ event, actorUuid, key });
+    },
     choiceData: (_info, _ctx, scale) => ({ prof: 3, scaling: scale }),
-    promptChoices: async () => {}
+    promptChoices: async () => {},
   };
 
   return {
     play: createPlay(adapter),
-    hero, foe, sword, foeToken, heroToken,
-    performed, whispered, whisperedDetails, appliedRoll, usages, resetCalls, triggersSent, appliedHooks, syncedDialogs, counterValues,
-    setClock: (ms: number) => { clockMs = ms; },
-    setGM: (gm: boolean) => { activeGM = gm; },
-    setVeto: (fn: (intent: ChainIntent) => boolean) => { vetoResult = fn; },
-    setSaveOutcome: (outcome: SaveOutcome | null) => { saveOutcome = outcome; }
+    hero,
+    foe,
+    sword,
+    foeToken,
+    heroToken,
+    performed,
+    whispered,
+    whisperedDetails,
+    appliedRoll,
+    usages,
+    resetCalls,
+    triggersSent,
+    appliedHooks,
+    syncedDialogs,
+    counterValues,
+    setClock: (ms: number) => {
+      clockMs = ms;
+    },
+    setGM: (gm: boolean) => {
+      activeGM = gm;
+    },
+    setVeto: (fn: (intent: ChainIntent) => boolean) => {
+      vetoResult = fn;
+    },
+    setSaveOutcome: (outcome: SaveOutcome | null) => {
+      saveOutcome = outcome;
+    },
   };
 }
 
@@ -267,16 +401,24 @@ describe("createPlay orchestration", () => {
         makeNode("event", "damageRoll", "ev"),
         makeNode("result", "rollBonus", "opt", {
           formula: "1d8",
-          common: { optional: true, choiceGroup: "smite", cost: { type: "none" }, limit: "turn", then: true }
+          common: { optional: true, choiceGroup: "smite", cost: { type: "none" }, limit: "turn", then: true },
         }),
-        makeNode("result", "applyEffect", "burn", { source: "status", status: "burning", who: "target" })
+        makeNode("result", "applyEffect", "burn", { source: "status", status: "burning", who: "target" }),
       ],
-      edges: [makeEdge("ev", "out", "opt"), makeEdge("opt", "then", "burn")]
+      edges: [makeEdge("ev", "out", "opt"), makeEdge("opt", "then", "burn")],
     });
     const env = harness([bp]);
     const config: RollConfig = { rolls: [{ data: {} }] };
     const dialog: Record<string, unknown> = {};
-    const roller = { actor: env.hero, item: env.sword, activity: null, token: env.heroToken, target: env.foeToken, details: {}, rollData: {} };
+    const roller = {
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      token: env.heroToken,
+      target: env.foeToken,
+      details: {},
+      rollData: {},
+    };
 
     env.play.preRoll("damageRoll", config, dialog, roller, "midi:c1");
     expect(dialog.configure).toBe(true);
@@ -287,7 +429,7 @@ describe("createPlay orchestration", () => {
 
     // Cancelled roll: spends nothing and stops continuations.
     env.play.postRoll(false, config);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
     expect(env.performed).toEqual([]);
     expect(env.usages).toEqual([]);
 
@@ -306,21 +448,36 @@ describe("createPlay orchestration", () => {
       nodes: [
         makeNode("event", "afterAttack", "ev"),
         makeNode("result", "rider", "ride", {
-          scope: "nextRoll", who: "self", roll: "damageRoll",
-          effect: { type: "diceModifiers", data: { amount: { enabled: true, mode: "add", value: "@prof" }, firstOnly: true } }
-        })
+          scope: "nextRoll",
+          who: "self",
+          roll: "damageRoll",
+          effect: {
+            type: "diceModifiers",
+            data: { amount: { enabled: true, mode: "add", value: "@prof" }, firstOnly: true },
+          },
+        }),
       ],
-      edges: [makeEdge("ev", "hit", "ride")]
+      edges: [makeEdge("ev", "hit", "ride")],
     });
     const env = harness([bp]);
     await env.play.runReaction({
-      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "midi:atk1"
+      event: "afterAttack",
+      pins: ["hit"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "midi:atk1",
     });
     expect(env.performed).toHaveLength(1);
     expect(env.performed[0]).toMatchObject({
       kind: "rider",
-      rider: { effect: { type: "diceModifiers", data: { amount: { enabled: true, mode: "add", value: "3" }, firstOnly: true } } }
+      rider: {
+        effect: {
+          type: "diceModifiers",
+          data: { amount: { enabled: true, mode: "add", value: "3" }, firstOnly: true },
+        },
+      },
     });
   });
 
@@ -329,10 +486,16 @@ describe("createPlay orchestration", () => {
       id: "SaveAndTurn00001",
       nodes: [
         makeNode("event", "turnStart", "ev"),
-        makeNode("result", "demandSave", "save", { ability: "con", dcMode: "formula", dc: "10 + @prof", who: "target", common: { limit: "turn" } }),
-        makeNode("result", "reminder", "rem", { text: "Check concentration @counters.focus" })
+        makeNode("result", "demandSave", "save", {
+          ability: "con",
+          dcMode: "formula",
+          dc: "10 + @prof",
+          who: "target",
+          common: { limit: "turn" },
+        }),
+        makeNode("result", "reminder", "rem", { text: "Check concentration @counters.focus" }),
       ],
-      edges: [makeEdge("ev", "out", "save"), makeEdge("save", "failed", "rem")]
+      edges: [makeEdge("ev", "out", "save"), makeEdge("save", "failed", "rem")],
     });
     const env = harness([bp]);
     env.counterValues["Actor.hero"] = { focus: 4 };
@@ -341,7 +504,7 @@ describe("createPlay orchestration", () => {
       id: "combat-1",
       previous: { round: 1, turn: 0, combatantId: "c0" },
       current: { round: 1, turn: 1, combatantId: "c1" },
-      combatant: id => (id === "c1") ? { actor: env.hero, token: env.heroToken } : null
+      combatant: (id) => (id === "c1" ? { actor: env.hero, token: env.heroToken } : null),
     });
     await vi.waitFor(() => expect(env.whispered).toHaveLength(1));
     expect(env.whispered[0]).toEqual({ text: "Check concentration 4", actor: "Actor.hero" });
@@ -364,18 +527,35 @@ describe("createPlay orchestration", () => {
       id: "DedupeReact00001",
       nodes: [
         makeNode("event", "afterAttack", "ev"),
-        makeNode("result", "resource", "heal", { action: "restore", resource: "hp", amount: "2", who: "self" })
+        makeNode("result", "resource", "heal", {
+          action: "restore",
+          resource: "hp",
+          amount: "2",
+          who: "self",
+        }),
       ],
-      edges: [makeEdge("ev", "hit", "heal")]
+      edges: [makeEdge("ev", "hit", "heal")],
     });
     const env = harness([bp]);
     await env.play.runReaction({
-      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "midi:x", dedupeKey: "afterAttack|midi:x|Token.foe"
+      event: "afterAttack",
+      pins: ["hit"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "midi:x",
+      dedupeKey: "afterAttack|midi:x|Token.foe",
     });
     await env.play.runReaction({
-      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "midi:x", dedupeKey: "afterAttack|midi:x|Token.foe"
+      event: "afterAttack",
+      pins: ["hit"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "midi:x",
+      dedupeKey: "afterAttack|midi:x|Token.foe",
     });
     expect(env.performed).toHaveLength(1);
   });
@@ -385,14 +565,17 @@ describe("createPlay orchestration", () => {
       id: "CombatStartBp001",
       nodes: [
         makeNode("event", "combatStart", "ev"),
-        makeNode("result", "reminder", "rem", { audience: "all", text: "Initiative!" })
+        makeNode("result", "reminder", "rem", { audience: "all", text: "Initiative!" }),
       ],
-      edges: [makeEdge("ev", "out", "rem")]
+      edges: [makeEdge("ev", "out", "rem")],
     });
     const env = harness([bp]);
 
     env.setGM(false);
-    await env.play.onCombatStart({ id: "cmb-1", combatants: [{ id: "c1", actor: env.hero, token: env.heroToken }] });
+    await env.play.onCombatStart({
+      id: "cmb-1",
+      combatants: [{ id: "c1", actor: env.hero, token: env.heroToken }],
+    });
     expect(env.whisperedDetails).toEqual([]);
 
     env.setGM(true);
@@ -401,8 +584,8 @@ describe("createPlay orchestration", () => {
       combatants: [
         { id: "c1", actor: env.hero, token: env.heroToken },
         { id: "c2", actor: env.hero, token: env.heroToken },
-        { id: "c3", actor: null, token: null }
-      ]
+        { id: "c3", actor: null, token: null },
+      ],
     });
     expect(env.whisperedDetails).toEqual([{ text: "Initiative!", audience: "all", actor: "Actor.hero" }]);
   });
@@ -415,35 +598,53 @@ describe("createPlay orchestration", () => {
         makeNode("result", "rollAdvantage", "adv", { mode: "advantage" }),
         makeNode("event", "afterAttack", "after"),
         makeNode("result", "rider", "ride", {
-          scope: "nextRoll", who: "self", roll: "savingThrow",
-          effect: { type: "rollAdvantage", data: { mode: "disadvantage" } }
-        })
+          scope: "nextRoll",
+          who: "self",
+          roll: "savingThrow",
+          effect: { type: "rollAdvantage", data: { mode: "disadvantage" } },
+        }),
       ],
-      edges: [makeEdge("ev", "out", "adv"), makeEdge("after", "hit", "ride")]
+      edges: [makeEdge("ev", "out", "adv"), makeEdge("after", "hit", "ride")],
     });
     const bpRem = createBlueprint({
       id: "RemFilterBp00001",
       nodes: [
         makeNode("event", "abilityCheck", "ev"),
         makeNode("result", "reminder", "shown", { audience: "auto", text: "In dialog" }),
-        makeNode("result", "reminder", "pub", { audience: "all", text: "Public note" })
+        makeNode("result", "reminder", "pub", { audience: "all", text: "Public note" }),
       ],
-      edges: [makeEdge("ev", "out", "shown"), makeEdge("ev", "out", "pub")]
+      edges: [makeEdge("ev", "out", "shown"), makeEdge("ev", "out", "pub")],
     });
     const env = harness([bpAdv, bpRem]);
-    const roller = { actor: env.hero, item: env.sword, activity: null, token: env.heroToken, target: env.foeToken, details: {}, rollData: {} };
+    const roller = {
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      token: env.heroToken,
+      target: env.foeToken,
+      details: {},
+      rollData: {},
+    };
 
     // rollAdvantage calls syncRollDialog even without choices/reminders; riders accept rollAdvantage.
     const atkConfig: RollConfig = { rolls: [{}] };
     const atkDialog: Record<string, unknown> = {};
     env.play.preRoll("attackRoll", atkConfig, atkDialog, roller, null);
     expect(env.syncedDialogs).toHaveLength(1);
-    expect(env.appliedRoll[0]?.intents.map(i => i.type)).toEqual(["rollAdvantage"]);
+    expect(env.appliedRoll[0]?.intents.map((i) => i.type)).toEqual(["rollAdvantage"]);
     await env.play.runReaction({
-      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "act1"
+      event: "afterAttack",
+      pins: ["hit"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "act1",
     });
-    expect(env.performed[0]).toMatchObject({ kind: "rider", rider: { effect: { type: "rollAdvantage", data: { mode: "disadvantage" } } } });
+    expect(env.performed[0]).toMatchObject({
+      kind: "rider",
+      rider: { effect: { type: "rollAdvantage", data: { mode: "disadvantage" } } },
+    });
 
     // Dialog shown for `shown`, skipped for `pub` -> only `pub` posts on submit.
     const cfg1: RollConfig = { rolls: [{}] };
@@ -477,15 +678,30 @@ describe("createPlay orchestration", () => {
         makeNode("result", "rollBonus", "sneak", { formula: "2d6" }),
         makeNode("event", "afterDamage", "afterDmg"),
         makeCondition("notDis", [{ id: "c2", type: "rollModes", data: { values: ["!disadvantage"] } }]),
-        makeNode("result", "resource", "heal", { action: "restore", resource: "hp", amount: "3", who: "self" })
+        makeNode("result", "resource", "heal", {
+          action: "restore",
+          resource: "hp",
+          amount: "3",
+          who: "self",
+        }),
       ],
       edges: [
-        makeEdge("dmg", "out", "adv"), makeEdge("adv", "yes", "sneak"),
-        makeEdge("afterDmg", "dealt", "notDis"), makeEdge("notDis", "yes", "heal")
-      ]
+        makeEdge("dmg", "out", "adv"),
+        makeEdge("adv", "yes", "sneak"),
+        makeEdge("afterDmg", "dealt", "notDis"),
+        makeEdge("notDis", "yes", "heal"),
+      ],
     });
     const env = harness([bp]);
-    const roller = { actor: env.hero, item: env.sword, activity: null, token: env.heroToken, target: env.foeToken, details: {}, rollData: {} };
+    const roller = {
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      token: env.heroToken,
+      target: env.foeToken,
+      details: {},
+      rollData: {},
+    };
 
     // Cancelled attack roll records nothing for the activation.
     const cancelledAtk: RollConfig = { advantage: true, rolls: [{}] };
@@ -501,7 +717,7 @@ describe("createPlay orchestration", () => {
 
     env.play.preRoll("damageRoll", { rolls: [{}] }, {}, roller, "message:m1");
     expect(env.appliedRoll).toHaveLength(1);
-    expect(env.appliedRoll[0]?.intents.map(i => i.nodeId)).toEqual(["sneak"]);
+    expect(env.appliedRoll[0]?.intents.map((i) => i.nodeId)).toEqual(["sneak"]);
 
     // Unrelated activation does not inherit message:m1's attack rollMode.
     env.play.preRoll("damageRoll", { rolls: [{}] }, {}, roller, "message:m2");
@@ -509,20 +725,36 @@ describe("createPlay orchestration", () => {
 
     // afterDamage on message:m1 inherits the attack's rollMode; disadvantageous afterAttack overwrites it.
     await env.play.runReaction({
-      event: "afterDamage", pins: ["dealt"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "message:m1"
+      event: "afterDamage",
+      pins: ["dealt"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "message:m1",
     });
     expect(env.performed).toHaveLength(1);
     expect(env.performed[0]).toMatchObject({ kind: "resource", resource: "hp", delta: 3 });
 
     env.performed.length = 0;
     await env.play.runReaction({
-      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "message:m1", details: { rollMode: "disadvantage" }
+      event: "afterAttack",
+      pins: ["hit"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "message:m1",
+      details: { rollMode: "disadvantage" },
     });
     await env.play.runReaction({
-      event: "afterDamage", pins: ["dealt"], actor: env.hero, item: env.sword, activity: null,
-      target: env.foeToken, activation: "message:m1"
+      event: "afterDamage",
+      pins: ["dealt"],
+      actor: env.hero,
+      item: env.sword,
+      activity: null,
+      target: env.foeToken,
+      activation: "message:m1",
     });
     expect(env.performed).toEqual([]);
   });

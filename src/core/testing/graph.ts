@@ -3,12 +3,21 @@ import type { BlueprintEdge, BlueprintNode, ConditionCheck } from "../blueprint/
 import type { NodeKind, PinId } from "../registry/constants";
 
 /** A node with a fixed id whose data is merged over the registry defaults. */
-export function makeNode(kind: NodeKind, type: string, id: string, data: Record<string, unknown> = {}): BlueprintNode {
+export function makeNode(
+  kind: NodeKind,
+  type: string,
+  id: string,
+  data: Record<string, unknown> = {},
+): BlueprintNode {
   const node = createNode(kind, type);
   return { ...node, id, data: { ...node.data, ...data } };
 }
 
-export function makeCondition(id: string, checks: ConditionCheck[], mode: "all" | "any" = "all"): BlueprintNode {
+export function makeCondition(
+  id: string,
+  checks: ConditionCheck[],
+  mode: "all" | "any" = "all",
+): BlueprintNode {
   return makeNode("condition", "condition", id, { mode, checks });
 }
 

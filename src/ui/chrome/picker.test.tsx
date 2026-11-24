@@ -9,7 +9,10 @@ import { TemplatePicker } from "./TemplatePicker";
 
 const saved = createBlueprint({ id: "LiBr5gH7jK9mN1p0", name: "Table favourite" });
 
-function library(canEdit: boolean, entries: BlueprintSource[] = [saved]): LibraryHost & { removed: string[]; imported: string[] } {
+function library(
+  canEdit: boolean,
+  entries: BlueprintSource[] = [saved],
+): LibraryHost & { removed: string[]; imported: string[] } {
   const removed: string[] = [];
   const imported: string[] = [];
   return {
@@ -18,16 +21,16 @@ function library(canEdit: boolean, entries: BlueprintSource[] = [saved]): Librar
     entries: () => entries,
     canEdit: () => canEdit,
     add: vi.fn(() => Promise.resolve()),
-    remove: id => {
+    remove: (id) => {
       removed.push(id);
       return Promise.resolve();
     },
-    import: text => {
+    import: (text) => {
       imported.push(text);
       return Promise.resolve({ blueprints: [saved], rejected: 0, error: null });
     },
     download: vi.fn(),
-    subscribe: () => () => {}
+    subscribe: () => () => {},
   };
 }
 
@@ -46,7 +49,10 @@ describe("TemplatePicker", () => {
 
   it("offers library entries and hides the library tab without a library", async () => {
     const onPick = vi.fn();
-    const { unmount } = renderWithServices(<TemplatePicker initialTab="library" onPick={onPick} onClose={vi.fn()} />, { host: { library: library(false) } });
+    const { unmount } = renderWithServices(
+      <TemplatePicker initialTab="library" onPick={onPick} onClose={vi.fn()} />,
+      { host: { library: library(false) } },
+    );
     await userEvent.click(screen.getByRole("button", { name: /Table favourite/ }));
     expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ name: "Table favourite" }));
     expect(screen.queryByRole("button", { name: "Import JSON…" })).toBeNull();
@@ -58,7 +64,9 @@ describe("TemplatePicker", () => {
 
   it("lets the GM remove, export and import", async () => {
     const host = library(true);
-    renderWithServices(<TemplatePicker initialTab="library" onPick={vi.fn()} onClose={vi.fn()} />, { host: { library: host } });
+    renderWithServices(<TemplatePicker initialTab="library" onPick={vi.fn()} onClose={vi.fn()} />, {
+      host: { library: host },
+    });
     await userEvent.click(screen.getByRole("button", { name: "Remove “Table favourite” from the library" }));
     await userEvent.click(screen.getByRole("button", { name: "Remove for good" }));
     expect(host.removed).toEqual([saved.id]);

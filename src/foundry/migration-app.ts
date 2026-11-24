@@ -1,10 +1,20 @@
 import { MODULE_SCOPE } from "../core/storage/repository";
-import { deleteBackups, migrationPacks, runMigration, scanMigration, type MigrationReport } from "./migration";
+import {
+  deleteBackups,
+  migrationPacks,
+  runMigration,
+  scanMigration,
+  type MigrationReport,
+} from "./migration";
 import { log } from "../core/log";
 
 type Step = "choose" | "report" | "running" | "done";
 
-function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text?: string): HTMLElementTagNameMap[K] {
+function element<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className = "",
+  text?: string,
+): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
@@ -29,7 +39,7 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
     id: "bna-migration",
     classes: ["bna-migration-window"],
     window: { title: "BNA.Migration.title", icon: "fa-solid fa-diagram-project", resizable: true },
-    position: { width: 620, height: 640 }
+    position: { width: 620, height: 640 },
   };
 
   #step: Step = "choose";
@@ -41,7 +51,8 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
 
   async _renderHTML(): Promise<HTMLElement> {
     const root = element("div", "bna-migration bna-surface");
-    const t = (key: string, data?: Record<string, unknown>) => (data ? game.i18n.format(key, data) : game.i18n.localize(key));
+    const t = (key: string, data?: Record<string, unknown>) =>
+      data ? game.i18n.format(key, data) : game.i18n.localize(key);
 
     if (this.#step === "choose") {
       root.append(element("p", "", t("BNA.Migration.intro")));
@@ -70,32 +81,57 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
 
     if (this.#report && (this.#step === "report" || this.#step === "done")) {
       const report = this.#report;
-      const summaryKey = (this.#step === "done") ? "BNA.Migration.doneSummary" : "BNA.Migration.scanSummary";
-      root.append(element("p", "bna-migration__summary", t(summaryKey, {
-        documents: report.documents, converted: report.converted, repaired: report.repaired, failed: report.failed, errors: report.errors
-      })));
-      if (!report.entries.length) root.append(element("p", "bna-migration__muted", t("BNA.Migration.nothing")));
+      const summaryKey = this.#step === "done" ? "BNA.Migration.doneSummary" : "BNA.Migration.scanSummary";
+      root.append(
+        element(
+          "p",
+          "bna-migration__summary",
+          t(summaryKey, {
+            documents: report.documents,
+            converted: report.converted,
+            repaired: report.repaired,
+            failed: report.failed,
+            errors: report.errors,
+          }),
+        ),
+      );
+      if (!report.entries.length)
+        root.append(element("p", "bna-migration__muted", t("BNA.Migration.nothing")));
       const list = element("ul", "bna-migration__list");
       for (const entry of report.entries) {
         const item = element("li", entry.error ? "is-error" : "");
         const open = element("button", "bna-migration__link", entry.label);
         open.type = "button";
         open.addEventListener("click", () => {
-          void fromUuid(entry.uuid).then(found => {
-            const sheet = (found as { sheet?: { render(options: Record<string, unknown>): unknown } } | null)?.sheet;
+          void fromUuid(entry.uuid).then((found) => {
+            const sheet = (found as { sheet?: { render(options: Record<string, unknown>): unknown } } | null)
+              ?.sheet;
             sheet?.render({ force: true });
           });
         });
-        item.append(open, element("span", "bna-migration__muted", entry.error
-          ? t("BNA.Migration.entryError", { error: entry.error })
-          : t("BNA.Migration.entry", { type: documentType(entry.documentName), converted: entry.converted, repaired: entry.repaired, failed: entry.failed })));
+        item.append(
+          open,
+          element(
+            "span",
+            "bna-migration__muted",
+            entry.error
+              ? t("BNA.Migration.entryError", { error: entry.error })
+              : t("BNA.Migration.entry", {
+                  type: documentType(entry.documentName),
+                  converted: entry.converted,
+                  repaired: entry.repaired,
+                  failed: entry.failed,
+                }),
+          ),
+        );
         list.append(item);
       }
       root.append(list);
       const actions = element("div", "bna-migration__actions");
       if (this.#step === "report") {
         actions.append(button(t("BNA.Migration.back"), () => this.#go("choose")));
-        if (report.converted || report.repaired) actions.append(button(t("BNA.Migration.run"), () => void this.#run(), true));
+        if (report.converted || report.repaired)
+          actions.append(button(t("BNA.Migration.run"), () => void this.#run(), true));
       }
       actions.append(button(t("BNA.Migration.deleteBackups"), () => void this.#deleteBackups()));
       root.append(actions);
@@ -110,7 +146,7 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
     }
 
     if (this.#note) root.append(element("p", "bna-migration__note", this.#note));
-    root.querySelectorAll("button").forEach(node => {
+    root.querySelectorAll("button").forEach((node) => {
       node.disabled = this.#busy;
     });
     return root;
@@ -148,14 +184,16 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
         onProgress: (done, total) => {
           this.#progress = [done, total];
           void this.render();
-        }
+        },
       });
       this.#step = "done";
     } catch (error) {
       // Only a pack that cannot be opened gets here; each document already fails on its own.
       log.error("the migration stopped", error);
       this.#step = "report";
-      this.#note = game.i18n.format("BNA.Migration.entryError", { error: (error instanceof Error) ? error.message : String(error) });
+      this.#note = game.i18n.format("BNA.Migration.entryError", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     void this.render();
   }
@@ -163,7 +201,7 @@ export class MigrationApp extends foundry.applications.api.ApplicationV2 {
   async #deleteBackups(): Promise<void> {
     const confirmed = await foundry.applications.api.DialogV2.confirm({
       window: { title: "BNA.Migration.deleteBackups" },
-      content: `<p>${game.i18n.localize("BNA.Migration.deleteBackupsConfirm")}</p>`
+      content: `<p>${game.i18n.localize("BNA.Migration.deleteBackupsConfirm")}</p>`,
     });
     if (!confirmed) return;
     this.#busy = true;
@@ -186,6 +224,6 @@ export function registerMigrationMenu(): void {
     hint: "BNA.Setting.migration.hint",
     icon: "fa-solid fa-diagram-project",
     type: MigrationApp,
-    restricted: true
+    restricted: true,
   });
 }

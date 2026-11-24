@@ -25,10 +25,11 @@ export interface ValidationIssue {
   code: ValidationCode;
 }
 
-export type ValidationResult = { ok: true; value: BlueprintSource } | { ok: false; issues: ValidationIssue[] };
+export type ValidationResult =
+  { ok: true; value: BlueprintSource } | { ok: false; issues: ValidationIssue[] };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return (typeof value === "object") && (value !== null) && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -47,16 +48,22 @@ export function validateBlueprintSource(input: unknown): ValidationResult {
     if (typeof input[key] !== "string") report(key, "invalidField");
   }
   if (typeof input.enabled !== "boolean") report("enabled", "invalidField");
-  if ((typeof input.sort !== "number") || !Number.isFinite(input.sort)) report("sort", "invalidField");
+  if (typeof input.sort !== "number" || !Number.isFinite(input.sort)) report("sort", "invalidField");
   if (!isRecord(input.flags)) report("flags", "invalidField");
   if (input.counters !== undefined) {
     if (!Array.isArray(input.counters)) report("counters", "invalidField");
-    else input.counters.forEach((entry: unknown, index: number) => {
-      const ok = isRecord(entry) && (typeof entry.name === "string") && !!entry.name.trim()
-        && (typeof entry.min === "number") && ((entry.max === null) || (typeof entry.max === "number"))
-        && (typeof entry.initial === "number") && COUNTER_RESETS.includes(entry.reset as CounterReset);
-      if (!ok) report(`counters.${index}`, "invalidField");
-    });
+    else
+      input.counters.forEach((entry: unknown, index: number) => {
+        const ok =
+          isRecord(entry) &&
+          typeof entry.name === "string" &&
+          !!entry.name.trim() &&
+          typeof entry.min === "number" &&
+          (entry.max === null || typeof entry.max === "number") &&
+          typeof entry.initial === "number" &&
+          COUNTER_RESETS.includes(entry.reset as CounterReset);
+        if (!ok) report(`counters.${index}`, "invalidField");
+      });
   }
 
   const nodes = new Map<string, { kind: NodeKind; type: string; data: Record<string, unknown> }>();
@@ -64,14 +71,14 @@ export function validateBlueprintSource(input: unknown): ValidationResult {
   if (!Array.isArray(input.nodes)) report("nodes", "invalidField");
   rawNodes.forEach((node, index) => {
     const path = `nodes.${index}`;
-    if (!isRecord(node) || (typeof node.id !== "string") || !node.id) return report(path, "invalidField");
+    if (!isRecord(node) || typeof node.id !== "string" || !node.id) return report(path, "invalidField");
     if (nodes.has(node.id)) return report(`${path}.id`, "duplicateNodeId");
     if (!NODE_KINDS.includes(node.kind as NodeKind)) return report(`${path}.kind`, "unknownKind");
     const kind = node.kind as NodeKind;
-    const type = (typeof node.type === "string") ? node.type : "";
+    const type = typeof node.type === "string" ? node.type : "";
     if (!hasDefinition(kind, type)) report(`${path}.type`, "unknownType");
     const position = node.position;
-    if (!isRecord(position) || (typeof position.x !== "number") || (typeof position.y !== "number")) {
+    if (!isRecord(position) || typeof position.x !== "number" || typeof position.y !== "number") {
       report(`${path}.position`, "invalidField");
     }
     if (!isRecord(node.data)) report(`${path}.data`, "invalidField");
@@ -84,8 +91,13 @@ export function validateBlueprintSource(input: unknown): ValidationResult {
   if (!Array.isArray(input.edges)) report("edges", "invalidField");
   rawEdges.forEach((edge, index) => {
     const path = `edges.${index}`;
-    if (!isRecord(edge) || (typeof edge.id !== "string") || (typeof edge.source !== "string")
-      || (typeof edge.target !== "string") || (typeof edge.sourcePin !== "string")) {
+    if (
+      !isRecord(edge) ||
+      typeof edge.id !== "string" ||
+      typeof edge.source !== "string" ||
+      typeof edge.target !== "string" ||
+      typeof edge.sourcePin !== "string"
+    ) {
       return report(path, "invalidField");
     }
     if (edgeIds.has(edge.id)) return report(`${path}.id`, "duplicateEdgeId");
@@ -93,10 +105,11 @@ export function validateBlueprintSource(input: unknown): ValidationResult {
     const source = nodes.get(edge.source);
     const target = nodes.get(edge.target);
     if (!source || !target) return report(path, "danglingEdge");
-    if ((target.kind === "event") || (edge.source === edge.target) || (edge.targetPin !== "in")) {
+    if (target.kind === "event" || edge.source === edge.target || edge.targetPin !== "in") {
       return report(path, "invalidDirection");
     }
-    if (!outputPins(source).includes(edge.sourcePin as PinId)) return report(`${path}.sourcePin`, "invalidPin");
+    if (!outputPins(source).includes(edge.sourcePin as PinId))
+      return report(`${path}.sourcePin`, "invalidPin");
     if (wouldCreateCycle(accepted, edge.source, edge.target)) return report(path, "cycle");
     accepted.push({ source: edge.source, target: edge.target });
   });

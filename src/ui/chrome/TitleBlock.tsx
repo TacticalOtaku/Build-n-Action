@@ -29,15 +29,26 @@ const EFFECT_STATE_KEYS: Record<EffectStatus["state"], string> = {
   active: "BNA.UI.Stamp.effectActive",
   disabled: "BNA.UI.Stamp.effectDisabled",
   expired: "BNA.UI.Stamp.effectExpired",
-  suppressed: "BNA.UI.Stamp.effectSuppressed"
+  suppressed: "BNA.UI.Stamp.effectSuppressed",
 };
 
-export function TitleBlock({ blueprint, carrier, saving, lint, onShowIssues, effect, dispatch }: TitleBlockProps) {
+export function TitleBlock({
+  blueprint,
+  carrier,
+  saving,
+  lint,
+  onShowIssues,
+  effect,
+  dispatch,
+}: TitleBlockProps) {
   const t = useT();
   const { fmt } = useServices();
   const sentences = useMemo(() => describeBlueprint(blueprint, fmt), [blueprint, fmt]);
   const { counters } = useHost();
-  const subscribe = useCallback((listener: () => void) => counters?.subscribe(listener) ?? (() => undefined), [counters]);
+  const subscribe = useCallback(
+    (listener: () => void) => counters?.subscribe(listener) ?? (() => undefined),
+    [counters],
+  );
   // A string snapshot compares by value, so unchanged values do not re-render.
   const snapshot = useSyncExternalStore(subscribe, () => JSON.stringify(counters?.rows(blueprint) ?? []));
   const rows = useMemo(() => JSON.parse(snapshot) as CounterRow[], [snapshot]);
@@ -50,59 +61,102 @@ export function TitleBlock({ blueprint, carrier, saving, lint, onShowIssues, eff
         aria-label={t("BNA.UI.Stamp.name")}
         placeholder={t("BNA.UI.Stamp.namePlaceholder")}
         value={blueprint.name}
-        onChange={event => dispatch({ type: "rename", name: event.target.value })}
+        onChange={(event) => dispatch({ type: "rename", name: event.target.value })}
       />
       <div className="bna-stamp__phrase" aria-live="polite">
-        {sentences.length
-          ? sentences.map((sentence, index) => <p key={index}>{sentence}</p>)
-          : <p>{t("BNA.UI.Stamp.emptyPhrase")}</p>}
+        {sentences.length ? (
+          sentences.map((sentence, index) => <p key={index}>{sentence}</p>)
+        ) : (
+          <p>{t("BNA.UI.Stamp.emptyPhrase")}</p>
+        )}
       </div>
       <div className="bna-stamp__issues">
         <span className="bna-stamp__label">{t("BNA.UI.Stamp.issues")}</span>
-        {(lint.error + lint.warning + lint.info) ? (
+        {lint.error + lint.warning + lint.info ? (
           <button
             type="button"
             className="bna-stamp__marks"
-            aria-label={t("BNA.UI.Stamp.showIssues", { errors: lint.error, warnings: lint.warning, notes: lint.info })}
+            aria-label={t("BNA.UI.Stamp.showIssues", {
+              errors: lint.error,
+              warnings: lint.warning,
+              notes: lint.info,
+            })}
             onClick={onShowIssues}
           >
-            {LINT_LEVELS.filter(level => lint[level] > 0).map(level => <LintMark key={level} level={level} count={lint[level]} />)}
+            {LINT_LEVELS.filter((level) => lint[level] > 0).map((level) => (
+              <LintMark key={level} level={level} count={lint[level]} />
+            ))}
           </button>
-        ) : <span>{t("BNA.UI.Stamp.noIssues")}</span>}
+        ) : (
+          <span>{t("BNA.UI.Stamp.noIssues")}</span>
+        )}
       </div>
       {counters ? (
         <div className="bna-stamp__counters">
           <span className="bna-stamp__label">{t("BNA.UI.Counters.title")}</span>
-          {rows.length ? rows.map(row => (
-            <span key={`${row.scope}:${row.name}`} className="bna-stamp__counter">
-              <span>{`${row.name}: ${row.value}`}</span>
-              <button
-                type="button"
-                className="bna-iconbtn"
-                aria-label={t("BNA.UI.Counters.reset", { name: row.name })}
-                title={t("BNA.UI.Counters.reset", { name: row.name })}
-                onClick={() => void counters.reset(blueprint, row)}
-              >
-                <Icon name="undo-2" size={12} />
-              </button>
-            </span>
-          )) : <span>{t("BNA.UI.Counters.none")}</span>}
-          <button type="button" className="bna-stamp__effect-open" aria-label={t("BNA.UI.Counters.setup")} onClick={event => setSetup(event.currentTarget.closest(".bna-app") ?? event.currentTarget.ownerDocument.body)}>
+          {rows.length ? (
+            rows.map((row) => (
+              <span key={`${row.scope}:${row.name}`} className="bna-stamp__counter">
+                <span>{`${row.name}: ${row.value}`}</span>
+                <button
+                  type="button"
+                  className="bna-iconbtn"
+                  aria-label={t("BNA.UI.Counters.reset", { name: row.name })}
+                  title={t("BNA.UI.Counters.reset", { name: row.name })}
+                  onClick={() => void counters.reset(blueprint, row)}
+                >
+                  <Icon name="undo-2" size={12} />
+                </button>
+              </span>
+            ))
+          ) : (
+            <span>{t("BNA.UI.Counters.none")}</span>
+          )}
+          <button
+            type="button"
+            className="bna-stamp__effect-open"
+            aria-label={t("BNA.UI.Counters.setup")}
+            onClick={(event) =>
+              setSetup(event.currentTarget.closest(".bna-app") ?? event.currentTarget.ownerDocument.body)
+            }
+          >
             {t("BNA.UI.Counters.setupShort")}
           </button>
         </div>
       ) : null}
-      {(counters && setup)
-        ? createPortal(<CountersDialog blueprint={blueprint} counters={counters} dispatch={dispatch} onClose={() => setSetup(null)} />, setup)
+      {counters && setup
+        ? createPortal(
+            <CountersDialog
+              blueprint={blueprint}
+              counters={counters}
+              dispatch={dispatch}
+              onClose={() => setSetup(null)}
+            />,
+            setup,
+          )
         : null}
       {effect ? (
         <div className="bna-stamp__effect" data-state={effect.state}>
           <span className="bna-stamp__label">{t("BNA.UI.Stamp.effect")}</span>
           <span className="bna-stamp__effect-state">{t(EFFECT_STATE_KEYS[effect.state])}</span>
-          {effect.disableCondition ? <span className="bna-stamp__effect-rule">{t("BNA.UI.Stamp.effectDisableWhen", { condition: effect.disableCondition })}</span> : null}
-          {effect.enableCondition ? <span className="bna-stamp__effect-rule">{t("BNA.UI.Stamp.effectRemoveUnless", { condition: effect.enableCondition })}</span> : null}
-          {effect.specialDurations.length ? <span className="bna-stamp__effect-rule">{t("BNA.UI.Stamp.effectEndsOn", { list: effect.specialDurations.join(", ") })}</span> : null}
-          <button type="button" className="bna-stamp__effect-open" onClick={effect.openConfig}>{t("BNA.UI.Stamp.effectConfig")}</button>
+          {effect.disableCondition ? (
+            <span className="bna-stamp__effect-rule">
+              {t("BNA.UI.Stamp.effectDisableWhen", { condition: effect.disableCondition })}
+            </span>
+          ) : null}
+          {effect.enableCondition ? (
+            <span className="bna-stamp__effect-rule">
+              {t("BNA.UI.Stamp.effectRemoveUnless", { condition: effect.enableCondition })}
+            </span>
+          ) : null}
+          {effect.specialDurations.length ? (
+            <span className="bna-stamp__effect-rule">
+              {t("BNA.UI.Stamp.effectEndsOn", { list: effect.specialDurations.join(", ") })}
+            </span>
+          ) : null}
+          <button type="button" className="bna-stamp__effect-open" onClick={effect.openConfig}>
+            {t("BNA.UI.Stamp.effectConfig")}
+          </button>
         </div>
       ) : null}
       <div className="bna-stamp__cell">
@@ -120,10 +174,12 @@ export function TitleBlock({ blueprint, carrier, saving, lint, onShowIssues, eff
           onClick={() => dispatch({ type: "setEnabled", enabled: !blueprint.enabled })}
         >
           {blueprint.enabled
-            ? t((effect && (effect.state !== "active")) ? "BNA.UI.Stamp.onWaiting" : "BNA.UI.Stamp.on")
+            ? t(effect && effect.state !== "active" ? "BNA.UI.Stamp.onWaiting" : "BNA.UI.Stamp.on")
             : t("BNA.UI.Stamp.off")}
         </button>
-        <span className="bna-stamp__label">{saving ? t("BNA.UI.Stamp.saving") : t("BNA.UI.Stamp.saved")}</span>
+        <span className="bna-stamp__label">
+          {saving ? t("BNA.UI.Stamp.saving") : t("BNA.UI.Stamp.saved")}
+        </span>
       </div>
     </section>
   );

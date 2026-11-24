@@ -8,7 +8,7 @@ import { carrierItem, isDocument } from "./documents";
 
 export const foundryTranslator: Translator = {
   t: (key, data) => (data ? game.i18n.format(key, data) : game.i18n.localize(key)),
-  has: key => game.i18n.has(key)
+  has: (key) => game.i18n.has(key),
 };
 
 function sourceData(carrier: FoundryDocument | null): ChoiceSourceData {
@@ -18,8 +18,10 @@ function sourceData(carrier: FoundryDocument | null): ChoiceSourceData {
     statusEffects: CONFIG.statusEffects,
     itemTypes: Object.fromEntries(Object.entries(CONFIG.Item.typeLabels).filter(([type]) => type !== "base")),
     trees: traitTrees(),
-    effects: listOf(read(effectsOwner, "effects")).filter(isDocument).map(effect => ({ id: effect.id, name: effect.name })),
-    localize: key => game.i18n.localize(key)
+    effects: listOf(read(effectsOwner, "effects"))
+      .filter(isDocument)
+      .map((effect) => ({ id: effect.id, name: effect.name })),
+    localize: (key) => game.i18n.localize(key),
   };
 }
 
@@ -36,6 +38,6 @@ export function foundryChoices(carrier: FoundryDocument | null = null): ChoicePr
         cache.set(source, list);
       }
       return list;
-    }
+    },
   };
 }

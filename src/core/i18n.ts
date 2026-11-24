@@ -11,13 +11,17 @@ export interface TranslatorOptions {
   strict?: boolean;
 }
 
-export function createTranslator(dictionary: unknown, { strict = false }: TranslatorOptions = {}): Translator {
-  const lookup = (key: string): unknown => key.split(".").reduce<unknown>((node, part) => {
-    return (node && (typeof node === "object")) ? (node as Record<string, unknown>)[part] : undefined;
-  }, dictionary);
+export function createTranslator(
+  dictionary: unknown,
+  { strict = false }: TranslatorOptions = {},
+): Translator {
+  const lookup = (key: string): unknown =>
+    key.split(".").reduce<unknown>((node, part) => {
+      return node && typeof node === "object" ? (node as Record<string, unknown>)[part] : undefined;
+    }, dictionary);
 
   return {
-    has: key => typeof lookup(key) === "string",
+    has: (key) => typeof lookup(key) === "string",
     t(key, data) {
       const template = lookup(key);
       if (typeof template !== "string") {
@@ -25,7 +29,9 @@ export function createTranslator(dictionary: unknown, { strict = false }: Transl
         return key;
       }
       if (!data) return template;
-      return template.replace(/\{(\w+)\}/g, (match, name: string) => (name in data ? String(data[name]) : match));
-    }
+      return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+        name in data ? String(data[name]) : match,
+      );
+    },
   };
 }

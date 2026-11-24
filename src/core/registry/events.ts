@@ -11,38 +11,61 @@ function reachField(modes: readonly StaticChoice[], text = "reach"): FieldSpec {
     hint: `BNA.Field.${text}.hint`,
     fields: [
       {
-        key: "mode", kind: "select", label: "BNA.Field.reachMode.label", hint: `BNA.Field.${text}Mode.hint`,
-        default: "self", choices: { static: modes }
+        key: "mode",
+        kind: "select",
+        label: "BNA.Field.reachMode.label",
+        hint: `BNA.Field.${text}Mode.hint`,
+        default: "self",
+        choices: { static: modes },
       },
       {
-        key: "range", kind: "formula", label: "BNA.Field.reachRange.label", hint: "BNA.Field.reachRange.hint",
-        default: "10", visibleWhen: { key: "mode", in: ["aura"] }
+        key: "range",
+        kind: "formula",
+        label: "BNA.Field.reachRange.label",
+        hint: "BNA.Field.reachRange.hint",
+        default: "10",
+        visibleWhen: { key: "mode", in: ["aura"] },
       },
       {
-        key: "disposition", kind: "select", label: "BNA.Field.reachDisposition.label",
-        hint: "BNA.Field.reachDisposition.hint", default: "1", choices: { static: STATIC.disposition },
-        visibleWhen: { key: "mode", in: ["aura", "template"] }
+        key: "disposition",
+        kind: "select",
+        label: "BNA.Field.reachDisposition.label",
+        hint: "BNA.Field.reachDisposition.hint",
+        default: "1",
+        choices: { static: STATIC.disposition },
+        visibleWhen: { key: "mode", in: ["aura", "template"] },
       },
       {
-        key: "includeSelf", kind: "toggle", label: "BNA.Field.reachIncludeSelf.label",
-        hint: "BNA.Field.reachIncludeSelf.hint", default: true, visibleWhen: { key: "mode", in: ["aura", "template"] }
+        key: "includeSelf",
+        kind: "toggle",
+        label: "BNA.Field.reachIncludeSelf.label",
+        hint: "BNA.Field.reachIncludeSelf.hint",
+        default: true,
+        visibleWhen: { key: "mode", in: ["aura", "template"] },
       },
       {
-        key: "blockers", kind: "multiselect", label: "BNA.Field.reachBlockers.label",
-        hint: "BNA.Field.reachBlockers.hint", default: [], choices: { source: "statusEffects" },
-        visibleWhen: { key: "mode", in: ["aura"] }
+        key: "blockers",
+        kind: "multiselect",
+        label: "BNA.Field.reachBlockers.label",
+        hint: "BNA.Field.reachBlockers.hint",
+        default: [],
+        choices: { source: "statusEffects" },
+        visibleWhen: { key: "mode", in: ["aura"] },
       },
       {
-        key: "require", kind: "group", label: "BNA.Field.reachRequire.label", hint: "BNA.Field.reachRequire.hint",
+        key: "require",
+        kind: "group",
+        label: "BNA.Field.reachRequire.label",
+        hint: "BNA.Field.reachRequire.hint",
         visibleWhen: { key: "mode", in: ["aura"] },
         fields: [
           { key: "sight", kind: "toggle", label: "BNA.Field.requireSight.label", default: false },
           { key: "move", kind: "toggle", label: "BNA.Field.requireMove.label", default: false },
           { key: "sound", kind: "toggle", label: "BNA.Field.requireSound.label", default: false },
-          { key: "light", kind: "toggle", label: "BNA.Field.requireLight.label", default: false }
-        ]
-      }
-    ]
+          { key: "light", kind: "toggle", label: "BNA.Field.requireLight.label", default: false },
+        ],
+      },
+    ],
   };
 }
 
@@ -54,8 +77,12 @@ const TURN_REACH: FieldSpec = reachField(STATIC.turnReachMode, "turnReach");
 
 /** Region events: which tokens count, by their disposition. */
 export const REGION_TOKENS: FieldSpec = {
-  key: "tokens", kind: "select", label: "BNA.Field.regionTokens.label", hint: "BNA.Field.regionTokens.hint",
-  default: "any", choices: { static: STATIC.regionTokens }
+  key: "tokens",
+  kind: "select",
+  label: "BNA.Field.regionTokens.label",
+  hint: "BNA.Field.regionTokens.hint",
+  default: "any",
+  choices: { static: STATIC.regionTokens },
 };
 
 function trigger(type: EventType, icon: string, fields: readonly FieldSpec[]): EventDefinition {
@@ -63,7 +90,11 @@ function trigger(type: EventType, icon: string, fields: readonly FieldSpec[]): E
 }
 
 const SIGNAL_NAME: FieldSpec = {
-  key: "name", kind: "text", label: "BNA.Field.signalName.label", hint: "BNA.Field.signalName.hint", default: ""
+  key: "name",
+  kind: "text",
+  label: "BNA.Field.signalName.label",
+  hint: "BNA.Field.signalName.hint",
+  default: "",
 };
 
 function pre(type: EventType, icon: string): EventDefinition {
@@ -92,5 +123,5 @@ export const EVENTS: readonly EventDefinition[] = [
   trigger("regionExit", "log-out", [REGION_TOKENS]),
   trigger("shortRest", "sun", []),
   trigger("longRest", "moon", []),
-  { kind: "event", type: "signal", phase: "signal", icon: "radio", pins: ["out"], fields: [SIGNAL_NAME] }
+  { kind: "event", type: "signal", phase: "signal", icon: "radio", pins: ["out"], fields: [SIGNAL_NAME] },
 ];

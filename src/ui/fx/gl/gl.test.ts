@@ -31,7 +31,7 @@ describe("shader palettes", () => {
 });
 
 describe("buildFragment", () => {
-  it.each(FX_FLAVORS)("builds a complete GLSL ES 3.0 shader for %s", flavor => {
+  it.each(FX_FLAVORS)("builds a complete GLSL ES 3.0 shader for %s", (flavor) => {
     const source = buildFragment(flavor);
     expect(source.startsWith("#version 300 es")).toBe(true);
     expect(source).toContain("void main()");

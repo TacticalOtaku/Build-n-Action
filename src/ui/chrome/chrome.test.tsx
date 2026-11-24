@@ -12,7 +12,7 @@ const wired = createBlueprint({
   id: "aB3dE5gH7jK9mN1p",
   name: "Flame tongue",
   nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r", { formula: "1d6" })],
-  edges: [makeEdge("ev", "out", "r")]
+  edges: [makeEdge("ev", "out", "r")],
 });
 const empty = createBlueprint({ id: "zZ3dE5gH7jK9mN1p", name: "", enabled: false });
 const NO_LINT = { error: 0, warning: 0, info: 0 };
@@ -21,7 +21,21 @@ describe("BlueprintList", () => {
   it("lists blueprints with their first sentence and state", async () => {
     const onSelect = vi.fn();
     const onCreate = vi.fn();
-    renderWithServices(<BlueprintList blueprints={[wired, empty]} activeId={wired.id} onSelect={onSelect} onCreate={onCreate} onDuplicate={vi.fn()} onToggle={vi.fn()} onDelete={vi.fn()} onOpenPicker={vi.fn()} hasLibrary={false} onDragRow={vi.fn()} onDropData={vi.fn()} />);
+    renderWithServices(
+      <BlueprintList
+        blueprints={[wired, empty]}
+        activeId={wired.id}
+        onSelect={onSelect}
+        onCreate={onCreate}
+        onDuplicate={vi.fn()}
+        onToggle={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenPicker={vi.fn()}
+        hasLibrary={false}
+        onDragRow={vi.fn()}
+        onDropData={vi.fn()}
+      />,
+    );
     expect(screen.getByText("When I roll damage: +1d6 to the roll.")).toBeInTheDocument();
     expect(screen.getByText("Untitled blueprint")).toBeInTheDocument();
     expect(screen.getByText("Not connected yet")).toBeInTheDocument();
@@ -38,7 +52,19 @@ describe("BlueprintList", () => {
     const onToggle = vi.fn();
     const onDelete = vi.fn();
     renderWithServices(
-      <BlueprintList blueprints={[wired]} activeId={wired.id} onSelect={vi.fn()} onCreate={vi.fn()} onDuplicate={onDuplicate} onToggle={onToggle} onDelete={onDelete} onOpenPicker={vi.fn()} hasLibrary={false} onDragRow={vi.fn()} onDropData={vi.fn()} />
+      <BlueprintList
+        blueprints={[wired]}
+        activeId={wired.id}
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+        onDuplicate={onDuplicate}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        onOpenPicker={vi.fn()}
+        hasLibrary={false}
+        onDragRow={vi.fn()}
+        onDropData={vi.fn()}
+      />,
     );
     await userEvent.click(screen.getByRole("button", { name: "More actions for “Flame tongue”" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Duplicate “Flame tongue”" }));
@@ -60,10 +86,19 @@ describe("BlueprintList", () => {
     const onDropData = vi.fn();
     renderWithServices(
       <BlueprintList
-        blueprints={[wired, empty]} activeId={wired.id} onSelect={vi.fn()} onCreate={vi.fn()} onDuplicate={vi.fn()}
-        onToggle={vi.fn()} onDelete={vi.fn()} onOpenPicker={vi.fn()} hasLibrary onSaveToLibrary={onSaveToLibrary}
-        onDragRow={vi.fn()} onDropData={onDropData}
-      />
+        blueprints={[wired, empty]}
+        activeId={wired.id}
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+        onDuplicate={vi.fn()}
+        onToggle={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenPicker={vi.fn()}
+        hasLibrary
+        onSaveToLibrary={onSaveToLibrary}
+        onDragRow={vi.fn()}
+        onDropData={onDropData}
+      />,
     );
     await userEvent.type(screen.getByRole("searchbox", { name: "Search blueprints" }), "flame");
     expect(screen.queryByRole("button", { name: /^Untitled blueprint/ })).toBeNull();
@@ -72,7 +107,10 @@ describe("BlueprintList", () => {
     expect(onSaveToLibrary).toHaveBeenCalledWith(wired.id);
     expect(screen.getByRole("button", { name: "Saved to the library" })).toBeInTheDocument();
     const rail = screen.getByRole("navigation");
-    const dataTransfer = { types: ["text/plain"], getData: () => JSON.stringify({ type: "Blueprint", uuid: "Item.x.Blueprint.y" }) };
+    const dataTransfer = {
+      types: ["text/plain"],
+      getData: () => JSON.stringify({ type: "Blueprint", uuid: "Item.x.Blueprint.y" }),
+    };
     fireEvent.drop(rail, { dataTransfer });
     expect(onDropData).toHaveBeenCalledWith({ type: "Blueprint", uuid: "Item.x.Blueprint.y" });
   });
@@ -80,10 +118,20 @@ describe("BlueprintList", () => {
   it("keeps three actions in the row and works the menu with the keyboard", async () => {
     renderWithServices(
       <BlueprintList
-        blueprints={[wired]} activeId={wired.id} onSelect={vi.fn()} onCreate={vi.fn()} onDuplicate={vi.fn()} onToggle={vi.fn()}
-        onDelete={vi.fn()} onOpenPicker={vi.fn()} hasLibrary onSaveToLibrary={vi.fn()} onMoveToEffect={vi.fn()}
-        onDragRow={vi.fn()} onDropData={vi.fn()}
-      />
+        blueprints={[wired]}
+        activeId={wired.id}
+        onSelect={vi.fn()}
+        onCreate={vi.fn()}
+        onDuplicate={vi.fn()}
+        onToggle={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenPicker={vi.fn()}
+        hasLibrary
+        onSaveToLibrary={vi.fn()}
+        onMoveToEffect={vi.fn()}
+        onDragRow={vi.fn()}
+        onDropData={vi.fn()}
+      />,
     );
     const row = screen.getByRole("button", { name: /^Flame tongue/ }).closest("li");
     expect(row?.querySelectorAll(".bna-rail__actions button")).toHaveLength(3);
@@ -103,7 +151,16 @@ describe("BlueprintList", () => {
 describe("TitleBlock", () => {
   it("renames, toggles and shows the save state", async () => {
     const dispatch = vi.fn();
-    renderWithServices(<TitleBlock blueprint={wired} carrier="Longsword" saving lint={NO_LINT} onShowIssues={vi.fn()} dispatch={dispatch} />);
+    renderWithServices(
+      <TitleBlock
+        blueprint={wired}
+        carrier="Longsword"
+        saving
+        lint={NO_LINT}
+        onShowIssues={vi.fn()}
+        dispatch={dispatch}
+      />,
+    );
     expect(screen.getByText("When I roll damage: +1d6 to the roll.")).toBeInTheDocument();
     expect(screen.getByText("Longsword")).toBeInTheDocument();
     expect(screen.getByText("Saving…")).toBeInTheDocument();
@@ -114,22 +171,51 @@ describe("TitleBlock", () => {
   });
 
   it("explains what to do when nothing is connected", () => {
-    renderWithServices(<TitleBlock blueprint={empty} carrier="Longsword" saving={false} lint={NO_LINT} onShowIssues={vi.fn()} dispatch={vi.fn()} />);
-    expect(screen.getByText("Connect an event to a result to see what this blueprint does.")).toBeInTheDocument();
+    renderWithServices(
+      <TitleBlock
+        blueprint={empty}
+        carrier="Longsword"
+        saving={false}
+        lint={NO_LINT}
+        onShowIssues={vi.fn()}
+        dispatch={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Connect an event to a result to see what this blueprint does."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
   it("counts issues and opens them", async () => {
     const onShowIssues = vi.fn();
     renderWithServices(
-      <TitleBlock blueprint={wired} carrier="Longsword" saving={false} lint={{ error: 1, warning: 2, info: 0 }} onShowIssues={onShowIssues} dispatch={vi.fn()} />
+      <TitleBlock
+        blueprint={wired}
+        carrier="Longsword"
+        saving={false}
+        lint={{ error: 1, warning: 2, info: 0 }}
+        onShowIssues={onShowIssues}
+        dispatch={vi.fn()}
+      />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Show issues (errors: 1, warnings: 2, notes: 0)" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Show issues (errors: 1, warnings: 2, notes: 0)" }),
+    );
     expect(onShowIssues).toHaveBeenCalled();
   });
 
   it("says when there are no issues", () => {
-    renderWithServices(<TitleBlock blueprint={wired} carrier="Longsword" saving={false} lint={NO_LINT} onShowIssues={vi.fn()} dispatch={vi.fn()} />);
+    renderWithServices(
+      <TitleBlock
+        blueprint={wired}
+        carrier="Longsword"
+        saving={false}
+        lint={NO_LINT}
+        onShowIssues={vi.fn()}
+        dispatch={vi.fn()}
+      />,
+    );
     expect(screen.getByText("None")).toBeInTheDocument();
   });
 
@@ -137,9 +223,20 @@ describe("TitleBlock", () => {
     const openConfig = vi.fn();
     renderWithServices(
       <TitleBlock
-        blueprint={wired} carrier="Rage" saving={false} lint={NO_LINT} onShowIssues={vi.fn()} dispatch={vi.fn()}
-        effect={{ state: "disabled", disableCondition: "@attributes.hp.value <= 0", enableCondition: null, specialDurations: ["Zero HP"], openConfig }}
-      />
+        blueprint={wired}
+        carrier="Rage"
+        saving={false}
+        lint={NO_LINT}
+        onShowIssues={vi.fn()}
+        dispatch={vi.fn()}
+        effect={{
+          state: "disabled",
+          disableCondition: "@attributes.hp.value <= 0",
+          enableCondition: null,
+          specialDurations: ["Zero HP"],
+          openConfig,
+        }}
+      />,
     );
     expect(screen.getByText("Off: the blueprint does not work now")).toBeInTheDocument();
     expect(screen.getByText("Turns off while @attributes.hp.value <= 0")).toBeInTheDocument();
@@ -149,8 +246,24 @@ describe("TitleBlock", () => {
   });
 
   it("says an enabled blueprint waits while its effect is off", () => {
-    const effect = { state: "disabled" as const, disableCondition: "@attributes.hp.value <= 0", enableCondition: null, specialDurations: [], openConfig: vi.fn() };
-    renderWithServices(<TitleBlock blueprint={wired} carrier="Rage" saving={false} lint={NO_LINT} onShowIssues={vi.fn()} effect={effect} dispatch={vi.fn()} />);
+    const effect = {
+      state: "disabled" as const,
+      disableCondition: "@attributes.hp.value <= 0",
+      enableCondition: null,
+      specialDurations: [],
+      openConfig: vi.fn(),
+    };
+    renderWithServices(
+      <TitleBlock
+        blueprint={wired}
+        carrier="Rage"
+        saving={false}
+        lint={NO_LINT}
+        onShowIssues={vi.fn()}
+        effect={effect}
+        dispatch={vi.fn()}
+      />,
+    );
     expect(screen.getByRole("switch", { name: "This blueprint" })).toHaveTextContent("On, waiting");
   });
 });
@@ -158,9 +271,19 @@ describe("TitleBlock", () => {
 describe("Toolbar", () => {
   function renderToolbar(overrides: Partial<Parameters<typeof Toolbar>[0]> = {}) {
     const props = {
-      onAdd: vi.fn(), onLayout: vi.fn(), onFit: vi.fn(), onUndo: vi.fn(), onRedo: vi.fn(),
-      canUndo: true, canRedo: false, testing: false, theme: "dark" as const, onToggleTheme: vi.fn(),
-      fxLevel: "full" as const, onCycleFx: vi.fn(), ...overrides
+      onAdd: vi.fn(),
+      onLayout: vi.fn(),
+      onFit: vi.fn(),
+      onUndo: vi.fn(),
+      onRedo: vi.fn(),
+      canUndo: true,
+      canRedo: false,
+      testing: false,
+      theme: "dark" as const,
+      onToggleTheme: vi.fn(),
+      fxLevel: "full" as const,
+      onCycleFx: vi.fn(),
+      ...overrides,
     };
     renderWithServices(<Toolbar {...props} />);
     return props;

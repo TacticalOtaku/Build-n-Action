@@ -1,6 +1,12 @@
 import { CONDITION_NODE_TYPE, type NodeKind, type PinId } from "../registry/constants";
 import { defaultsFor } from "../registry/fields";
-import { COMMON_RESULT_FIELDS, CONDITION_NODE_FIELDS, getCheck, getEvent, getResult } from "../registry/index";
+import {
+  COMMON_RESULT_FIELDS,
+  CONDITION_NODE_FIELDS,
+  getCheck,
+  getEvent,
+  getResult,
+} from "../registry/index";
 import { randomId } from "./ids";
 import {
   DEFAULT_BLUEPRINT_IMG,
@@ -9,7 +15,7 @@ import {
   type BlueprintNode,
   type BlueprintSource,
   type ConditionCheck,
-  type Position
+  type Position,
 } from "./types";
 
 export function createBlueprint(init: Partial<Omit<BlueprintSource, "schemaVersion">> = {}): BlueprintSource {
@@ -24,7 +30,7 @@ export function createBlueprint(init: Partial<Omit<BlueprintSource, "schemaVersi
     nodes: init.nodes ?? [],
     edges: init.edges ?? [],
     flags: init.flags ?? {},
-    ...(init.counters ? { counters: init.counters.map(counter => ({ ...counter })) } : {})
+    ...(init.counters ? { counters: init.counters.map((counter) => ({ ...counter })) } : {}),
   };
 }
 
@@ -74,6 +80,8 @@ export function duplicateBlueprint(source: BlueprintSource, name: string): Bluep
     sort: source.sort + 1,
     nodes: structuredClone(source.nodes),
     edges: structuredClone(source.edges),
-    flags: Object.fromEntries(Object.entries(structuredClone(source.flags)).filter(([scope]) => scope !== "build-n-action"))
+    flags: Object.fromEntries(
+      Object.entries(structuredClone(source.flags)).filter(([scope]) => scope !== "build-n-action"),
+    ),
   });
 }

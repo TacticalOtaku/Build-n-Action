@@ -33,6 +33,6 @@ Hooks.once("ready", () => {
   validateIntegrations();
   registerPlayHooks();
   registerRegionBehaviorSync();
-  loadTraitTrees().catch(error => log.warn("could not load language and tool trees", error));
+  loadTraitTrees().catch((error) => log.warn("could not load language and tool trees", error));
   Hooks.callAll(`${MODULE_SCOPE}.ready`, api);
 });

@@ -21,7 +21,7 @@ export function FlavorField({ flavor, seed }: { flavor: FxFlavor; seed: number }
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || (level === "off") || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!canvas || level === "off" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const context = canvas.getContext("2d");
     if (!context) return;
 
@@ -44,7 +44,7 @@ export function FlavorField({ flavor, seed }: { flavor: FxFlavor; seed: number }
     sizeObserver.observe(canvas);
 
     let visible = true;
-    const visibilityObserver = new IntersectionObserver(entries => {
+    const visibilityObserver = new IntersectionObserver((entries) => {
       visible = entries.at(-1)?.isIntersecting ?? true;
     });
     visibilityObserver.observe(canvas);
@@ -56,12 +56,29 @@ export function FlavorField({ flavor, seed }: { flavor: FxFlavor; seed: number }
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       const stage = ShaderStage.shared();
-      const shaded = stage?.draw({
-        flavor, width: canvas.width, height: canvas.height, scale: ratio, time, seed,
-        intensity: reduced ? REDUCED.intensity : 1, dark
-      }) ?? false;
+      const shaded =
+        stage?.draw({
+          flavor,
+          width: canvas.width,
+          height: canvas.height,
+          scale: ratio,
+          time,
+          seed,
+          intensity: reduced ? REDUCED.intensity : 1,
+          dark,
+        }) ?? false;
       if (stage && shaded) {
-        context.drawImage(stage.canvas, 0, stage.sourceY(canvas.height), canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+        context.drawImage(
+          stage.canvas,
+          0,
+          stage.sourceY(canvas.height),
+          canvas.width,
+          canvas.height,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
       }
 
       const particleRate = (shaded ? spec.overlay : 1) * (reduced ? REDUCED.particles : 1);

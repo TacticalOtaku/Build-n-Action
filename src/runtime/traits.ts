@@ -5,7 +5,7 @@ export type TraitTree = Readonly<Record<string, unknown>>;
 
 function childrenOf(node: unknown): TraitTree | null {
   const children = read(node, "children");
-  return (children && (typeof children === "object")) ? children as TraitTree : null;
+  return children && typeof children === "object" ? (children as TraitTree) : null;
 }
 
 /** Keys from the root down to `key`, e.g. ["exotic", "primordial", "ignan"]; [] when absent. */

@@ -6,7 +6,9 @@ let queue: FrameRequestCallback[] = [];
 beforeEach(() => {
   queue = [];
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => queue.push(callback));
-  vi.stubGlobal("cancelAnimationFrame", () => { queue = []; });
+  vi.stubGlobal("cancelAnimationFrame", () => {
+    queue = [];
+  });
 });
 
 afterEach(() => vi.unstubAllGlobals());

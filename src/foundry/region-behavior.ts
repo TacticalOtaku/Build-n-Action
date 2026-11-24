@@ -6,7 +6,11 @@ import { guardedAsync, runTrigger } from "./play";
 
 export const REGION_BEHAVIOR_TYPE = `${MODULE_SCOPE}.blueprints`;
 
-async function onToken(this: RegionBehaviorTypeLike, event: RegionEventLike, trigger: "regionEnter" | "regionExit"): Promise<void> {
+async function onToken(
+  this: RegionBehaviorTypeLike,
+  event: RegionEventLike,
+  trigger: "regionEnter" | "regionExit",
+): Promise<void> {
   const token = event.data.token;
   const actor = read(token, "actor");
   if (!token || !isDocument(actor)) return;
@@ -15,7 +19,7 @@ async function onToken(this: RegionBehaviorTypeLike, event: RegionEventLike, tri
     actor,
     token: (read(token, "object") as TokenPlaceable | null | undefined) ?? null,
     only: this.region,
-    key: `${this.region.uuid}|${token.uuid}|${trigger}|${event.data.movement?.id ?? Date.now()}`
+    key: `${this.region.uuid}|${token.uuid}|${trigger}|${event.data.movement?.id ?? Date.now()}`,
   });
 }
 
@@ -34,7 +38,7 @@ class BlueprintsRegionBehavior extends foundry.data.regionBehaviors.RegionBehavi
     },
     tokenExit(this: RegionBehaviorTypeLike, event: RegionEventLike) {
       return guardedAsync("region exit", () => onToken.call(this, event, "regionExit"));
-    }
+    },
   };
 }
 
@@ -50,19 +54,25 @@ export function registerRegionBehavior(): void {
 /** Add the behavior while the region's blueprints start on entering or leaving it, and remove it otherwise. */
 export async function syncRegionBehavior(region: FoundryDocument): Promise<void> {
   const wanted = needsRegionBehavior(documentBlueprints(region).blueprints);
-  const behaviors = [...(read(region, "behaviors") as Iterable<FoundryDocument> | undefined ?? [])]
-    .filter(behavior => read(behavior, "type") === REGION_BEHAVIOR_TYPE);
+  const behaviors = [...((read(region, "behaviors") as Iterable<FoundryDocument> | undefined) ?? [])].filter(
+    (behavior) => read(behavior, "type") === REGION_BEHAVIOR_TYPE,
+  );
   if (wanted && !behaviors.length) {
-    await region.createEmbeddedDocuments?.("RegionBehavior", [{ type: REGION_BEHAVIOR_TYPE, name: game.i18n.localize("BNA.RegionBehavior.label") }]);
+    await region.createEmbeddedDocuments?.("RegionBehavior", [
+      { type: REGION_BEHAVIOR_TYPE, name: game.i18n.localize("BNA.RegionBehavior.label") },
+    ]);
   } else if (!wanted && behaviors.length) {
-    await region.deleteEmbeddedDocuments?.("RegionBehavior", behaviors.map(behavior => behavior.id));
+    await region.deleteEmbeddedDocuments?.(
+      "RegionBehavior",
+      behaviors.map((behavior) => behavior.id),
+    );
   }
 }
 
 /** Keep regions' behaviors in step with their blueprints (active GM). */
 export function registerRegionBehaviorSync(): void {
   const sync = (region: unknown) => {
-    if (!isDocument(region) || (game.users.activeGM?.id !== game.user.id)) return;
+    if (!isDocument(region) || game.users.activeGM?.id !== game.user.id) return;
     void guardedAsync("region behavior", () => syncRegionBehavior(region));
   };
   Hooks.on("createRegion", (region: unknown) => sync(region));

@@ -19,26 +19,31 @@ export interface HeaderControl {
 function carrierOf(application: unknown): FoundryDocument | null {
   const document = read(application, "document");
   if (!isDocument(document) || !carrierKind(document)) return null;
-  if ((document.documentName === "Actor") && (read(document, "type") === "group")) return null;
+  if (document.documentName === "Actor" && read(document, "type") === "group") return null;
   return canEdit(document) ? document : null;
 }
 
 function open(document: FoundryDocument): void {
-  openEditor(document).catch(error => log.error("could not open the editor", error));
+  openEditor(document).catch((error) => log.error("could not open the editor", error));
 }
 
 /** The document's blueprints, and whether one of them works now (enabled, on a carrier that is not switched off). */
 function blueprintState(document: FoundryDocument): { count: number; active: boolean } {
   const { blueprints } = documentBlueprints(document);
-  return { count: blueprints.length, active: !isSuppressed(document) && blueprints.some(blueprint => blueprint.enabled) };
+  return {
+    count: blueprints.length,
+    active: !isSuppressed(document) && blueprints.some((blueprint) => blueprint.enabled),
+  };
 }
 
 export function headerControl(document: FoundryDocument, count: number, active: boolean): HeaderControl {
   return {
     action: "bnaOpenEditor",
     icon: active ? `${ICON} ${ACTIVE_MARKER}` : ICON,
-    label: count ? game.i18n.format("BNA.Header.labelCount", { count }) : game.i18n.localize("BNA.Header.label"),
-    onClick: () => open(document)
+    label: count
+      ? game.i18n.format("BNA.Header.labelCount", { count })
+      : game.i18n.localize("BNA.Header.label"),
+    onClick: () => open(document),
   };
 }
 
@@ -59,7 +64,7 @@ function addTitleButton(application: unknown, document: FoundryDocument): void {
   button.classList.toggle(ACTIVE_MARKER, blueprintState(document).active);
   button.dataset.tooltip = label;
   button.setAttribute("aria-label", label);
-  button.addEventListener("click", event => {
+  button.addEventListener("click", (event) => {
     event.preventDefault();
     open(document);
   });

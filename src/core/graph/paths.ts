@@ -21,8 +21,11 @@ export interface BlueprintPath {
  * path per route (fan-in means OR); malformed wiring is skipped rather than reported, since the
  * linter and validator own reporting.
  */
-export function enumeratePaths(graph: BlueprintGraph, from: "events" | "results" = "events"): BlueprintPath[] {
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+export function enumeratePaths(
+  graph: BlueprintGraph,
+  from: "events" | "results" = "events",
+): BlueprintPath[] {
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const outgoing = new Map<string, BlueprintEdge[]>();
   for (const edge of graph.edges) {
     const list = outgoing.get(edge.source) ?? [];
@@ -35,7 +38,7 @@ export function enumeratePaths(graph: BlueprintGraph, from: "events" | "results"
     nodeId: string,
     start: { eventNodeId: string; eventPin: PinId },
     guards: Guard[],
-    trail: ReadonlySet<string>
+    trail: ReadonlySet<string>,
   ): void => {
     const node = nodes.get(nodeId);
     if (!node || trail.has(nodeId)) return;
@@ -46,16 +49,16 @@ export function enumeratePaths(graph: BlueprintGraph, from: "events" | "results"
     if (node.kind !== "condition") return;
     const nextTrail = new Set(trail).add(nodeId);
     for (const edge of outgoing.get(nodeId) ?? []) {
-      if ((edge.sourcePin !== "yes") && (edge.sourcePin !== "no")) continue;
+      if (edge.sourcePin !== "yes" && edge.sourcePin !== "no") continue;
       visit(edge.target, start, [...guards, { nodeId, expect: edge.sourcePin === "yes" }], nextTrail);
     }
   };
 
   for (const node of graph.nodes) {
-    if (node.kind !== ((from === "events") ? "event" : "result")) continue;
+    if (node.kind !== (from === "events" ? "event" : "result")) continue;
     const pins = outputPins(node);
     for (const edge of outgoing.get(node.id) ?? []) {
-      if ((node.kind === "result") && !pins.includes(edge.sourcePin)) continue;
+      if (node.kind === "result" && !pins.includes(edge.sourcePin)) continue;
       visit(edge.target, { eventNodeId: node.id, eventPin: edge.sourcePin }, [], new Set([node.id]));
     }
   }

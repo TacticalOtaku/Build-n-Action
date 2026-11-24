@@ -1,9 +1,27 @@
 /** Why a check, condition, event or result passed or failed; the text is `BNA.Reason.<code>`. */
 export const REASON_CODES = [
-  "empty", "matched", "notMatched", "excluded",
-  "noTarget", "noItem", "noActivity", "notSpell", "notWeapon", "notFeature", "noValue",
-  "threshold", "comparisonFailed", "scriptFalse", "scriptError", "scriptDisabled", "scriptUntrusted", "otherItem",
-  "noChecks", "disabled", "outOfReach", "limitUsed"
+  "empty",
+  "matched",
+  "notMatched",
+  "excluded",
+  "noTarget",
+  "noItem",
+  "noActivity",
+  "notSpell",
+  "notWeapon",
+  "notFeature",
+  "noValue",
+  "threshold",
+  "comparisonFailed",
+  "scriptFalse",
+  "scriptError",
+  "scriptDisabled",
+  "scriptUntrusted",
+  "otherItem",
+  "noChecks",
+  "disabled",
+  "outOfReach",
+  "limitUsed",
 ] as const;
 
 export type ReasonCode = (typeof REASON_CODES)[number];

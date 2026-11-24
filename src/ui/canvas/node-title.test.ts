@@ -15,18 +15,22 @@ describe("nodeTitle", () => {
   it("names conditions by their first check and counts the rest", () => {
     const checks = [
       { id: "c1", type: "creatureTypes", data: {} },
-      { id: "c2", type: "thisItem", data: {} }
+      { id: "c2", type: "thisItem", data: {} },
     ];
     expect(nodeTitle(makeCondition("if", checks), t)).toBe(`${t("BNA.Check.creatureTypes.Label")} +1`);
     expect(nodeTitle(makeCondition("if", []), t)).toBe(t("BNA.UI.Node.noChecksTitle"));
   });
 
-  it("names a condition that only has the \"only this item\" tick after it", () => {
+  it('names a condition that only has the "only this item" tick after it', () => {
     const ticked = makeCondition("if", []);
-    expect(nodeTitle({ ...ticked, data: { ...ticked.data, thisItem: true } }, t)).toBe(t("BNA.Check.thisItem.Label"));
+    expect(nodeTitle({ ...ticked, data: { ...ticked.data, thisItem: true } }, t)).toBe(
+      t("BNA.Check.thisItem.Label"),
+    );
   });
 
   it("falls back for unknown types", () => {
-    expect(nodeTitle({ ...makeNode("result", "rollBonus", "r"), type: "gone" }, t)).toBe(t("BNA.UI.Node.unknown"));
+    expect(nodeTitle({ ...makeNode("result", "rollBonus", "r"), type: "gone" }, t)).toBe(
+      t("BNA.UI.Node.unknown"),
+    );
   });
 });

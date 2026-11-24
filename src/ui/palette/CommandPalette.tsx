@@ -31,8 +31,10 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
 
   const context = useMemo<PaletteContext>(() => {
     const sourceId = request.from?.source;
-    const source = sourceId ? blueprint.nodes.find(node => node.id === sourceId) : undefined;
-    return source ? { from: source.kind, upstream: resultEvents(blueprint, source.id, request.from?.sourcePin) } : { from: null, upstream: [] };
+    const source = sourceId ? blueprint.nodes.find((node) => node.id === sourceId) : undefined;
+    return source
+      ? { from: source.kind, upstream: resultEvents(blueprint, source.id, request.from?.sourcePin) }
+      : { from: null, upstream: [] };
   }, [blueprint, request.from]);
 
   const items = useMemo(() => filterPaletteItems(PALETTE_ITEMS, query, context, t), [context, query, t]);
@@ -76,7 +78,7 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
       aria-label={t("BNA.UI.Palette.label")}
       style={{
         left: clamp(request.screen.x, MARGIN, request.bounds.width - WIDTH - MARGIN),
-        top: clamp(request.screen.y, MARGIN, request.bounds.height - MAX_HEIGHT - MARGIN)
+        top: clamp(request.screen.y, MARGIN, request.bounds.height - MAX_HEIGHT - MARGIN),
       }}
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -94,7 +96,7 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
           aria-label={t("BNA.UI.Palette.search")}
           placeholder={t("BNA.UI.Palette.placeholder")}
           value={query}
-          onChange={event => {
+          onChange={(event) => {
             setQuery(event.target.value);
             setActive(0);
           }}
@@ -104,10 +106,14 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
       {request.from ? <p className="bna-palette__hint">{t("BNA.UI.Palette.fromHint")}</p> : null}
       <ul id={listId} className="bna-palette__list" role="listbox" aria-label={t("BNA.UI.Palette.label")}>
         {items.map((item, index) => {
-          const heading = grouped && ((index === 0) || (items[index - 1]?.groupKey !== item.groupKey));
+          const heading = grouped && (index === 0 || items[index - 1]?.groupKey !== item.groupKey);
           return (
             <Fragment key={item.key}>
-              {heading ? <li role="presentation" className="bna-palette__group">{t(item.groupKey)}</li> : null}
+              {heading ? (
+                <li role="presentation" className="bna-palette__group">
+                  {t(item.groupKey)}
+                </li>
+              ) : null}
               <li
                 id={optionId(item)}
                 role="option"
@@ -117,7 +123,9 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
                 onPointerEnter={() => setActive(index)}
                 onClick={() => onPick(item)}
               >
-                <span className="bna-palette__icon"><Icon name={item.icon} /></span>
+                <span className="bna-palette__icon">
+                  <Icon name={item.icon} />
+                </span>
                 <span>
                   <span className="bna-palette__label">{t(item.labelKey)}</span>
                   <span className="bna-palette__summary">{t(item.summaryKey)}</span>
@@ -127,7 +135,9 @@ export function CommandPalette({ request, blueprint, onPick, onClose }: CommandP
           );
         })}
       </ul>
-      {items.length ? null : <p className="bna-palette__empty">{t("BNA.UI.Palette.empty", { query: query.trim() })}</p>}
+      {items.length ? null : (
+        <p className="bna-palette__empty">{t("BNA.UI.Palette.empty", { query: query.trim() })}</p>
+      )}
     </motion.div>
   );
 }

@@ -13,11 +13,15 @@ const first = createBlueprint({
   id: "aB3dE5gH7jK9mN1p",
   name: "Flame tongue",
   nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r", { formula: "1d6" })],
-  edges: [makeEdge("ev", "out", "r")]
+  edges: [makeEdge("ev", "out", "r")],
 });
 const second = createBlueprint({ id: "zZ3dE5gH7jK9mN1p", name: "Hex" });
 
-function Harness({ onSave, initial = [first, second], initialActiveId }: {
+function Harness({
+  onSave,
+  initial = [first, second],
+  initialActiveId,
+}: {
   onSave(blueprint: BlueprintSource): void;
   initial?: BlueprintSource[];
   initialActiveId?: string;
@@ -31,16 +35,16 @@ function Harness({ onSave, initial = [first, second], initialActiveId }: {
       fxLevel="off"
       initialActiveId={initialActiveId}
       onCycleFx={() => {}}
-      onSave={blueprint => {
+      onSave={(blueprint) => {
         onSave(blueprint);
-        setBlueprints(list => list.map(entry => (entry.id === blueprint.id) ? blueprint : entry));
+        setBlueprints((list) => list.map((entry) => (entry.id === blueprint.id ? blueprint : entry)));
       }}
-      onCreate={source => {
+      onCreate={(source) => {
         const blueprint = source ?? createBlueprint();
-        setBlueprints(list => [...list, blueprint]);
+        setBlueprints((list) => [...list, blueprint]);
         return blueprint;
       }}
-      onDelete={id => setBlueprints(list => list.filter(entry => entry.id !== id))}
+      onDelete={(id) => setBlueprints((list) => list.filter((entry) => entry.id !== id))}
     />
   );
 }
@@ -62,7 +66,9 @@ describe("Editor", () => {
     const onSave = vi.fn();
     renderWithServices(<Harness onSave={onSave} />);
     await userEvent.type(screen.getByLabelText("Blueprint name"), "!");
-    await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ name: "Flame tongue!" })));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ name: "Flame tongue!" })),
+    );
     expect(screen.getByRole("button", { name: /^Flame tongue!/ })).toBeInTheDocument();
   });
 
@@ -100,10 +106,15 @@ describe("Editor", () => {
     const loose = createBlueprint({
       id: "lL3dE5gH7jK9mN1p",
       name: "Loose ends",
-      nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r", { formula: "1d6" })]
+      nodes: [
+        makeNode("event", "damageRoll", "ev"),
+        makeNode("result", "rollBonus", "r", { formula: "1d6" }),
+      ],
     });
     renderWithServices(<Harness onSave={vi.fn()} initial={[loose]} />);
-    await userEvent.click(await screen.findByRole("button", { name: "Show issues (errors: 0, warnings: 2, notes: 0)" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Show issues (errors: 0, warnings: 2, notes: 0)" }),
+    );
     const panel = screen.getByRole("tabpanel");
     await userEvent.click(within(panel).getByRole("button", { name: /Nothing leads into this node/ }));
     const inspector = screen.getByRole("complementary", { name: "Node settings" });
@@ -118,8 +129,8 @@ describe("Editor", () => {
       defaults: () => ({ actorUuid: "Actor.aria", itemUuid: null, targetUuid: null }),
       run: (_blueprint, request) => ({
         run: { blueprintId: first.id, intents: [], nodes: {}, edges: [], skipped: { code: "disabled" } },
-        notes: request.targetUuid ? [] : ["noToken"]
-      })
+        notes: request.targetUuid ? [] : ["noToken"],
+      }),
     };
     renderWithServices(<Harness onSave={vi.fn()} />, { host: { simulator } });
     await userEvent.click(screen.getByRole("button", { name: "Show a test run" }));
@@ -135,7 +146,10 @@ describe("Editor", () => {
       items: () => [],
       targets: () => [],
       defaults: () => ({ actorUuid: "Actor.aria", itemUuid: null, targetUuid: null }),
-      run: () => ({ run: { blueprintId: first.id, intents: [], nodes: {}, edges: [], skipped: { code: "disabled" } }, notes: ["trigger"] })
+      run: () => ({
+        run: { blueprintId: first.id, intents: [], nodes: {}, edges: [], skipped: { code: "disabled" } },
+        notes: ["trigger"],
+      }),
     };
     renderWithServices(<Harness onSave={vi.fn()} />, { host: { simulator } });
     await userEvent.click(screen.getByRole("button", { name: "Show a test run" }));
@@ -148,7 +162,10 @@ describe("Editor", () => {
       items: () => [],
       targets: () => [],
       defaults: () => ({ actorUuid: "Actor.aria", itemUuid: null, targetUuid: null }),
-      run: () => ({ run: { blueprintId: first.id, intents: [], nodes: {}, edges: [], skipped: { code: "disabled" } }, notes: ["chosen"] })
+      run: () => ({
+        run: { blueprintId: first.id, intents: [], nodes: {}, edges: [], skipped: { code: "disabled" } },
+        notes: ["chosen"],
+      }),
     };
     renderWithServices(<Harness onSave={vi.fn()} />, { host: { simulator } });
     await userEvent.click(screen.getByRole("button", { name: "Show a test run" }));
@@ -165,16 +182,27 @@ describe("Editor", () => {
     const loose = createBlueprint({
       id: "lL3dE5gH7jK9mN1p",
       name: "Loose ends",
-      nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r", { formula: "1d6" })]
+      nodes: [
+        makeNode("event", "damageRoll", "ev"),
+        makeNode("result", "rollBonus", "r", { formula: "1d6" }),
+      ],
     });
     renderWithServices(<Harness onSave={onSave} initial={[loose]} />);
     await userEvent.click(await screen.findByRole("button", { name: /Show issues/ }));
-    await userEvent.click(within(screen.getByRole("tabpanel")).getByRole("button", { name: /Nothing leads into this node/ }));
+    await userEvent.click(
+      within(screen.getByRole("tabpanel")).getByRole("button", { name: /Nothing leads into this node/ }),
+    );
     screen.getByRole("main").focus();
     await userEvent.keyboard("{Control>}d{/Control}");
-    await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({
-      nodes: expect.arrayContaining([expect.objectContaining({ type: "rollBonus", position: { x: 36, y: 36 } })]) as unknown
-    })));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ type: "rollBonus", position: { x: 36, y: 36 } }),
+          ]) as unknown,
+        }),
+      ),
+    );
   });
 
   it("duplicates the open blueprint with its unsaved edits and opens the copy", async () => {
@@ -252,19 +280,27 @@ describe("Editor", () => {
     const elsewhere = createBlueprint({ id: "eLsE5gH7jK9mN1p0", name: "From elsewhere" });
     renderWithServices(<Harness onSave={vi.fn()} />);
     fireEvent.drop(screen.getByRole("navigation"), {
-      dataTransfer: { types: ["text/plain"], getData: () => JSON.stringify({ type: "Blueprint", data: elsewhere }) }
+      dataTransfer: {
+        types: ["text/plain"],
+        getData: () => JSON.stringify({ type: "Blueprint", data: elsewhere }),
+      },
     });
     await waitFor(() => expect(screen.getByLabelText("Blueprint name")).toHaveValue("From elsewhere"));
   });
 
   it("moves a blueprint onto a new effect and removes it here", async () => {
     const moved: BlueprintSource[] = [];
-    const effects = { moveToEffect: (blueprint: BlueprintSource) => { moved.push(blueprint); return Promise.resolve(); } };
+    const effects = {
+      moveToEffect: (blueprint: BlueprintSource) => {
+        moved.push(blueprint);
+        return Promise.resolve();
+      },
+    };
     renderWithServices(<Harness onSave={vi.fn()} />, { host: { effects } });
     await userEvent.click(screen.getByRole("button", { name: "More actions for “Flame tongue”" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Move “Flame tongue” to a new effect" }));
     await waitFor(() => expect(screen.getByLabelText("Blueprint name")).toHaveValue("Hex"));
-    expect(moved.map(blueprint => blueprint.id)).toEqual([first.id]);
+    expect(moved.map((blueprint) => blueprint.id)).toEqual([first.id]);
     expect(screen.queryByRole("button", { name: /^Flame tongue/ })).toBeNull();
   });
 });

@@ -11,9 +11,11 @@ describe("syncDialogAdvantage", () => {
     const app = {
       get options() {
         return appOpts;
-      }
+      },
     };
-    expect(() => syncDialogAdvantage(app, { advantage: false, disadvantage: true, rolls: [{}] })).not.toThrow();
+    expect(() =>
+      syncDialogAdvantage(app, { advantage: false, disadvantage: true, rolls: [{}] }),
+    ).not.toThrow();
     expect(appOpts).toEqual({ advantageMode: -1, defaultButton: "disadvantage" });
 
     // Mutual cancellation returns to normal even when advantageMode was preset.
@@ -22,9 +24,11 @@ describe("syncDialogAdvantage", () => {
 
     // Real ApplicationV2 dialogs call Object.freeze(this.options) in their constructor.
     const frozenApp: { options: Record<string, unknown> } = {
-      options: Object.freeze({ advantageMode: 0, defaultButton: "normal" })
+      options: Object.freeze({ advantageMode: 0, defaultButton: "normal" }),
     };
-    expect(() => syncDialogAdvantage(frozenApp, { advantage: true, disadvantage: false, rolls: [{}] })).not.toThrow();
+    expect(() =>
+      syncDialogAdvantage(frozenApp, { advantage: true, disadvantage: false, rolls: [{}] }),
+    ).not.toThrow();
     expect(frozenApp.options).toEqual({ advantageMode: 1, defaultButton: "advantage" });
     expect(Object.isFrozen(frozenApp.options)).toBe(true);
   });

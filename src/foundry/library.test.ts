@@ -15,9 +15,9 @@ function settings(value: () => unknown) {
       register: (_scope: string, _key: string, config: { onChange?: () => void }) => {
         onChange = config.onChange;
       },
-      get: () => value()
+      get: () => value(),
     },
-    user: { isGM: true }
+    user: { isGM: true },
   });
   registerLibrary();
   return { change: () => onChange?.() };
@@ -41,6 +41,6 @@ describe("libraryEntries", () => {
     expect(libraryEntries()).toEqual([]);
     stored = [blueprint];
     world.change();
-    expect(libraryEntries().map(entry => entry.id)).toEqual(["aB3dE5gH7jK9mN1p"]);
+    expect(libraryEntries().map((entry) => entry.id)).toEqual(["aB3dE5gH7jK9mN1p"]);
   });
 });

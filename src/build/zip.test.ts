@@ -12,19 +12,19 @@ interface Read {
 function readZip(zip: Uint8Array): Map<string, Read> {
   const buffer = Buffer.from(zip);
   const end = buffer.length - 22;
-  expect(buffer.readUInt32LE(end)).toBe(0x06054B50);
+  expect(buffer.readUInt32LE(end)).toBe(0x06054b50);
   const count = buffer.readUInt16LE(end + 10);
   let at = buffer.readUInt32LE(end + 16);
   const files = new Map<string, Read>();
   for (let index = 0; index < count; index++) {
-    expect(buffer.readUInt32LE(at)).toBe(0x02014B50);
+    expect(buffer.readUInt32LE(at)).toBe(0x02014b50);
     expect(buffer.readUInt16LE(at + 10)).toBe(8);
     const crc = buffer.readUInt32LE(at + 16);
     const size = buffer.readUInt32LE(at + 20);
     const nameLength = buffer.readUInt16LE(at + 28);
     const offset = buffer.readUInt32LE(at + 42);
     const name = buffer.toString("utf8", at + 46, at + 46 + nameLength);
-    expect(buffer.readUInt32LE(offset)).toBe(0x04034B50);
+    expect(buffer.readUInt32LE(offset)).toBe(0x04034b50);
     const start = offset + 30 + buffer.readUInt16LE(offset + 26) + buffer.readUInt16LE(offset + 28);
     const data = inflateRawSync(buffer.subarray(start, start + size));
     files.set(name, { data: data.toString("utf8"), crcMatches: crc32(data) === crc });
@@ -38,13 +38,13 @@ const text = (value: string) => new TextEncoder().encode(value);
 describe("createZip", () => {
   it("stores every entry under its path, deflated, with its checksum", () => {
     const zip = createZip([
-      { path: "module.json", data: text("{\"id\":\"build-n-action\"}") },
-      { path: "lang/ru.json", data: text("{\"BNA\":\"Проверка\"}") },
-      { path: "chunks/empty.mjs", data: new Uint8Array() }
+      { path: "module.json", data: text('{"id":"build-n-action"}') },
+      { path: "lang/ru.json", data: text('{"BNA":"Проверка"}') },
+      { path: "chunks/empty.mjs", data: new Uint8Array() },
     ]);
     const files = readZip(zip);
     expect([...files.keys()]).toEqual(["module.json", "lang/ru.json", "chunks/empty.mjs"]);
-    expect(files.get("lang/ru.json")).toEqual({ data: "{\"BNA\":\"Проверка\"}", crcMatches: true });
+    expect(files.get("lang/ru.json")).toEqual({ data: '{"BNA":"Проверка"}', crcMatches: true });
     expect(files.get("chunks/empty.mjs")).toEqual({ data: "", crcMatches: true });
   });
 

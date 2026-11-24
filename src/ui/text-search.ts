@@ -6,5 +6,5 @@ export function normalizeSearch(text: string): string {
 /** Whether any of the texts contains the query; an empty query matches everything. */
 export function matchesSearch(query: string, ...texts: readonly string[]): boolean {
   const needle = normalizeSearch(query);
-  return !needle || texts.some(text => normalizeSearch(text).includes(needle));
+  return !needle || texts.some((text) => normalizeSearch(text).includes(needle));
 }

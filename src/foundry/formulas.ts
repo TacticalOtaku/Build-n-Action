@@ -33,8 +33,13 @@ export function resolveForeign(formula: string, data: Record<string, unknown>): 
  * The formula of an optional bonus paid `scale` steps above its minimum (v1 _scaleOptionalBonus):
  * the base formula plus the scaling formula multiplied by the scale.
  */
-export function scaledFormula(formula: string, scaleFormula: string, data: Record<string, unknown>, scale: number): string {
-  const base = scale ? (scaleFormula || formula) : formula;
+export function scaledFormula(
+  formula: string,
+  scaleFormula: string,
+  data: Record<string, unknown>,
+  scale: number,
+): string {
+  const base = scale ? scaleFormula || formula : formula;
   const roll = new CONFIG.Dice.DamageRoll(base, data);
   if (!scale) return roll.formula;
   const scaled = roll.alter(scale, 0, { multiplyNumeric: true }).formula;
@@ -50,13 +55,13 @@ function applyToDie(die: DieTermLike, spec: ModifierSpec): void {
   if (isRoll(die._number) && die._number.isDeterministic) die._number = die._number.evaluateSync().total;
   if (isRoll(die._faces) && die._faces.isDeterministic) die._faces = die._faces.evaluateSync().total;
   const view: DieLike = {
-    number: (typeof die._number === "number") ? die._number : null,
-    faces: (typeof die._faces === "number") ? die._faces : ((typeof die.faces === "number") ? die.faces : null),
-    modifiers: die.modifiers
+    number: typeof die._number === "number" ? die._number : null,
+    faces: typeof die._faces === "number" ? die._faces : typeof die.faces === "number" ? die.faces : null,
+    modifiers: die.modifiers,
   };
   modifyDie(view, spec);
-  if ((typeof die._number === "number") && (view.number !== null)) die._number = view.number;
-  if ((typeof die._faces === "number") && (view.faces !== null)) die._faces = view.faces;
+  if (typeof die._number === "number" && view.number !== null) die._number = view.number;
+  if (typeof die._faces === "number" && view.faces !== null) die._faces = view.faces;
 }
 
 /**
@@ -70,7 +75,7 @@ function rebuildFormula(terms: unknown[]): string {
       term.rolls.forEach((roll, index) => {
         term.terms[index] = rebuildFormula(roll.terms);
       });
-    } else if ((term instanceof ParentheticalTerm) && term.roll) {
+    } else if (term instanceof ParentheticalTerm && term.roll) {
       term.term = rebuildFormula(term.roll.terms);
     }
   }
@@ -81,7 +86,11 @@ function rebuildFormula(terms: unknown[]): string {
  * Apply a modifier spec to every die in `parts` (mutated in place). Returns true when a
  * "first die only" modifier has been used and must not apply again.
  */
-export function modifyFormulaParts(parts: unknown[], data: Record<string, unknown>, spec: ModifierSpec): boolean {
+export function modifyFormulaParts(
+  parts: unknown[],
+  data: Record<string, unknown>,
+  spec: ModifierSpec,
+): boolean {
   for (let index = 0; index < parts.length; index++) {
     const roll = new CONFIG.Dice.DamageRoll(String(parts[index]), data);
     if (!roll.dice.length) continue;

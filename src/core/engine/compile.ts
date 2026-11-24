@@ -37,7 +37,10 @@ export interface CompiledBlueprint {
 // Blueprint sources are replaced, never mutated, so the object itself is a safe cache key.
 const cache = new WeakMap<BlueprintSource, CompiledBlueprint>();
 
-function groupBy(paths: readonly CompiledPath[], key: (path: CompiledPath) => string): Map<string, CompiledPath[]> {
+function groupBy(
+  paths: readonly CompiledPath[],
+  key: (path: CompiledPath) => string,
+): Map<string, CompiledPath[]> {
   const groups = new Map<string, CompiledPath[]>();
   for (const path of paths) {
     const list = groups.get(key(path)) ?? [];
@@ -51,9 +54,12 @@ export function compileBlueprint(source: BlueprintSource): CompiledBlueprint {
   const cached = cache.get(source);
   if (cached) return cached;
 
-  const nodes = new Map(source.nodes.map(node => [node.id, node]));
+  const nodes = new Map(source.nodes.map((node) => [node.id, node]));
   const edgeId = (from: string, pin: string, to: string): string => {
-    return source.edges.find(edge => (edge.source === from) && (edge.sourcePin === pin) && (edge.target === to))?.id ?? "";
+    return (
+      source.edges.find((edge) => edge.source === from && edge.sourcePin === pin && edge.target === to)?.id ??
+      ""
+    );
   };
 
   const build = (path: BlueprintPath, eventType: EventType | undefined): CompiledPath | null => {
@@ -71,9 +77,9 @@ export function compileBlueprint(source: BlueprintSource): CompiledBlueprint {
       guards.push({
         node,
         expect: guard.expect,
-        mode: (asString(node.data.mode) === "any") ? "any" : "all",
-        checks: Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [],
-        thisItem: node.data.thisItem === true
+        mode: asString(node.data.mode) === "any" ? "any" : "all",
+        checks: Array.isArray(node.data.checks) ? (node.data.checks as ConditionCheck[]) : [],
+        thisItem: node.data.thisItem === true,
       });
       previous = node.id;
       pin = guard.expect ? "yes" : "no";
@@ -82,17 +88,21 @@ export function compileBlueprint(source: BlueprintSource): CompiledBlueprint {
     return { event, eventType, pin: path.eventPin, guards, result, hops };
   };
 
-  const paths = enumeratePaths(source).flatMap(path => build(path, nodes.get(path.eventNodeId)?.type as EventType) ?? []);
-  const continuations = enumeratePaths(source, "results").flatMap(path => build(path, CONTINUATION_EVENT_BY_PIN[path.eventPin]) ?? []);
-  const byEvent = groupBy(paths, path => path.eventType);
-  const byResult = groupBy(continuations, path => path.event.id);
+  const paths = enumeratePaths(source).flatMap(
+    (path) => build(path, nodes.get(path.eventNodeId)?.type as EventType) ?? [],
+  );
+  const continuations = enumeratePaths(source, "results").flatMap(
+    (path) => build(path, CONTINUATION_EVENT_BY_PIN[path.eventPin]) ?? [],
+  );
+  const byEvent = groupBy(paths, (path) => path.eventType);
+  const byResult = groupBy(continuations, (path) => path.event.id);
 
   const compiled: CompiledBlueprint = {
     source,
     paths,
-    pathsFor: event => byEvent.get(event) ?? [],
+    pathsFor: (event) => byEvent.get(event) ?? [],
     continuations,
-    continuationsOf: nodeId => byResult.get(nodeId) ?? []
+    continuationsOf: (nodeId) => byResult.get(nodeId) ?? [],
   };
   cache.set(source, compiled);
   return compiled;

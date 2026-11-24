@@ -14,14 +14,25 @@ const first = { uuid: "Item.staff.ActiveEffect.first", name: "Особая ме�
 const second = { uuid: "Item.staff.ActiveEffect.second", name: "Другой эффект" };
 function Controlled({ changed, initial = first }: { changed: (value: unknown) => void; initial?: unknown }) {
   const [source, setSource] = useState<unknown>(initial);
-  return <FieldList fields={getCheck("actorActiveEffects")!.fields} data={{ match: "source", source }} path={[]} upstream={[]} onChange={(_path, value) => { changed(value); setSource(value); }} />;
+  return (
+    <FieldList
+      fields={getCheck("actorActiveEffects")!.fields}
+      data={{ match: "source", source }}
+      path={[]}
+      upstream={[]}
+      onChange={(_path, value) => {
+        changed(value);
+        setSource(value);
+      }}
+    />
+  );
 }
 const host: EditorHost = {
   effectSelection: {
     choices: () => [first, second],
-    resolve: async uuid => [first, second].find(ref => ref.uuid === uuid) ?? null,
-    parseDrop: parseEffectDrop
-  }
+    resolve: async (uuid) => [first, second].find((ref) => ref.uuid === uuid) ?? null,
+    parseDrop: parseEffectDrop,
+  },
 };
 function setup(selection = host, initial: unknown = first) {
   const changed = vi.fn();
@@ -35,7 +46,9 @@ async function enter(uuid: string) {
   await userEvent.click(screen.getByRole("button", { name: "Use UUID" }));
 }
 function drop(data: unknown) {
-  fireEvent.drop(screen.getByRole("group", { name: "Effect source" }), { dataTransfer: { getData: () => typeof data === "string" ? data : JSON.stringify(data) } });
+  fireEvent.drop(screen.getByRole("group", { name: "Effect source" }), {
+    dataTransfer: { getData: () => (typeof data === "string" ? data : JSON.stringify(data)) },
+  });
 }
 
 describe("effect reference field", () => {
@@ -71,14 +84,41 @@ describe("effect reference field", () => {
     drop({ type: "ActiveEffect", uuid: "Item.staff" });
     expect(changed).toHaveBeenLastCalledWith({ uuid: "Item.staff", name: "" });
     expect(await screen.findByRole("alert")).toBeInTheDocument();
-    const env = { evaluateNumber: () => null, replaceData: (text: string) => text, runScript: () => null, carrierItemUuid: null };
-    expect(evaluateCheck("actorActiveEffects", { match: "source", source: changed.mock.calls.at(-1)?.[0] }, rollFacts(), env).pass).toBe(false);
+    const env = {
+      evaluateNumber: () => null,
+      replaceData: (text: string) => text,
+      runScript: () => null,
+      carrierItemUuid: null,
+    };
+    expect(
+      evaluateCheck(
+        "actorActiveEffects",
+        { match: "source", source: changed.mock.calls.at(-1)?.[0] },
+        rollFacts(),
+        env,
+      ).pass,
+    ).toBe(false);
     // Legacy v2.3.2 saves containing invalid: true are still ignored as non-matching references.
-    expect(evaluateCheck("actorActiveEffects", { match: "source", source: { uuid: first.uuid, name: "", invalid: true } }, rollFacts(), env).pass).toBe(false);
+    expect(
+      evaluateCheck(
+        "actorActiveEffects",
+        { match: "source", source: { uuid: first.uuid, name: "", invalid: true } },
+        rollFacts(),
+        env,
+      ).pass,
+    ).toBe(false);
   });
   it("keeps the last request when lookups finish out of order", async () => {
     const pending = new Map<string, (value: EffectReference | null) => void>();
-    const { changed } = setup({ effectSelection: { choices: () => [first, second], resolve: uuid => new Promise(resolve => pending.set(uuid, resolve)) } }, null);
+    const { changed } = setup(
+      {
+        effectSelection: {
+          choices: () => [first, second],
+          resolve: (uuid) => new Promise((resolve) => pending.set(uuid, resolve)),
+        },
+      },
+      null,
+    );
     await enter(first.uuid);
     await enter(second.uuid);
     await act(async () => pending.get(second.uuid)!(second));
@@ -88,14 +128,29 @@ describe("effect reference field", () => {
   });
   it("does not commit a result after the field has unmounted", async () => {
     let finish: (value: EffectReference | null) => void = () => {};
-    const { changed, unmount } = setup({ effectSelection: { choices: () => [], resolve: () => new Promise(resolve => { finish = resolve; }) } });
+    const { changed, unmount } = setup({
+      effectSelection: {
+        choices: () => [],
+        resolve: () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      },
+    });
     await enter(second.uuid);
     unmount();
     await act(async () => finish(second));
     expect(changed).not.toHaveBeenCalled();
   });
   it("reports host failures without clearing the current selection", async () => {
-    const { changed } = setup({ effectSelection: { choices: () => [], resolve: async () => { throw new Error("offline"); } } });
+    const { changed } = setup({
+      effectSelection: {
+        choices: () => [],
+        resolve: async () => {
+          throw new Error("offline");
+        },
+      },
+    });
     await enter(second.uuid);
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(changed).not.toHaveBeenCalled();

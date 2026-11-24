@@ -27,9 +27,16 @@ describe("matchPaths", () => {
 
 describe("insertPath", () => {
   it("replaces the token and puts the caret after it", () => {
-    expect(insertPath("1d6 + @abil", { start: 6, end: 11, query: "abil" }, "@abilities.str.mod"))
-      .toEqual({ text: "1d6 + @abilities.str.mod", caret: 24 });
-    expect(insertPath("@abilities.str.mod + 2", { start: 0, end: 18, query: "abilities.str" }, "@abilities.cha.mod"))
-      .toEqual({ text: "@abilities.cha.mod + 2", caret: 18 });
+    expect(insertPath("1d6 + @abil", { start: 6, end: 11, query: "abil" }, "@abilities.str.mod")).toEqual({
+      text: "1d6 + @abilities.str.mod",
+      caret: 24,
+    });
+    expect(
+      insertPath(
+        "@abilities.str.mod + 2",
+        { start: 0, end: 18, query: "abilities.str" },
+        "@abilities.cha.mod",
+      ),
+    ).toEqual({ text: "@abilities.cha.mod + 2", caret: 18 });
   });
 });

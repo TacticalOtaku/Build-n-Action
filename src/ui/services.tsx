@@ -12,7 +12,11 @@ export interface EditorServices {
   host: EditorHost;
 }
 
-export function createEditorServices(translator: Translator, choices: ChoiceProvider, host: EditorHost = {}): EditorServices {
+export function createEditorServices(
+  translator: Translator,
+  choices: ChoiceProvider,
+  host: EditorHost = {},
+): EditorServices {
   return { translator, choices, fmt: createPhraseFormatter(translator, choices), host };
 }
 

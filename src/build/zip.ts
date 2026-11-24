@@ -14,7 +14,7 @@ const VERSION = 20;
 function dosTime(date: Date): [time: number, day: number] {
   const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
   const day = ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
-  return [time & 0xFFFF, day & 0xFFFF];
+  return [time & 0xffff, day & 0xffff];
 }
 
 /** A ZIP archive of the entries, deflated, in the given order (no ZIP64: under 4 GB). */
@@ -29,7 +29,7 @@ export function createZip(entries: readonly ZipEntry[], date = new Date()): Uint
     const crc = crc32(entry.data);
 
     const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034B50, 0);
+    local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(VERSION, 4);
     local.writeUInt16LE(UTF8_NAMES, 6);
     local.writeUInt16LE(DEFLATE, 8);
@@ -42,7 +42,7 @@ export function createZip(entries: readonly ZipEntry[], date = new Date()): Uint
     parts.push(local, name, compressed);
 
     const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014B50, 0);
+    central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(VERSION, 4);
     central.writeUInt16LE(VERSION, 6);
     central.writeUInt16LE(UTF8_NAMES, 8);
@@ -60,7 +60,7 @@ export function createZip(entries: readonly ZipEntry[], date = new Date()): Uint
   }
   const listing = Buffer.concat(directory);
   const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054B50, 0);
+  end.writeUInt32LE(0x06054b50, 0);
   end.writeUInt16LE(entries.length, 8);
   end.writeUInt16LE(entries.length, 10);
   end.writeUInt32LE(listing.length, 12);

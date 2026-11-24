@@ -16,9 +16,13 @@ export const SHADER_PALETTES: Record<FxFlavor, { dark: Triple; light: Triple }> 
   poison: { dark: ["#5F3DC4", "#38D9A9", "#B197FC"], light: ["#5F3DC4", "#0CA678", "#7048E8"] },
   thunder: { dark: ["#339AF0", "#D0EBFF", "#FFFFFF"], light: ["#1864AB", "#1C7ED6", "#4DABF7"] },
   force: { dark: ["#4C6EF5", "#BAC8FF", "#E5DBFF"], light: ["#364FC7", "#5C7CFA", "#7048E8"] },
-  psychic: { dark: ["#D6336C", "#9C36B5", "#FFDEEB"], light: ["#C2255C", "#9C36B5", "#E64980"] }
+  psychic: { dark: ["#D6336C", "#9C36B5", "#FFDEEB"], light: ["#C2255C", "#9C36B5", "#E64980"] },
 };
 
 export function hexToRgb(hex: string): [number, number, number] {
-  return [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16) / 255) as [number, number, number];
+  return [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ];
 }

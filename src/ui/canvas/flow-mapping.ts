@@ -20,18 +20,22 @@ export function toFlowNodes(
   selection: readonly string[],
   sizes: Readonly<Record<string, Size>>,
   trace: CanvasTrace | null,
-  lints: Readonly<Record<string, NodeLint>> = {}
+  lints: Readonly<Record<string, NodeLint>> = {},
 ): BnaFlowNode[] {
   const selected = new Set(selection);
-  return blueprint.nodes.map(node => {
+  return blueprint.nodes.map((node) => {
     const measured = sizes[node.id];
     return {
       id: node.id,
       type: node.kind,
       position: node.position,
-      data: { node, status: trace ? (trace.nodes[node.id] ?? "skipped") : null, lint: lints[node.id] ?? null },
+      data: {
+        node,
+        status: trace ? (trace.nodes[node.id] ?? "skipped") : null,
+        lint: lints[node.id] ?? null,
+      },
       selected: selected.has(node.id),
-      ...(measured ? { measured } : {})
+      ...(measured ? { measured } : {}),
     };
   });
 }
@@ -40,9 +44,9 @@ export function toFlowEdges(
   blueprint: BlueprintSource,
   selectedEdges: ReadonlySet<string>,
   trace: CanvasTrace | null,
-  label?: (edge: BlueprintEdge) => string
+  label?: (edge: BlueprintEdge) => string,
 ): BnaFlowEdge[] {
-  return blueprint.edges.map(edge => ({
+  return blueprint.edges.map((edge) => ({
     id: edge.id,
     type: "draft",
     source: edge.source,
@@ -51,6 +55,6 @@ export function toFlowEdges(
     targetHandle: "in",
     selected: selectedEdges.has(edge.id),
     data: { pin: edge.sourcePin, status: trace ? (trace.edges.has(edge.id) ? "taken" : "idle") : null },
-    ...(label ? { ariaLabel: label(edge) } : {})
+    ...(label ? { ariaLabel: label(edge) } : {}),
   }));
 }

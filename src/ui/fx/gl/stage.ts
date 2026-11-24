@@ -35,14 +35,19 @@ export class ShaderStage {
   static shared(): ShaderStage | null {
     if (ShaderStage.#shared === undefined) ShaderStage.#shared = ShaderStage.#create();
     const stage = ShaderStage.#shared;
-    return (stage && !stage.#lost) ? stage : null;
+    return stage && !stage.#lost ? stage : null;
   }
 
   static #create(): ShaderStage | null {
     if (typeof document === "undefined") return null;
     const canvas = document.createElement("canvas");
     const gl = canvas.getContext("webgl2", {
-      alpha: true, premultipliedAlpha: true, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false
+      alpha: true,
+      premultipliedAlpha: true,
+      antialias: false,
+      depth: false,
+      stencil: false,
+      preserveDrawingBuffer: false,
     });
     return gl ? new ShaderStage(canvas, gl) : null;
   }
@@ -57,7 +62,7 @@ export class ShaderStage {
     this.canvas = canvas;
     this.#gl = gl;
     this.#setupGeometry();
-    canvas.addEventListener("webglcontextlost", event => {
+    canvas.addEventListener("webglcontextlost", (event) => {
       event.preventDefault();
       this.#lost = true;
     });
@@ -76,7 +81,7 @@ export class ShaderStage {
     const gl = this.#gl;
     const width = Math.max(1, Math.ceil(frame.width));
     const height = Math.max(1, Math.ceil(frame.height));
-    if ((this.canvas.width < width) || (this.canvas.height < height)) {
+    if (this.canvas.width < width || this.canvas.height < height) {
       this.canvas.width = Math.max(this.canvas.width, width);
       this.canvas.height = Math.max(this.canvas.height, height);
     }
@@ -142,7 +147,9 @@ export class ShaderStage {
       gl.bindAttribLocation(program, 0, "a_position");
       gl.linkProgram(program);
       if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        const uniforms = Object.fromEntries(SHADER_UNIFORMS.map(name => [name, gl.getUniformLocation(program, name)]));
+        const uniforms = Object.fromEntries(
+          SHADER_UNIFORMS.map((name) => [name, gl.getUniformLocation(program, name)]),
+        );
         compiled = { program, uniforms: uniforms as CompiledProgram["uniforms"] };
       } else {
         log.warn(`${flavor} effect shader failed to link:`, gl.getProgramInfoLog(program));

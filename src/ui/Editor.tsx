@@ -1,8 +1,18 @@
 import { ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { AnimatePresence, MotionConfig } from "motion/react";
 import {
-  useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState,
-  type Dispatch, type DragEvent, type KeyboardEvent, type PointerEvent, type RefObject
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type Dispatch,
+  type DragEvent,
+  type KeyboardEvent,
+  type PointerEvent,
+  type RefObject,
 } from "react";
 import { createNode, duplicateBlueprint } from "../core/blueprint/factory";
 import type { BlueprintSource } from "../core/blueprint/types";
@@ -93,9 +103,11 @@ function EditorBody(props: EditorProps) {
   const { document, onCreate } = props;
   const [activeId, setActiveId] = useState<string | null>(() => {
     const wanted = props.initialActiveId;
-    return (wanted && document.blueprints.some(blueprint => blueprint.id === wanted)) ? wanted : (document.blueprints[0]?.id ?? null);
+    return wanted && document.blueprints.some((blueprint) => blueprint.id === wanted)
+      ? wanted
+      : (document.blueprints[0]?.id ?? null);
   });
-  const active = document.blueprints.find(blueprint => blueprint.id === activeId) ?? null;
+  const active = document.blueprints.find((blueprint) => blueprint.id === activeId) ?? null;
   const create = () => setActiveId(onCreate().id);
   const { preferences, simulator, library, transfer, effects } = useHost();
   const [picker, setPicker] = useState<PickerTab | null>(null);
@@ -109,28 +121,35 @@ function EditorBody(props: EditorProps) {
   const startTour = useCallback(() => setCoach(true), []);
   const handleRef = useRef<ActiveHandle | null>(null);
 
-  const current = (id: string) => (((id === active?.id) && handleRef.current)
-    ? handleRef.current.blueprint()
-    : document.blueprints.find(blueprint => blueprint.id === id));
+  const current = (id: string) =>
+    id === active?.id && handleRef.current
+      ? handleRef.current.blueprint()
+      : document.blueprints.find((blueprint) => blueprint.id === id);
 
   const duplicate = (id: string) => {
     const source = current(id);
     if (!source) return;
-    const copy = onCreate(duplicateBlueprint(source, t("BNA.UI.Rail.copyName", { name: source.name || t("BNA.UI.Rail.untitled") })));
+    const copy = onCreate(
+      duplicateBlueprint(
+        source,
+        t("BNA.UI.Rail.copyName", { name: source.name || t("BNA.UI.Rail.untitled") }),
+      ),
+    );
     setActiveId(copy.id);
   };
 
   const toggle = (id: string) => {
     const source = current(id);
     if (!source) return;
-    if ((id === active?.id) && handleRef.current) handleRef.current.dispatch({ type: "setEnabled", enabled: !source.enabled });
+    if (id === active?.id && handleRef.current)
+      handleRef.current.dispatch({ type: "setEnabled", enabled: !source.enabled });
     else props.onSave({ ...source, enabled: !source.enabled });
   };
 
   const remove = (id: string) => {
     if (id === active?.id) {
       handleRef.current?.discard();
-      const index = document.blueprints.findIndex(blueprint => blueprint.id === id);
+      const index = document.blueprints.findIndex((blueprint) => blueprint.id === id);
       const next = document.blueprints[index + 1] ?? document.blueprints[index - 1] ?? null;
       setActiveId(next?.id ?? null);
     }
@@ -140,9 +159,10 @@ function EditorBody(props: EditorProps) {
   const moveToEffect = (id: string) => {
     const source = current(id);
     if (!source || !effects) return;
-    effects.moveToEffect(source)
+    effects
+      .moveToEffect(source)
       .then(() => remove(id))
-      .catch(error => log.warn("could not move the blueprint to an effect", error));
+      .catch((error) => log.warn("could not move the blueprint to an effect", error));
   };
 
   const adopt = (blueprint: BlueprintSource) => {
@@ -157,23 +177,27 @@ function EditorBody(props: EditorProps) {
 
   const saveToLibrary = (id: string) => {
     const source = current(id);
-    if (source) library?.add(source).catch(error => log.warn("could not save to the library", error));
+    if (source) library?.add(source).catch((error) => log.warn("could not save to the library", error));
   };
 
   const dragRow = (id: string, event: DragEvent<HTMLElement>) => {
     const source = current(id);
     if (!source) return;
-    event.dataTransfer.setData("text/plain", JSON.stringify(transfer ? transfer.dragData(source) : defaultDragData(source)));
+    event.dataTransfer.setData(
+      "text/plain",
+      JSON.stringify(transfer ? transfer.dragData(source) : defaultDragData(source)),
+    );
     event.dataTransfer.effectAllowed = "copy";
   };
 
   const dropData = (data: unknown) => {
     const resolve = transfer ? transfer.resolveDrop(data) : Promise.resolve(readDroppedBlueprint(data));
     resolve
-      .then(dropped => {
-        if (dropped && !document.blueprints.some(blueprint => blueprint.id === dropped.id)) adopt(duplicateBlueprint(dropped, dropped.name));
+      .then((dropped) => {
+        if (dropped && !document.blueprints.some((blueprint) => blueprint.id === dropped.id))
+          adopt(duplicateBlueprint(dropped, dropped.name));
       })
-      .catch(error => log.warn("could not read the dropped blueprint", error));
+      .catch((error) => log.warn("could not read the dropped blueprint", error));
   };
 
   return (
@@ -206,8 +230,7 @@ function EditorBody(props: EditorProps) {
                   <button type="button" className="bna-button" onClick={create}>
                     <Icon name="plus" />
                     {t("BNA.UI.Rail.create")}
-                  </button>
-                  {" "}
+                  </button>{" "}
                   <button type="button" className="bna-button" onClick={() => setPicker("presets")}>
                     <Icon name="layers" />
                     {t("BNA.UI.Rail.templates")}
@@ -219,16 +242,26 @@ function EditorBody(props: EditorProps) {
           <aside className="bna-inspector" aria-label={t("BNA.UI.Inspector.label")} />
         </>
       )}
-      {(active && coach) ? <CoachMarks root={appRef} anchors={anchors} onDone={finishCoach} /> : null}
+      {active && coach ? <CoachMarks root={appRef} anchors={anchors} onDone={finishCoach} /> : null}
       <AnimatePresence>
-        {picker ? <TemplatePicker key="picker" initialTab={picker} onPick={pick} onClose={() => setPicker(null)} /> : null}
+        {picker ? (
+          <TemplatePicker key="picker" initialTab={picker} onPick={pick} onClose={() => setPicker(null)} />
+        ) : null}
       </AnimatePresence>
     </div>
   );
 }
 
 function ActiveEditor({
-  initial, handleRef, onTour, document, theme, onToggleTheme, fxLevel, onCycleFx, onSave
+  initial,
+  handleRef,
+  onTour,
+  document,
+  theme,
+  onToggleTheme,
+  fxLevel,
+  onCycleFx,
+  onSave,
 }: EditorProps & { initial: BlueprintSource; handleRef: RefObject<ActiveHandle | null>; onTour(): void }) {
   const t = useT();
   const [state, dispatch] = useReducer(editorReducer, initial, createEditorState);
@@ -251,8 +284,8 @@ function ActiveEditor({
     }
   }, [deferredBlueprint, host]);
   const [simTrace, setSimTrace] = useState<CanvasTrace | null>(null);
-  const trace = (drawer === "test") ? simTrace : null;
-  const toggleTest = useCallback(() => setDrawer(open => ((open === "test") ? null : "test")), []);
+  const trace = drawer === "test" ? simTrace : null;
+  const toggleTest = useCallback(() => setDrawer((open) => (open === "test" ? null : "test")), []);
   const lints = useMemo(() => nodeLints(issues, t), [issues, t]);
   const counts = useMemo(() => lintCounts(issues), [issues]);
 
@@ -266,7 +299,7 @@ function ActiveEditor({
       dispatch,
       discard: () => {
         discarded.current = true;
-      }
+      },
     };
     return () => {
       handleRef.current = null;
@@ -275,7 +308,7 @@ function ActiveEditor({
 
   // Autosave shortly after the last change.
   useEffect(() => {
-    if (discarded.current || (blueprint === saved)) return;
+    if (discarded.current || blueprint === saved) return;
     const timer = window.setTimeout(() => {
       onSave(blueprint);
       setSaved(blueprint);
@@ -287,7 +320,7 @@ function ActiveEditor({
   const flush = useRef<() => void>(() => {});
   useEffect(() => {
     flush.current = () => {
-      if (!discarded.current && (blueprint !== saved)) onSave(blueprint);
+      if (!discarded.current && blueprint !== saved) onSave(blueprint);
     };
   });
   useEffect(() => {
@@ -295,26 +328,32 @@ function ActiveEditor({
     return () => pending.current();
   }, []);
 
-  const onSizes = useCallback((updates: Record<string, Size>) => setSizes(previous => ({ ...previous, ...updates })), []);
+  const onSizes = useCallback(
+    (updates: Record<string, Size>) => setSizes((previous) => ({ ...previous, ...updates })),
+    [],
+  );
   const closePalette = useCallback(() => setPalette(null), []);
 
   const openPaletteAtCenter = useCallback(() => {
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
     setPalette({
-      flow: screenToFlowPosition({ x: rect.left + (rect.width / 2), y: rect.top + (rect.height / 2) }),
-      screen: { x: (rect.width / 2) - 180, y: rect.height / 4 },
+      flow: screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }),
+      screen: { x: rect.width / 2 - 180, y: rect.height / 4 },
       bounds: { width: rect.width, height: rect.height },
-      from: null
+      from: null,
     });
   }, [screenToFlowPosition]);
 
-  const pick = useCallback((item: PaletteItem) => {
-    if (!palette) return;
-    const node = createNode(item.kind, item.type, { x: snap(palette.flow.x), y: snap(palette.flow.y) });
-    dispatch({ type: "addNode", node, connectFrom: palette.from ?? undefined });
-    setPalette(null);
-  }, [palette]);
+  const pick = useCallback(
+    (item: PaletteItem) => {
+      if (!palette) return;
+      const node = createNode(item.kind, item.type, { x: snap(palette.flow.x), y: snap(palette.flow.y) });
+      dispatch({ type: "addNode", node, connectFrom: palette.from ?? undefined });
+      setPalette(null);
+    },
+    [palette],
+  );
 
   const tidy = useCallback(async () => {
     const positions = await autoLayout(blueprint, sizes);
@@ -332,42 +371,57 @@ function ActiveEditor({
       drawerToggled.current = true;
       return;
     }
-    const timer = window.setTimeout(() => void fitView(fitOptions(stageRef.current, { duration: 300 })), DRAWER_SETTLE);
+    const timer = window.setTimeout(
+      () => void fitView(fitOptions(stageRef.current, { duration: 300 })),
+      DRAWER_SETTLE,
+    );
     return () => window.clearTimeout(timer);
   }, [drawerOpen, fitView]);
 
-  const focusNode = useCallback((id: string) => {
-    dispatch({ type: "select", ids: [id] });
-    void fitView(fitOptions(stageRef.current, { nodes: [{ id }], duration: 300 }));
-  }, [fitView]);
+  const focusNode = useCallback(
+    (id: string) => {
+      dispatch({ type: "select", ids: [id] });
+      void fitView(fitOptions(stageRef.current, { nodes: [{ id }], duration: 300 }));
+    },
+    [fitView],
+  );
 
   const onStageKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if ((event.target as HTMLElement).closest(EDITABLE)) return;
     const key = event.key.toLowerCase();
     const modifier = event.ctrlKey || event.metaKey;
-    if (modifier && (key === "z") && !event.shiftKey) {
+    if (modifier && key === "z" && !event.shiftKey) {
       event.preventDefault();
       dispatch({ type: "undo" });
-    } else if (modifier && ((key === "y") || ((key === "z") && event.shiftKey))) {
+    } else if (modifier && (key === "y" || (key === "z" && event.shiftKey))) {
       event.preventDefault();
       dispatch({ type: "redo" });
-    } else if (modifier && (key === "d")) {
+    } else if (modifier && key === "d") {
       event.preventDefault();
-      if (state.selection.length) dispatch({ type: "duplicateNodes", ids: state.selection, offset: { x: GRID * 2, y: GRID * 2 } });
-    } else if ((event.key === " ") && !palette) {
+      if (state.selection.length)
+        dispatch({ type: "duplicateNodes", ids: state.selection, offset: { x: GRID * 2, y: GRID * 2 } });
+    } else if (event.key === " " && !palette) {
       event.preventDefault();
       openPaletteAtCenter();
     }
   };
 
   const onStagePointerDown = (event: PointerEvent<HTMLElement>) => {
-    if (!(event.target as HTMLElement).closest(`${EDITABLE}, button`)) stageRef.current?.focus({ preventScroll: true });
+    if (!(event.target as HTMLElement).closest(`${EDITABLE}, button`))
+      stageRef.current?.focus({ preventScroll: true });
   };
 
   return (
     <>
       <div className="bna-center">
-        <main ref={stageRef} className="bna-stage" data-coach="canvas" tabIndex={-1} onKeyDown={onStageKeyDown} onPointerDown={onStagePointerDown}>
+        <main
+          ref={stageRef}
+          className="bna-stage"
+          data-coach="canvas"
+          tabIndex={-1}
+          onKeyDown={onStageKeyDown}
+          onPointerDown={onStagePointerDown}
+        >
           <BlueprintCanvas
             state={state}
             dispatch={dispatch}
@@ -406,7 +460,13 @@ function ActiveEditor({
           />
           <AnimatePresence>
             {palette ? (
-              <CommandPalette key="palette" request={palette} blueprint={blueprint} onPick={pick} onClose={closePalette} />
+              <CommandPalette
+                key="palette"
+                request={palette}
+                blueprint={blueprint}
+                onPick={pick}
+                onClose={closePalette}
+              />
             ) : null}
           </AnimatePresence>
         </main>
@@ -418,13 +478,27 @@ function ActiveEditor({
               onTab={setDrawer}
               onClose={() => setDrawer(null)}
               issueCount={issues.length}
-              test={simulator ? <SimulatorPanel blueprint={blueprint} simulator={simulator} onTrace={setSimTrace} onFocus={focusNode} /> : undefined}
+              test={
+                simulator ? (
+                  <SimulatorPanel
+                    blueprint={blueprint}
+                    simulator={simulator}
+                    onTrace={setSimTrace}
+                    onFocus={focusNode}
+                  />
+                ) : undefined
+              }
               issues={<IssuesPanel blueprint={blueprint} issues={issues} onFocus={focusNode} />}
             />
           ) : null}
         </AnimatePresence>
       </div>
-      <Inspector blueprint={blueprint} selection={state.selection} dispatch={dispatch} itemCarrier={document.itemCarrier === true} />
+      <Inspector
+        blueprint={blueprint}
+        selection={state.selection}
+        dispatch={dispatch}
+        itemCarrier={document.itemCarrier === true}
+      />
     </>
   );
 }

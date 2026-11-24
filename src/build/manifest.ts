@@ -2,7 +2,8 @@
 export const MODULE_VERSION = "2.5.0";
 
 const REPOSITORY = "https://github.com/TacticalOtaku/Build-n-Action";
-const SCREENSHOTS_BASE = "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots";
+const SCREENSHOTS_BASE =
+  "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots";
 
 /** The Foundry manifest of the built package. */
 export function createManifest(version = MODULE_VERSION) {
@@ -19,12 +20,12 @@ export function createManifest(version = MODULE_VERSION) {
       systems: [{ id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } }],
       recommends: [
         { id: "midi-qol", type: "module", compatibility: { minimum: "14.0.12", verified: "14.0.12" } },
-        { id: "dae", type: "module", compatibility: { minimum: "14.0.14", verified: "14.0.14" } }
-      ]
+        { id: "dae", type: "module", compatibility: { minimum: "14.0.14", verified: "14.0.14" } },
+      ],
     },
     languages: [
       { lang: "en", name: "English", path: "lang/en.json", flags: {} },
-      { lang: "ru", name: "Русский", path: "lang/ru.json", flags: {} }
+      { lang: "ru", name: "Русский", path: "lang/ru.json", flags: {} },
     ],
     url: REPOSITORY,
     manifest: `${REPOSITORY}/releases/latest/download/module.json`,
@@ -37,20 +38,20 @@ export function createManifest(version = MODULE_VERSION) {
       {
         type: "cover",
         url: `${SCREENSHOTS_BASE}/editor-graph.png`,
-        caption: "Visual When → If → Then blueprint editor and inspector in dark theme"
+        caption: "Visual When → If → Then blueprint editor and inspector in dark theme",
       },
       {
         type: "screenshot",
         url: `${SCREENSHOTS_BASE}/editor-test-simulator.png`,
-        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses"
+        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses",
       },
       {
         type: "screenshot",
         url: `${SCREENSHOTS_BASE}/editor-templates.png`,
-        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets"
-      }
+        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets",
+      },
     ],
     socket: true,
-    documentTypes: { RegionBehavior: { blueprints: {} } }
+    documentTypes: { RegionBehavior: { blueprints: {} } },
   };
 }

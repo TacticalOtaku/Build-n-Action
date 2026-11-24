@@ -8,10 +8,11 @@ import { validateBlueprintSource } from "../blueprint/validate";
  */
 export function foldThisItemChecks(blueprint: BlueprintSource): BlueprintSource {
   let changed = false;
-  const nodes = blueprint.nodes.map(node => {
-    if ((node.kind !== "condition") || (node.data.mode === "any") || !Array.isArray(node.data.checks)) return node;
+  const nodes = blueprint.nodes.map((node) => {
+    if (node.kind !== "condition" || node.data.mode === "any" || !Array.isArray(node.data.checks))
+      return node;
     const checks = node.data.checks as ConditionCheck[];
-    const kept = checks.filter(check => check.type !== "thisItem");
+    const kept = checks.filter((check) => check.type !== "thisItem");
     if (kept.length === checks.length) return node;
     changed = true;
     return { ...node, data: { ...node.data, checks: kept, thisItem: true } };
@@ -48,13 +49,15 @@ export interface FlagUpdate {
 const ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
 export function issueMessageKey(issue: Pick<RepositoryIssue, "code">): string {
-  return (issue.code === "invalidBlueprint") ? "BNA.Storage.invalidBlueprint" : `BNA.Migration.Warning.${issue.code}`;
+  return issue.code === "invalidBlueprint"
+    ? "BNA.Storage.invalidBlueprint"
+    : `BNA.Migration.Warning.${issue.code}`;
 }
 
 /** Stored lists may be arrays or id-keyed objects (v1 accepted both). */
 export function storedEntries(value: unknown): unknown[] {
   if (Array.isArray(value)) return value.filter(Boolean);
-  if (value && (typeof value === "object")) return Object.values(value).filter(Boolean);
+  if (value && typeof value === "object") return Object.values(value).filter(Boolean);
   return [];
 }
 
@@ -77,7 +80,7 @@ function derivedId(seed: string): string {
 }
 
 function byOrder(left: BlueprintSource, right: BlueprintSource): number {
-  return (left.sort - right.sort) || left.name.localeCompare(right.name);
+  return left.sort - right.sort || left.name.localeCompare(right.name);
 }
 
 /** The blueprints stored on a document: saved ones plus lazily converted v1 bonuses. */
@@ -90,7 +93,11 @@ export function readBlueprints(scope: unknown, carrier: LegacyCarrier): ReadResu
   for (const raw of storedEntries(flags.blueprints)) {
     const result = validateBlueprintSource(raw);
     if (!result.ok) {
-      issues.push({ id: storedId(raw), code: "invalidBlueprint", values: { path: result.issues[0]?.path || "—" } });
+      issues.push({
+        id: storedId(raw),
+        code: "invalidBlueprint",
+        values: { path: result.issues[0]?.path || "—" },
+      });
       continue;
     }
     if (ids.has(result.value.id)) continue;
@@ -104,7 +111,9 @@ export function readBlueprints(scope: unknown, carrier: LegacyCarrier): ReadResu
     const seed = JSON.stringify(raw);
     const occurrence = seeds.get(seed) ?? 0;
     seeds.set(seed, occurrence + 1);
-    const { blueprint, warnings } = convertLegacyBonus(raw, carrier, { fallbackId: derivedId(`${occurrence}:${seed}`) });
+    const { blueprint, warnings } = convertLegacyBonus(raw, carrier, {
+      fallbackId: derivedId(`${occurrence}:${seed}`),
+    });
     const id = blueprint?.id ?? storedId(raw);
     for (const warning of warnings) issues.push({ id, ...warning });
     if (!blueprint || ids.has(blueprint.id)) continue;
@@ -116,15 +125,18 @@ export function readBlueprints(scope: unknown, carrier: LegacyCarrier): ReadResu
 }
 
 /** Remove the v1 bonus a blueprint was converted from (if still stored) and back it up. */
-function withoutLegacy(flags: Record<string, unknown>, blueprint: Pick<BlueprintSource, "id" | "flags">): Omit<FlagUpdate, "blueprints"> {
+function withoutLegacy(
+  flags: Record<string, unknown>,
+  blueprint: Pick<BlueprintSource, "id" | "flags">,
+): Omit<FlagUpdate, "blueprints"> {
   const legacyId = asString(asRecord(blueprint.flags[MODULE_SCOPE]).legacyId, blueprint.id);
   const bonuses = storedEntries(flags.bonuses);
-  const index = bonuses.findIndex(entry => [blueprint.id, legacyId].includes(storedId(entry)));
+  const index = bonuses.findIndex((entry) => [blueprint.id, legacyId].includes(storedId(entry)));
   if (index < 0) return {};
   const original = bonuses[index];
   return {
     bonuses: bonuses.filter((_entry, position) => position !== index),
-    legacyBackup: { ...asRecord(flags.legacyBackup), [blueprint.id]: original }
+    legacyBackup: { ...asRecord(flags.legacyBackup), [blueprint.id]: original },
   };
 }
 
@@ -132,23 +144,29 @@ function withoutLegacy(flags: Record<string, unknown>, blueprint: Pick<Blueprint
 export function upsertBlueprint(scope: unknown, blueprint: BlueprintSource): FlagUpdate {
   const flags = asRecord(scope);
   const stored = storedEntries(flags.blueprints);
-  const index = stored.findIndex(entry => storedId(entry) === blueprint.id);
-  const blueprints = (index < 0)
-    ? [...stored, blueprint]
-    : stored.map((entry, position) => (position === index) ? blueprint : entry);
+  const index = stored.findIndex((entry) => storedId(entry) === blueprint.id);
+  const blueprints =
+    index < 0
+      ? [...stored, blueprint]
+      : stored.map((entry, position) => (position === index ? blueprint : entry));
   return { blueprints, ...withoutLegacy(flags, blueprint) };
 }
 
 /** Delete a blueprint, including the v1 bonus it may still be stored as (kept in the backup). */
-export function deleteBlueprint(scope: unknown, blueprint: Pick<BlueprintSource, "id" | "flags">): FlagUpdate {
+export function deleteBlueprint(
+  scope: unknown,
+  blueprint: Pick<BlueprintSource, "id" | "flags">,
+): FlagUpdate {
   const flags = asRecord(scope);
-  const blueprints = storedEntries(flags.blueprints).filter(entry => storedId(entry) !== blueprint.id);
+  const blueprints = storedEntries(flags.blueprints).filter((entry) => storedId(entry) !== blueprint.id);
   return { blueprints, ...withoutLegacy(flags, blueprint) };
 }
 
 /** A flag update as `document.update` changes. */
 export function flagChanges(update: FlagUpdate): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(update).map(([key, value]) => [`flags.${MODULE_SCOPE}.${key}`, value]));
+  return Object.fromEntries(
+    Object.entries(update).map(([key, value]) => [`flags.${MODULE_SCOPE}.${key}`, value]),
+  );
 }
 
 export function blueprintUuid(parentUuid: string, id: string): string {

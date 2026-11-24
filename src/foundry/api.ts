@@ -8,7 +8,11 @@ import { asRecord } from "../core/registry/data";
 import { blueprintUuid } from "../core/storage/repository";
 import type { SimulationResult } from "../ui/host";
 import {
-  blueprintFromUuid, blueprintFromUuidSync, documentBlueprints, removeBlueprint, saveBlueprint
+  blueprintFromUuid,
+  blueprintFromUuidSync,
+  documentBlueprints,
+  removeBlueprint,
+  saveBlueprint,
 } from "./documents";
 import { openEditor } from "./editor/app";
 import { simulate } from "./editor/host";
@@ -18,11 +22,17 @@ import { MigrationApp } from "./migration-app";
 import { recentRolls } from "./play";
 import { log } from "../core/log";
 
-export { blueprintFromUuid, blueprintFromUuidSync, removeBlueprint, saveBlueprint, type FoundBlueprint } from "./documents";
+export {
+  blueprintFromUuid,
+  blueprintFromUuidSync,
+  removeBlueprint,
+  saveBlueprint,
+  type FoundBlueprint,
+} from "./documents";
 
 const INTEGRATIONS = {
   "midi-qol": { label: "Midi QOL", minimum: "14.0.12" },
-  dae: { label: "DAE", minimum: "14.0.14" }
+  dae: { label: "DAE", minimum: "14.0.14" },
 } as const;
 
 export interface IntegrationState {
@@ -33,12 +43,15 @@ export interface IntegrationState {
 }
 
 export function getIntegrationStatus(): Record<string, IntegrationState> {
-  return Object.fromEntries(Object.entries(INTEGRATIONS).map(([id, support]) => {
-    const module = game.modules.get(id);
-    const version = module?.version ?? null;
-    const compatible = !module?.active || !version || !foundry.utils.isNewerVersion(support.minimum, version);
-    return [id, { active: module?.active === true, compatible, minimum: support.minimum, version }];
-  }));
+  return Object.fromEntries(
+    Object.entries(INTEGRATIONS).map(([id, support]) => {
+      const module = game.modules.get(id);
+      const version = module?.version ?? null;
+      const compatible =
+        !module?.active || !version || !foundry.utils.isNewerVersion(support.minimum, version);
+      return [id, { active: module?.active === true, compatible, minimum: support.minimum, version }];
+    }),
+  );
 }
 
 /** Warn about active integrations older than supported; neither is required. */
@@ -59,18 +72,28 @@ export async function toggleBlueprint(uuid: string): Promise<boolean | null> {
   }
   const enabled = !found.blueprint.enabled;
   await saveBlueprint(found.document, { ...found.blueprint, enabled });
-  ui.notifications.info(game.i18n.format(enabled ? "BNA.Runtime.Enabled" : "BNA.Runtime.Disabled", { name: found.blueprint.name }));
+  ui.notifications.info(
+    game.i18n.format(enabled ? "BNA.Runtime.Enabled" : "BNA.Runtime.Disabled", {
+      name: found.blueprint.name,
+    }),
+  );
   return enabled;
 }
 
 function validated(blueprint: unknown): BlueprintSource {
   const result = validateBlueprintSource(blueprint);
-  if (!result.ok) throw new Error(`Build-n-Action | the blueprint is not valid (${result.issues.map(issue => issue.code).join(", ")})`);
+  if (!result.ok)
+    throw new Error(
+      `Build-n-Action | the blueprint is not valid (${result.issues.map((issue) => issue.code).join(", ")})`,
+    );
   return result.value;
 }
 
 /** Store a new blueprint on a document, from optional partial data; it gets a fresh id. */
-export async function createStoredBlueprint(document: FoundryDocument, data: unknown = {}): Promise<BlueprintSource> {
+export async function createStoredBlueprint(
+  document: FoundryDocument,
+  data: unknown = {},
+): Promise<BlueprintSource> {
   return saveBlueprint(document, { ...createBlueprint(), ...asRecord(data), id: randomId() });
 }
 
@@ -78,7 +101,9 @@ export async function createStoredBlueprint(document: FoundryDocument, data: unk
 export async function duplicateStoredBlueprint(uuid: string): Promise<BlueprintSource | null> {
   const found = await blueprintFromUuid(uuid);
   if (!found) return null;
-  const name = game.i18n.format("BNA.UI.Rail.copyName", { name: found.blueprint.name || game.i18n.localize("BNA.UI.Rail.untitled") });
+  const name = game.i18n.format("BNA.UI.Rail.copyName", {
+    name: found.blueprint.name || game.i18n.localize("BNA.UI.Rail.untitled"),
+  });
   return saveBlueprint(found.document, duplicateBlueprint(found.blueprint, name));
 }
 
@@ -113,7 +138,7 @@ export function simulateBlueprint(blueprint: unknown, context: SimulateContext):
     abilityId: context.abilityId ?? null,
     skillId: context.skillId ?? null,
     saveOutcome: context.saveOutcome ?? "failed",
-    counters: context.counters ?? {}
+    counters: context.counters ?? {},
   });
 }
 
@@ -131,7 +156,7 @@ export function createApi() {
       create: createStoredBlueprint,
       duplicate: duplicateStoredBlueprint,
       compile: (blueprint: unknown): CompiledBlueprint => compileBlueprint(validated(blueprint)),
-      simulate: simulateBlueprint
+      simulate: simulateBlueprint,
     },
     openEditor,
     library: createLibraryApi(),
@@ -140,12 +165,12 @@ export function createApi() {
       scan: scanMigration,
       run: runMigration,
       deleteBackups,
-      open: () => new MigrationApp().render({ force: true })
+      open: () => new MigrationApp().render({ force: true }),
     },
     hotbarToggle: toggleBlueprint,
     fromUuid: blueprintFromUuid,
     fromUuidSync: blueprintFromUuidSync,
     getIntegrationStatus,
-    debug: { recentRolls }
+    debug: { recentRolls },
   };
 }

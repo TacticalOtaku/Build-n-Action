@@ -24,7 +24,7 @@ export const PALETTE_ITEMS: readonly PaletteItem[] = [
     labelKey: `BNA.Event.${event.type}.Label`,
     summaryKey: `BNA.Event.${event.type}.Summary`,
     icon: event.icon,
-    compatibleEvents: null
+    compatibleEvents: null,
   })),
   {
     key: "condition",
@@ -34,7 +34,7 @@ export const PALETTE_ITEMS: readonly PaletteItem[] = [
     labelKey: "BNA.Palette.condition.Label",
     summaryKey: "BNA.Palette.condition.Summary",
     icon: "split",
-    compatibleEvents: null
+    compatibleEvents: null,
   },
   ...RESULTS.map((result): PaletteItem => ({
     key: `result:${result.type}`,
@@ -44,8 +44,8 @@ export const PALETTE_ITEMS: readonly PaletteItem[] = [
     labelKey: `BNA.Result.${result.type}.Label`,
     summaryKey: `BNA.Result.${result.type}.Summary`,
     icon: result.icon,
-    compatibleEvents: result.compatibleEvents
-  }))
+    compatibleEvents: result.compatibleEvents,
+  })),
 ];
 
 export interface PaletteContext {
@@ -58,8 +58,8 @@ export interface PaletteContext {
 function allowed(item: PaletteItem, context: PaletteContext): boolean {
   if (!context.from) return true;
   if (item.kind === "event") return false;
-  if ((item.kind === "result") && context.upstream.length) {
-    return context.upstream.some(event => item.compatibleEvents?.includes(event));
+  if (item.kind === "result" && context.upstream.length) {
+    return context.upstream.some((event) => item.compatibleEvents?.includes(event));
   }
   return true;
 }
@@ -82,14 +82,17 @@ export function filterPaletteItems(
   items: readonly PaletteItem[],
   query: string,
   context: PaletteContext,
-  t: (key: string) => string
+  t: (key: string) => string,
 ): PaletteItem[] {
-  const visible = items.filter(item => allowed(item, context));
+  const visible = items.filter((item) => allowed(item, context));
   const needle = normalizeSearch(query);
   if (!needle) return visible;
   return visible
-    .map(item => ({ item, rank: score(needle, normalizeSearch(t(item.labelKey)), normalizeSearch(t(item.summaryKey))) }))
-    .filter(entry => entry.rank > 0)
+    .map((item) => ({
+      item,
+      rank: score(needle, normalizeSearch(t(item.labelKey)), normalizeSearch(t(item.summaryKey))),
+    }))
+    .filter((entry) => entry.rank > 0)
     .sort((a, b) => b.rank - a.rank)
-    .map(entry => entry.item);
+    .map((entry) => entry.item);
 }

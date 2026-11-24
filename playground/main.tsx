@@ -23,7 +23,7 @@ type Language = "en" | "ru";
 function readPreference<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
   try {
     const value = localStorage.getItem(key);
-    return allowed.includes(value as T) ? value as T : fallback;
+    return allowed.includes(value as T) ? (value as T) : fallback;
   } catch {
     return fallback;
   }
@@ -41,10 +41,16 @@ function writePreference(key: string, value: string): void {
 const shown: { blueprints: readonly BlueprintSource[] } = { blueprints: [] };
 
 function App() {
-  const [language, setLanguage] = useState<Language>(() => readPreference("bna.lang", ["en", "ru"] as const, "ru"));
-  const [theme, setTheme] = useState<ThemeName>(() => readPreference(
-    "bna.theme", ["dark", "light"] as const, window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"
-  ));
+  const [language, setLanguage] = useState<Language>(() =>
+    readPreference("bna.lang", ["en", "ru"] as const, "ru"),
+  );
+  const [theme, setTheme] = useState<ThemeName>(() =>
+    readPreference(
+      "bna.theme",
+      ["dark", "light"] as const,
+      window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark",
+    ),
+  );
   const [fxLevel, setFxLevel] = useState<FxLevel>(() => readPreference("bna.fx", FX_LEVELS, "full"));
   const [blueprints, setBlueprints] = useState<BlueprintSource[]>(() => createSampleBlueprints(language));
 
@@ -52,12 +58,13 @@ function App() {
     shown.blueprints = blueprints;
   }, [blueprints]);
   const services = useMemo(
-    () => createEditorServices(
-      createTranslator((language === "ru") ? ru : en),
-      createMockChoices(language),
-      createPlaygroundHost(language, () => shown.blueprints)
-    ),
-    [language]
+    () =>
+      createEditorServices(
+        createTranslator(language === "ru" ? ru : en),
+        createMockChoices(language),
+        createPlaygroundHost(language, () => shown.blueprints),
+      ),
+    [language],
   );
 
   useEffect(() => {
@@ -66,17 +73,17 @@ function App() {
   }, [theme, language]);
 
   const onSave = useCallback((blueprint: BlueprintSource) => {
-    setBlueprints(list => list.map(entry => (entry.id === blueprint.id) ? blueprint : entry));
+    setBlueprints((list) => list.map((entry) => (entry.id === blueprint.id ? blueprint : entry)));
   }, []);
 
   const onCreate = useCallback((source?: BlueprintSource) => {
     const blueprint = source ?? createBlueprint();
-    setBlueprints(list => [...list, blueprint]);
+    setBlueprints((list) => [...list, blueprint]);
     return blueprint;
   }, []);
 
   const onDelete = useCallback((id: string) => {
-    setBlueprints(list => list.filter(entry => entry.id !== id));
+    setBlueprints((list) => list.filter((entry) => entry.id !== id));
   }, []);
 
   const chooseLanguage = (next: Language) => {
@@ -88,10 +95,19 @@ function App() {
     <div className="playground">
       <header className="playground__bar">
         <strong>Build-n-Action</strong>
-        <span>{(language === "ru") ? "Песочница редактора. ПКМ по холсту или Пробел добавляют узел." : "Editor playground. Right-click the canvas or press Space to add a node."}</span>
+        <span>
+          {language === "ru"
+            ? "Песочница редактора. ПКМ по холсту или Пробел добавляют узел."
+            : "Editor playground. Right-click the canvas or press Space to add a node."}
+        </span>
         <div className="playground__langs">
-          {(["ru", "en"] as const).map(option => (
-            <button key={option} type="button" aria-pressed={language === option} onClick={() => chooseLanguage(option)}>
+          {(["ru", "en"] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={language === option}
+              onClick={() => chooseLanguage(option)}
+            >
               {option.toUpperCase()}
             </button>
           ))}
@@ -100,10 +116,14 @@ function App() {
       <ServicesProvider services={services}>
         <Editor
           key={language}
-          document={{ label: (language === "ru") ? "Длинный меч «Ария»" : "Longsword “Aria”", blueprints, itemCarrier: true }}
+          document={{
+            label: language === "ru" ? "Длинный меч «Ария»" : "Longsword “Aria”",
+            blueprints,
+            itemCarrier: true,
+          }}
           theme={theme}
           onToggleTheme={() => {
-            const next = (theme === "dark") ? "light" : "dark";
+            const next = theme === "dark" ? "light" : "dark";
             setTheme(next);
             writePreference("bna.theme", next);
           }}
@@ -127,6 +147,6 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <App />
-    </StrictMode>
+    </StrictMode>,
   );
 }

@@ -16,7 +16,7 @@ export class BlueprintEditorApp extends foundry.applications.api.ApplicationV2 {
   static DEFAULT_OPTIONS = {
     classes: ["bna-editor-window"],
     window: { icon: "fa-solid fa-diagram-project", resizable: true },
-    position: { width: 1280, height: 780 }
+    position: { width: 1280, height: 780 },
   };
 
   readonly carrier: FoundryDocument;
@@ -26,7 +26,7 @@ export class BlueprintEditorApp extends foundry.applications.api.ApplicationV2 {
   constructor(carrier: FoundryDocument, blueprintId: string | null) {
     super({
       id: `bna-editor-${carrier.uuid.replace(/[^A-Za-z0-9-]+/g, "-")}`,
-      window: { title: game.i18n.format("BNA.Editor.title", { name: carrier.name }) }
+      window: { title: game.i18n.format("BNA.Editor.title", { name: carrier.name }) },
     });
     this.carrier = carrier;
     this.#blueprintId = blueprintId;
@@ -44,7 +44,10 @@ export class BlueprintEditorApp extends foundry.applications.api.ApplicationV2 {
     if (!content) return;
     try {
       const { mountEditor } = await import("./mount");
-      this.#mounted = await mountEditor(content, this.carrier, { blueprintId: this.#blueprintId, close: this.#close });
+      this.#mounted = await mountEditor(content, this.carrier, {
+        blueprintId: this.#blueprintId,
+        close: this.#close,
+      });
     } catch (error) {
       log.error("the blueprint editor could not load", error);
       ui.notifications.error(game.i18n.localize("BNA.Editor.loadFailed"));
@@ -64,12 +67,15 @@ export class BlueprintEditorApp extends foundry.applications.api.ApplicationV2 {
   }
 
   readonly #close = (): void => {
-    this.close().catch(error => log.warn("could not close the editor", error));
+    this.close().catch((error) => log.warn("could not close the editor", error));
   };
 }
 
 /** Open (or bring forward) the editor for a document; null when the user may not edit it. */
-export async function openEditor(document: FoundryDocument, { blueprintId = null }: { blueprintId?: string | null } = {}): Promise<BlueprintEditorApp | null> {
+export async function openEditor(
+  document: FoundryDocument,
+  { blueprintId = null }: { blueprintId?: string | null } = {},
+): Promise<BlueprintEditorApp | null> {
   if (!canEdit(document)) {
     ui.notifications.warn(game.i18n.localize("BNA.Editor.noPermission"));
     return null;

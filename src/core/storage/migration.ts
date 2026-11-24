@@ -3,7 +3,13 @@ import type { LegacyCarrier } from "../legacy/adapter";
 import { repairMigratedBlueprint } from "../legacy/repair";
 import { asRecord } from "../registry/data";
 import {
-  flagChanges, MODULE_SCOPE, readBlueprints, storedEntries, storedId, upsertBlueprint, type RepositoryIssue
+  flagChanges,
+  MODULE_SCOPE,
+  readBlueprints,
+  storedEntries,
+  storedId,
+  upsertBlueprint,
+  type RepositoryIssue,
 } from "./repository";
 
 export interface MigrationPlan {
@@ -28,7 +34,7 @@ interface FlagState {
 function repairStored(flags: Record<string, unknown>): { blueprints: unknown[]; repaired: number } {
   const backup = asRecord(flags.legacyBackup);
   let repaired = 0;
-  const blueprints = storedEntries(flags.blueprints).map(entry => {
+  const blueprints = storedEntries(flags.blueprints).map((entry) => {
     const original = backup[storedId(entry)];
     const result = original ? validateBlueprintSource(entry) : null;
     const fixed = result?.ok ? repairMigratedBlueprint(result.value, original) : null;
@@ -48,8 +54,11 @@ export function planMigration(scope: unknown, carrier: LegacyCarrier): Migration
   const repair = repairStored(flags);
   if (!storedEntries(flags.bonuses).length) {
     return {
-      converted: 0, failed: 0, repaired: repair.repaired, issues: [],
-      changes: repair.repaired ? flagChanges({ blueprints: repair.blueprints }) : null
+      converted: 0,
+      failed: 0,
+      repaired: repair.repaired,
+      issues: [],
+      changes: repair.repaired ? flagChanges({ blueprints: repair.blueprints }) : null,
     };
   }
 
@@ -58,33 +67,46 @@ export function planMigration(scope: unknown, carrier: LegacyCarrier): Migration
   let state: FlagState = {
     blueprints: repair.blueprints,
     bonuses: storedEntries(flags.bonuses),
-    legacyBackup: { ...asRecord(flags.legacyBackup) }
+    legacyBackup: { ...asRecord(flags.legacyBackup) },
   };
   let converted = 0;
   for (const blueprint of blueprints) {
     if (storedIds.has(blueprint.id)) continue;
     const update = upsertBlueprint(state, blueprint);
-    state = { blueprints: update.blueprints, bonuses: update.bonuses ?? state.bonuses, legacyBackup: update.legacyBackup ?? state.legacyBackup };
+    state = {
+      blueprints: update.blueprints,
+      bonuses: update.bonuses ?? state.bonuses,
+      legacyBackup: update.legacyBackup ?? state.legacyBackup,
+    };
     converted++;
   }
 
   // A bonus whose id a stored blueprint already uses was saved before; keep its original in the backup.
-  const shadowed = state.bonuses.filter(entry => storedIds.has(storedId(entry)));
+  const shadowed = state.bonuses.filter((entry) => storedIds.has(storedId(entry)));
   if (shadowed.length) {
     state = {
       ...state,
-      bonuses: state.bonuses.filter(entry => !storedIds.has(storedId(entry))),
-      legacyBackup: { ...state.legacyBackup, ...Object.fromEntries(shadowed.map(entry => [storedId(entry), entry])) }
+      bonuses: state.bonuses.filter((entry) => !storedIds.has(storedId(entry))),
+      legacyBackup: {
+        ...state.legacyBackup,
+        ...Object.fromEntries(shadowed.map((entry) => [storedId(entry), entry])),
+      },
     };
   }
 
-  const changed = (converted > 0) || (shadowed.length > 0) || (repair.repaired > 0);
+  const changed = converted > 0 || shadowed.length > 0 || repair.repaired > 0;
   return {
     converted,
     failed: state.bonuses.length,
     repaired: repair.repaired,
     issues,
-    changes: changed ? flagChanges({ blueprints: state.blueprints, bonuses: state.bonuses, legacyBackup: state.legacyBackup }) : null
+    changes: changed
+      ? flagChanges({
+          blueprints: state.blueprints,
+          bonuses: state.bonuses,
+          legacyBackup: state.legacyBackup,
+        })
+      : null,
   };
 }
 

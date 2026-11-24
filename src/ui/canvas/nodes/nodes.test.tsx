@@ -11,7 +11,12 @@ import { ConditionNode } from "./ConditionNode";
 import { EventNode } from "./EventNode";
 import { ResultNode } from "./ResultNode";
 
-function props(node: BlueprintNode, selected = false, status: NodeRunStatus | null = null, lint: NodeLint | null = null): NodeProps<BnaFlowNode> {
+function props(
+  node: BlueprintNode,
+  selected = false,
+  status: NodeRunStatus | null = null,
+  lint: NodeLint | null = null,
+): NodeProps<BnaFlowNode> {
   return {
     id: node.id,
     type: node.kind,
@@ -24,15 +29,28 @@ function props(node: BlueprintNode, selected = false, status: NodeRunStatus | nu
     isConnectable: true,
     zIndex: 0,
     positionAbsoluteX: 0,
-    positionAbsoluteY: 0
+    positionAbsoluteY: 0,
   } as NodeProps<BnaFlowNode>;
 }
 
 describe("EventNode", () => {
   it("shows the event, whose roll and outcome pins", () => {
-    renderWithServices(<EventNode {...props(makeNode("event", "afterAttack", "ev", {
-      reach: { mode: "aura", range: "10", disposition: "1", includeSelf: true, blockers: [], require: {} }
-    }))} />);
+    renderWithServices(
+      <EventNode
+        {...props(
+          makeNode("event", "afterAttack", "ev", {
+            reach: {
+              mode: "aura",
+              range: "10",
+              disposition: "1",
+              includeSelf: true,
+              blockers: [],
+              require: {},
+            },
+          }),
+        )}
+      />,
+    );
     expect(screen.getByText("After an attack")).toBeInTheDocument();
     expect(screen.getByText("Whose roll: My aura, 10 ft")).toBeInTheDocument();
     expect(screen.getByText("Hit")).toBeInTheDocument();
@@ -47,18 +65,35 @@ describe("EventNode", () => {
   it("shows a revision mark with the node's lint messages", () => {
     const lint = { level: "warning" as const, messages: ["This event does not lead to any result."] };
     renderWithServices(<EventNode {...props(makeNode("event", "damageRoll", "ev"), false, null, lint)} />);
-    expect(screen.getByRole("img", { name: "This event does not lead to any result." })).toHaveTextContent("1");
+    expect(screen.getByRole("img", { name: "This event does not lead to any result." })).toHaveTextContent(
+      "1",
+    );
   });
 });
 
 describe("EventNode without a roll", () => {
   it("names whose turn, which tokens, or nothing for rests", () => {
-    const { unmount } = renderWithServices(<EventNode {...props(makeNode("event", "turnStart", "ev", {
-      reach: { mode: "aura", range: "30", disposition: "1", includeSelf: true, blockers: [], require: {} }
-    }))} />);
+    const { unmount } = renderWithServices(
+      <EventNode
+        {...props(
+          makeNode("event", "turnStart", "ev", {
+            reach: {
+              mode: "aura",
+              range: "30",
+              disposition: "1",
+              includeSelf: true,
+              blockers: [],
+              require: {},
+            },
+          }),
+        )}
+      />,
+    );
     expect(screen.getByText("Whose turn: My aura, 30 ft")).toBeInTheDocument();
     unmount();
-    const region = renderWithServices(<EventNode {...props(makeNode("event", "regionEnter", "ev", { tokens: "hostile" }))} />);
+    const region = renderWithServices(
+      <EventNode {...props(makeNode("event", "regionEnter", "ev", { tokens: "hostile" }))} />,
+    );
     expect(screen.getByText("Which tokens: Hostile tokens")).toBeInTheDocument();
     region.unmount();
     renderWithServices(<EventNode {...props(makeNode("event", "longRest", "ev"))} />);
@@ -68,10 +103,14 @@ describe("EventNode without a roll", () => {
 
 describe("ConditionNode", () => {
   it("lists its checks as phrases", () => {
-    const node = makeCondition("if", [
-      { id: "a", type: "creatureTypes", data: { values: ["undead"] } },
-      { id: "b", type: "targetEffects", data: { values: ["prone"] } }
-    ], "any");
+    const node = makeCondition(
+      "if",
+      [
+        { id: "a", type: "creatureTypes", data: { values: ["undead"] } },
+        { id: "b", type: "targetEffects", data: { values: ["prone"] } },
+      ],
+      "any",
+    );
     renderWithServices(<ConditionNode {...props(node)} />);
     expect(screen.getByText("Target creature type +1")).toBeInTheDocument();
     expect(screen.getByText("the target is Undead")).toBeInTheDocument();
@@ -87,8 +126,8 @@ describe("ConditionNode", () => {
   });
 });
 
-describe("ConditionNode with \"only this item\"", () => {
-  it("shows the tick above the checks instead of \"always passes\"", () => {
+describe('ConditionNode with "only this item"', () => {
+  it('shows the tick above the checks instead of "always passes"', () => {
     const ticked = makeCondition("if", []);
     renderWithServices(<ConditionNode {...props({ ...ticked, data: { ...ticked.data, thisItem: true } })} />);
     expect(screen.getByText("the roll uses this very item")).toBeInTheDocument();
@@ -101,7 +140,7 @@ describe("ResultNode", () => {
     const node = makeNode("result", "rollBonus", "r", {
       formula: "1d6",
       damageTypes: ["fire"],
-      common: { optional: true, choiceGroup: "", cost: { type: "slots" }, limit: "turn" }
+      common: { optional: true, choiceGroup: "", cost: { type: "slots" }, limit: "turn" },
     });
     const { container } = renderWithServices(<ResultNode {...props(node, true, "passed")} />);
     expect(screen.getByText("Roll bonus")).toBeInTheDocument();
@@ -116,12 +155,23 @@ describe("ResultNode", () => {
     expect(container.querySelector(".bna-fx")).toHaveAttribute("data-flavor", "fire");
   });
 
-  it("shows the \"And then\" output only when it is on", () => {
-    const node = makeNode("result", "applyEffect", "blind", { source: "status", status: "blinded", who: "target" });
+  it('shows the "And then" output only when it is on', () => {
+    const node = makeNode("result", "applyEffect", "blind", {
+      source: "status",
+      status: "blinded",
+      who: "target",
+    });
     const { unmount } = renderWithServices(<ResultNode {...props(node)} />);
     expect(screen.queryByText("And then")).not.toBeInTheDocument();
     unmount();
-    renderWithServices(<ResultNode {...props({ ...node, data: { ...node.data, common: { ...(node.data.common as object), then: true } } })} />);
+    renderWithServices(
+      <ResultNode
+        {...props({
+          ...node,
+          data: { ...node.data, common: { ...(node.data.common as object), then: true } },
+        })}
+      />,
+    );
     expect(screen.getByText("And then")).toBeInTheDocument();
   });
 

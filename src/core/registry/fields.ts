@@ -43,8 +43,7 @@ export interface Choice {
 }
 
 export type ChoiceSpec =
-  | { readonly static: readonly StaticChoice[] }
-  | { readonly source: DynamicChoiceSource };
+  { readonly static: readonly StaticChoice[] } | { readonly source: DynamicChoiceSource };
 
 /** Show a field only while a sibling value is one of `in`. */
 export interface VisibleWhen {
@@ -78,21 +77,21 @@ export type FieldSpec =
   | (FieldBase & { readonly kind: "formula"; readonly default: string })
   | (FieldBase & { readonly kind: "text"; readonly default: string; readonly multiline?: boolean })
   | (FieldBase & {
-    readonly kind: "number";
-    readonly default: number | null;
-    readonly min?: number;
-    readonly max?: number;
-    readonly step?: number;
-  })
+      readonly kind: "number";
+      readonly default: number | null;
+      readonly min?: number;
+      readonly max?: number;
+      readonly step?: number;
+    })
   | (FieldBase & { readonly kind: "toggle"; readonly default: boolean })
   | (FieldBase & { readonly kind: "select"; readonly default: string; readonly choices: ChoiceSpec })
   | (FieldBase & {
-    readonly kind: "multiselect";
-    readonly default: readonly string[];
-    readonly choices: ChoiceSpec;
-    /** Values may be stored with a leading "!" to require that they do not match. */
-    readonly exclusion?: boolean;
-  })
+      readonly kind: "multiselect";
+      readonly default: readonly string[];
+      readonly choices: ChoiceSpec;
+      /** Values may be stored with a leading "!" to require that they do not match. */
+      readonly exclusion?: boolean;
+    })
   | (FieldBase & { readonly kind: "tags"; readonly default: readonly string[] })
   | (FieldBase & { readonly kind: "comparisons"; readonly default: readonly Comparison[] })
   | (FieldBase & { readonly kind: "script"; readonly default: string })
@@ -123,7 +122,7 @@ function defaultOf(field: FieldSpec): unknown {
     case "tags":
       return [...field.default];
     case "comparisons":
-      return field.default.map(comparison => ({ ...comparison }));
+      return field.default.map((comparison) => ({ ...comparison }));
     default:
       return field.default;
   }
@@ -147,7 +146,7 @@ export function walkFields(fields: readonly FieldSpec[], visit: (field: FieldSpe
 export function collectFormulaFields(
   fields: readonly FieldSpec[],
   data: Readonly<Record<string, unknown>>,
-  embeddedFields?: (type: string) => readonly FieldSpec[] | undefined
+  embeddedFields?: (type: string) => readonly FieldSpec[] | undefined,
 ): string[] {
   const formulas: string[] = [];
   const visit = (specs: readonly FieldSpec[], values: Readonly<Record<string, unknown>>) => {
@@ -157,7 +156,7 @@ export function collectFormulaFields(
         if (value) formulas.push(value);
       } else if (spec.kind === "group") {
         visit(spec.fields, asRecord(values[spec.key]));
-      } else if ((spec.kind === "embeddedResult") && embeddedFields) {
+      } else if (spec.kind === "embeddedResult" && embeddedFields) {
         const embedded = asRecord(values[spec.key]);
         const nested = embeddedFields(asString(embedded.type));
         if (nested) visit(nested, asRecord(embedded.data));
@@ -172,14 +171,14 @@ export function collectFormulaFields(
 export function mapFormulaFields(
   fields: readonly FieldSpec[],
   data: Readonly<Record<string, unknown>>,
-  transform: (formula: string) => string
+  transform: (formula: string) => string,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...data };
   for (const spec of fields) {
     if (spec.kind === "formula") {
       const value = asString(data[spec.key]).trim();
       if (value) next[spec.key] = transform(value);
-    } else if ((spec.kind === "group") && (spec.key in data)) {
+    } else if (spec.kind === "group" && spec.key in data) {
       next[spec.key] = mapFormulaFields(spec.fields, asRecord(data[spec.key]), transform);
     }
   }

@@ -25,6 +25,6 @@ describe("FLAVOR_SPECS", () => {
   });
 
   it("gives only fire the flame band", () => {
-    expect(FX_FLAVORS.filter(flavor => FLAVOR_SPECS[flavor].band)).toEqual(["fire"]);
+    expect(FX_FLAVORS.filter((flavor) => FLAVOR_SPECS[flavor].band)).toEqual(["fire"]);
   });
 });

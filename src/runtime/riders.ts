@@ -22,7 +22,14 @@ export interface RiderClock {
 }
 
 export type RiderUntil =
-  | { kind: "rounds" | "turns"; count: number; combatId: string; round: number; turn: number; combatants: number }
+  | {
+      kind: "rounds" | "turns";
+      count: number;
+      combatId: string;
+      round: number;
+      turn: number;
+      combatants: number;
+    }
   | { kind: "rest"; shortRests: number; longRests: number };
 
 export interface Rider {
@@ -50,7 +57,7 @@ export function createRider(data: Readonly<Record<string, unknown>>, ctx: RiderC
   const effect = asRecord(data.effect);
   const type = asString(effect.type);
   if (!ROLL_RESULT_TYPES.includes(type) || !getResult(type)) return null;
-  const scope = (asString(data.scope) === "nextRoll") ? "nextRoll" : "sameActivation";
+  const scope = asString(data.scope) === "nextRoll" ? "nextRoll" : "sameActivation";
   const wanted = asString(data.roll) as EventType;
   const duration = asRecord(data.duration);
   const unit = asString(duration.unit, "uses");
@@ -61,10 +68,17 @@ export function createRider(data: Readonly<Record<string, unknown>>, ctx: RiderC
   let until: RiderUntil | null = null;
   if (unit === "untilRest") {
     until = { kind: "rest", shortRests: clock.shortRests, longRests: clock.longRests };
-  } else if (((unit === "rounds") || (unit === "turns")) && clock.combatId) {
-    until = { kind: unit, count, combatId: clock.combatId, round: clock.round, turn: clock.turn, combatants: Math.max(1, clock.combatants) };
+  } else if ((unit === "rounds" || unit === "turns") && clock.combatId) {
+    until = {
+      kind: unit,
+      count,
+      combatId: clock.combatId,
+      round: clock.round,
+      turn: clock.turn,
+      combatants: Math.max(1, clock.combatants),
+    };
   } else {
-    uses = (unit === "uses") ? count : 1;
+    uses = unit === "uses" ? count : 1;
   }
 
   return {
@@ -72,35 +86,35 @@ export function createRider(data: Readonly<Record<string, unknown>>, ctx: RiderC
     created: clock.time,
     effect: { type, data: { ...asRecord(effect.data) } },
     scope,
-    roll: (scope === "nextRoll") ? (RIDER_ROLLS.includes(wanted) ? wanted : "attackRoll") : null,
-    activation: (scope === "sameActivation") ? ctx.activation : null,
+    roll: scope === "nextRoll" ? (RIDER_ROLLS.includes(wanted) ? wanted : "attackRoll") : null,
+    activation: scope === "sameActivation" ? ctx.activation : null,
     uses,
     until,
-    source: ctx.source
+    source: ctx.source,
   };
 }
 
 export function riderExpired(rider: Rider, now: RiderClock): boolean {
-  if ((rider.uses !== null) && (rider.uses <= 0)) return true;
-  if ((rider.scope === "sameActivation") && ((now.time - rider.created) > STALE_ACTIVATION_MS)) return true;
+  if (rider.uses !== null && rider.uses <= 0) return true;
+  if (rider.scope === "sameActivation" && now.time - rider.created > STALE_ACTIVATION_MS) return true;
   const until = rider.until;
   if (!until) return false;
-  if (until.kind === "rest") return (now.shortRests > until.shortRests) || (now.longRests > until.longRests);
+  if (until.kind === "rest") return now.shortRests > until.shortRests || now.longRests > until.longRests;
   if (now.combatId !== until.combatId) return true;
-  const elapsed = ((now.round - until.round) * Math.max(1, until.combatants)) + (now.turn - until.turn);
-  return (until.kind === "rounds") ? (elapsed >= until.count * until.combatants) : (elapsed >= until.count);
+  const elapsed = (now.round - until.round) * Math.max(1, until.combatants) + (now.turn - until.turn);
+  return until.kind === "rounds" ? elapsed >= until.count * until.combatants : elapsed >= until.count;
 }
 
 /** Whether a rider changes this roll: same activation (compatible rolls) or its next-roll kind. */
 export function riderApplies(rider: Rider, event: EventType, activation: string | null): boolean {
   if (!getResult(rider.effect.type)?.compatibleEvents.includes(event)) return false;
-  if (rider.scope === "sameActivation") return !!rider.activation && (rider.activation === activation);
+  if (rider.scope === "sameActivation") return !!rider.activation && rider.activation === activation;
   return rider.roll === event;
 }
 
 /** The rider after one use; riders limited by time only are unchanged. */
 export function useRider(rider: Rider): Rider {
-  return (rider.uses === null) ? rider : { ...rider, uses: rider.uses - 1 };
+  return rider.uses === null ? rider : { ...rider, uses: rider.uses - 1 };
 }
 
 /** A rider as a one-path blueprint for this roll, so collection and the interpreter handle it. */
@@ -109,21 +123,35 @@ export function riderBlueprint(rider: Rider, event: EventType): BlueprintSource 
     id: rider.id,
     name: rider.source.name,
     nodes: [
-      { id: "event", kind: "event", type: event, position: { x: 0, y: 0 }, data: { reach: { mode: "self" } } },
       {
-        id: "effect", kind: "result", type: rider.effect.type, position: { x: 324, y: 0 },
-        data: { ...rider.effect.data, common: { optional: false, choiceGroup: "", cost: { type: "none" }, limit: "none" } }
-      }
+        id: "event",
+        kind: "event",
+        type: event,
+        position: { x: 0, y: 0 },
+        data: { reach: { mode: "self" } },
+      },
+      {
+        id: "effect",
+        kind: "result",
+        type: rider.effect.type,
+        position: { x: 324, y: 0 },
+        data: {
+          ...rider.effect.data,
+          common: { optional: false, choiceGroup: "", cost: { type: "none" }, limit: "none" },
+        },
+      },
     ],
-    edges: [{ id: "event-out-effect", source: "event", sourcePin: "out", target: "effect", targetPin: "in" }]
+    edges: [{ id: "event-out-effect", source: "event", sourcePin: "out", target: "effect", targetPin: "in" }],
   });
 }
 
 function isRider(value: unknown): value is Rider {
   const record = asRecord(value);
-  return (typeof record.id === "string")
-    && (typeof asRecord(record.effect).type === "string")
-    && ((record.scope === "sameActivation") || (record.scope === "nextRoll"));
+  return (
+    typeof record.id === "string" &&
+    typeof asRecord(record.effect).type === "string" &&
+    (record.scope === "sameActivation" || record.scope === "nextRoll")
+  );
 }
 
 /** Riders stored in `flags.build-n-action.riders`: by id since 2.3.0, a list before. */

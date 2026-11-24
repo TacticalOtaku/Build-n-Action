@@ -8,14 +8,24 @@ describe("createBlueprint", () => {
     const blueprint = createBlueprint();
     expect(isValidId(blueprint.id)).toBe(true);
     expect(blueprint).toMatchObject({
-      schemaVersion: 2, name: "", img: DEFAULT_BLUEPRINT_IMG, description: "", enabled: true, sort: 0,
-      nodes: [], edges: [], flags: {}
+      schemaVersion: 2,
+      name: "",
+      img: DEFAULT_BLUEPRINT_IMG,
+      description: "",
+      enabled: true,
+      sort: 0,
+      nodes: [],
+      edges: [],
+      flags: {},
     });
   });
 
   it("keeps provided values", () => {
-    expect(createBlueprint({ id: "aB3dE5gH7jK9mN1p", name: "Hex", enabled: false }))
-      .toMatchObject({ id: "aB3dE5gH7jK9mN1p", name: "Hex", enabled: false });
+    expect(createBlueprint({ id: "aB3dE5gH7jK9mN1p", name: "Hex", enabled: false })).toMatchObject({
+      id: "aB3dE5gH7jK9mN1p",
+      name: "Hex",
+      enabled: false,
+    });
   });
 });
 
@@ -33,7 +43,9 @@ describe("createNode", () => {
 
   it("creates a result with its common properties", () => {
     expect(createNode("result", "rollBonus").data).toMatchObject({
-      formula: "", damageTypes: [], common: { optional: false, limit: "none" }
+      formula: "",
+      damageTypes: [],
+      common: { optional: false, limit: "none" },
     });
   });
 
@@ -58,7 +70,12 @@ describe("createCheck", () => {
 
 describe("createEdge", () => {
   it("always targets the input pin", () => {
-    expect(createEdge("a", "yes", "b")).toMatchObject({ source: "a", sourcePin: "yes", target: "b", targetPin: "in" });
+    expect(createEdge("a", "yes", "b")).toMatchObject({
+      source: "a",
+      sourcePin: "yes",
+      target: "b",
+      targetPin: "in",
+    });
   });
 });
 
@@ -68,11 +85,16 @@ describe("duplicateBlueprint", () => {
       name: "Hex",
       sort: 3,
       nodes: [createNode("event", "damageRoll")],
-      flags: { "build-n-action": { legacyId: "old" }, other: { keep: true } }
+      flags: { "build-n-action": { legacyId: "old" }, other: { keep: true } },
     });
     const copy = duplicateBlueprint(source, "Hex (copy)");
     expect(copy.id).not.toBe(source.id);
-    expect(copy).toMatchObject({ name: "Hex (copy)", sort: 4, enabled: source.enabled, flags: { other: { keep: true } } });
+    expect(copy).toMatchObject({
+      name: "Hex (copy)",
+      sort: 4,
+      enabled: source.enabled,
+      flags: { other: { keep: true } },
+    });
     expect(copy.flags).not.toHaveProperty("build-n-action");
     expect(copy.nodes).toEqual(source.nodes);
     expect(copy.nodes[0]).not.toBe(source.nodes[0]);

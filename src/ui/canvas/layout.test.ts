@@ -10,9 +10,9 @@ describe("autoLayout", () => {
         makeNode("result", "rollBonus", "bonus"),
         makeCondition("if", []),
         makeNode("event", "damageRoll", "ev"),
-        makeNode("result", "reminder", "note")
+        makeNode("result", "reminder", "note"),
       ],
-      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus"), makeEdge("if", "no", "note")]
+      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus"), makeEdge("if", "no", "note")],
     });
     const positions = await autoLayout(blueprint, {});
     expect(Object.keys(positions).sort()).toEqual(["bonus", "ev", "if", "note"]);

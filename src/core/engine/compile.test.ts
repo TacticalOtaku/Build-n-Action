@@ -8,19 +8,25 @@ const blueprint = createBlueprint({
     makeNode("event", "afterAttack", "ev"),
     makeCondition("if", [{ id: "c", type: "creatureTypes", data: { values: ["undead"] } }], "any"),
     makeNode("result", "applyEffect", "apply"),
-    makeNode("result", "rider", "rider")
+    makeNode("result", "rider", "rider"),
   ],
-  edges: [makeEdge("ev", "hit", "if"), makeEdge("if", "no", "apply"), makeEdge("ev", "crit", "rider")]
+  edges: [makeEdge("ev", "hit", "if"), makeEdge("if", "no", "apply"), makeEdge("ev", "crit", "rider")],
 });
 
 describe("compileBlueprint", () => {
   it("turns routes into paths with their guards and wires", () => {
     const compiled = compileBlueprint(blueprint);
-    expect(compiled.paths.map(path => [path.pin, path.guards.map(guard => [guard.node.id, guard.expect, guard.mode]), path.result.id, path.hops]))
-      .toEqual([
-        ["hit", [["if", false, "any"]], "apply", ["ev-hit-if", "if-no-apply"]],
-        ["crit", [], "rider", ["ev-crit-rider"]]
-      ]);
+    expect(
+      compiled.paths.map((path) => [
+        path.pin,
+        path.guards.map((guard) => [guard.node.id, guard.expect, guard.mode]),
+        path.result.id,
+        path.hops,
+      ]),
+    ).toEqual([
+      ["hit", [["if", false, "any"]], "apply", ["ev-hit-if", "if-no-apply"]],
+      ["crit", [], "rider", ["ev-crit-rider"]],
+    ]);
     expect(compiled.paths[0]?.guards[0]?.checks).toHaveLength(1);
   });
 

@@ -35,7 +35,15 @@ interface RowMenuItem {
 }
 
 /** A row's extra actions. Arrow keys move, Escape closes and returns focus to the "More" button. */
-function RowMenu({ label, items, onClose }: { label: string; items: readonly RowMenuItem[]; onClose(): void }) {
+function RowMenu({
+  label,
+  items,
+  onClose,
+}: {
+  label: string;
+  items: readonly RowMenuItem[];
+  onClose(): void;
+}) {
   const keys = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
@@ -44,11 +52,11 @@ function RowMenu({ label, items, onClose }: { label: string; items: readonly Row
       onClose();
       return;
     }
-    if ((event.key !== "ArrowDown") && (event.key !== "ArrowUp")) return;
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     event.preventDefault();
     const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='menuitem']")];
     const index = buttons.indexOf(event.target as HTMLButtonElement);
-    const step = (event.key === "ArrowDown") ? 1 : -1;
+    const step = event.key === "ArrowDown" ? 1 : -1;
     buttons[(index + step + buttons.length) % buttons.length]?.focus();
   };
   const blur = (event: FocusEvent<HTMLDivElement>) => {
@@ -80,7 +88,19 @@ function RowMenu({ label, items, onClose }: { label: string; items: readonly Row
 }
 
 export function BlueprintList({
-  blueprints, activeId, onSelect, onCreate, onDuplicate, onToggle, onDelete, onOpenPicker, hasLibrary, onSaveToLibrary, onDragRow, onDropData, onMoveToEffect
+  blueprints,
+  activeId,
+  onSelect,
+  onCreate,
+  onDuplicate,
+  onToggle,
+  onDelete,
+  onOpenPicker,
+  hasLibrary,
+  onSaveToLibrary,
+  onDragRow,
+  onDropData,
+  onMoveToEffect,
 }: BlueprintListProps) {
   const t = useT();
   const { fmt } = useServices();
@@ -89,10 +109,10 @@ export function BlueprintList({
   const [over, setOver] = useState(false);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
-  const rows = blueprints.map(blueprint => {
+  const rows = blueprints.map((blueprint) => {
     const name = blueprint.name || t("BNA.UI.Rail.untitled");
     const sentence = describeBlueprint(blueprint, fmt)[0];
-    if ((confirming !== blueprint.id) && !matchesSearch(query, name, sentence ?? "")) return null;
+    if (confirming !== blueprint.id && !matchesSearch(query, name, sentence ?? "")) return null;
     return { blueprint, name, sentence };
   });
   const shown = rows.filter(Boolean).length;
@@ -101,15 +121,15 @@ export function BlueprintList({
       className="bna-rail"
       aria-label={t("BNA.UI.Rail.label")}
       data-drop={over ? "" : undefined}
-      onDragOver={event => {
+      onDragOver={(event) => {
         if (!event.dataTransfer.types.includes("text/plain")) return;
         event.preventDefault();
         setOver(true);
       }}
-      onDragLeave={event => {
+      onDragLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
       }}
-      onDrop={event => {
+      onDrop={(event) => {
         event.preventDefault();
         setOver(false);
         const data = parseDragText(event.dataTransfer.getData("text/plain"));
@@ -118,14 +138,32 @@ export function BlueprintList({
     >
       <div className="bna-rail__head">
         <h2 className="bna-rail__title">{t("BNA.UI.Rail.title")}</h2>
-        <button type="button" className="bna-iconbtn" aria-label={t("BNA.UI.Rail.create")} title={t("BNA.UI.Rail.create")} onClick={onCreate}>
+        <button
+          type="button"
+          className="bna-iconbtn"
+          aria-label={t("BNA.UI.Rail.create")}
+          title={t("BNA.UI.Rail.create")}
+          onClick={onCreate}
+        >
           <Icon name="plus" size={17} />
         </button>
-        <button type="button" className="bna-iconbtn" aria-label={t("BNA.UI.Rail.templates")} title={t("BNA.UI.Rail.templates")} onClick={() => onOpenPicker("presets")}>
+        <button
+          type="button"
+          className="bna-iconbtn"
+          aria-label={t("BNA.UI.Rail.templates")}
+          title={t("BNA.UI.Rail.templates")}
+          onClick={() => onOpenPicker("presets")}
+        >
           <Icon name="layers" size={17} />
         </button>
         {hasLibrary ? (
-          <button type="button" className="bna-iconbtn" aria-label={t("BNA.UI.Rail.library")} title={t("BNA.UI.Rail.library")} onClick={() => onOpenPicker("library")}>
+          <button
+            type="button"
+            className="bna-iconbtn"
+            aria-label={t("BNA.UI.Rail.library")}
+            title={t("BNA.UI.Rail.library")}
+            onClick={() => onOpenPicker("library")}
+          >
             <Icon name="book-marked" size={17} />
           </button>
         ) : null}
@@ -137,11 +175,11 @@ export function BlueprintList({
           aria-label={t("BNA.UI.Rail.search")}
           placeholder={t("BNA.UI.Rail.searchPlaceholder")}
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={(event) => setQuery(event.target.value)}
         />
       </div>
       <ul className="bna-rail__list">
-        {rows.map(row => {
+        {rows.map((row) => {
           if (!row) return null;
           const { blueprint, name, sentence } = row;
           if (confirming === blueprint.id) {
@@ -173,14 +211,16 @@ export function BlueprintList({
               <button
                 type="button"
                 className="bna-rail__item"
-                aria-current={(blueprint.id === activeId) ? "true" : undefined}
+                aria-current={blueprint.id === activeId ? "true" : undefined}
                 draggable
-                onDragStart={event => onDragRow(blueprint.id, event)}
+                onDragStart={(event) => onDragRow(blueprint.id, event)}
                 onClick={() => onSelect(blueprint.id)}
               >
                 <span className="bna-rail__name">{name}</span>
                 <span className="bna-rail__phrase">{sentence ?? t("BNA.UI.Rail.noChain")}</span>
-                {blueprint.enabled ? null : <span className="bna-rail__off">{t("BNA.UI.Rail.disabled")}</span>}
+                {blueprint.enabled ? null : (
+                  <span className="bna-rail__off">{t("BNA.UI.Rail.disabled")}</span>
+                )}
               </button>
               <div className="bna-rail__actions">
                 <button
@@ -198,11 +238,19 @@ export function BlueprintList({
                   className="bna-iconbtn"
                   aria-haspopup="menu"
                   aria-expanded={menuFor === blueprint.id}
-                  aria-label={(savedId === blueprint.id) ? t("BNA.UI.Rail.savedToLibrary") : t("BNA.UI.Rail.more", { name })}
-                  title={(savedId === blueprint.id) ? t("BNA.UI.Rail.savedToLibrary") : t("BNA.UI.Rail.more", { name })}
-                  onClick={() => setMenuFor(current => ((current === blueprint.id) ? null : blueprint.id))}
+                  aria-label={
+                    savedId === blueprint.id
+                      ? t("BNA.UI.Rail.savedToLibrary")
+                      : t("BNA.UI.Rail.more", { name })
+                  }
+                  title={
+                    savedId === blueprint.id
+                      ? t("BNA.UI.Rail.savedToLibrary")
+                      : t("BNA.UI.Rail.more", { name })
+                  }
+                  onClick={() => setMenuFor((current) => (current === blueprint.id ? null : blueprint.id))}
                 >
-                  <Icon name={(savedId === blueprint.id) ? "check" : "ellipsis"} size={14} />
+                  <Icon name={savedId === blueprint.id ? "check" : "ellipsis"} size={14} />
                 </button>
                 <button
                   type="button"
@@ -214,24 +262,47 @@ export function BlueprintList({
                   <Icon name="trash-2" size={14} />
                 </button>
               </div>
-              {(menuFor === blueprint.id) ? (
+              {menuFor === blueprint.id ? (
                 <RowMenu
                   label={t("BNA.UI.Rail.more", { name })}
                   onClose={() => setMenuFor(null)}
                   items={[
-                    { key: "duplicate", icon: "copy", text: t("BNA.UI.Rail.menuDuplicate"), label: t("BNA.UI.Rail.duplicate", { name }), run: () => onDuplicate(blueprint.id) },
-                    ...(onSaveToLibrary ? [{
-                      key: "save", icon: "book-marked", text: t("BNA.UI.Rail.menuSave"), label: t("BNA.UI.Rail.saveToLibrary", { name }),
-                      run: () => {
-                        onSaveToLibrary(blueprint.id);
-                        setSavedId(blueprint.id);
-                        window.setTimeout(() => setSavedId(current => ((current === blueprint.id) ? null : current)), 2000);
-                      }
-                    }] : []),
-                    ...(onMoveToEffect ? [{
-                      key: "move", icon: "sparkles", text: t("BNA.UI.Rail.menuMove"), label: t("BNA.UI.Rail.moveToEffect", { name }),
-                      run: () => onMoveToEffect(blueprint.id)
-                    }] : [])
+                    {
+                      key: "duplicate",
+                      icon: "copy",
+                      text: t("BNA.UI.Rail.menuDuplicate"),
+                      label: t("BNA.UI.Rail.duplicate", { name }),
+                      run: () => onDuplicate(blueprint.id),
+                    },
+                    ...(onSaveToLibrary
+                      ? [
+                          {
+                            key: "save",
+                            icon: "book-marked",
+                            text: t("BNA.UI.Rail.menuSave"),
+                            label: t("BNA.UI.Rail.saveToLibrary", { name }),
+                            run: () => {
+                              onSaveToLibrary(blueprint.id);
+                              setSavedId(blueprint.id);
+                              window.setTimeout(
+                                () => setSavedId((current) => (current === blueprint.id ? null : current)),
+                                2000,
+                              );
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(onMoveToEffect
+                      ? [
+                          {
+                            key: "move",
+                            icon: "sparkles",
+                            text: t("BNA.UI.Rail.menuMove"),
+                            label: t("BNA.UI.Rail.moveToEffect", { name }),
+                            run: () => onMoveToEffect(blueprint.id),
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               ) : null}
@@ -239,7 +310,7 @@ export function BlueprintList({
           );
         })}
       </ul>
-      {(query && !shown) ? <p className="bna-rail__empty">{t("BNA.UI.Rail.searchEmpty")}</p> : null}
+      {query && !shown ? <p className="bna-rail__empty">{t("BNA.UI.Rail.searchEmpty")}</p> : null}
     </nav>
   );
 }

@@ -7,7 +7,7 @@ import { listOf, read } from "./read";
 export const SAVE_WAIT_MS = 30_000;
 
 /** The asking client outwaits the GM: two player waits (prompt, then roll dialog) and the GM's own roll. */
-export const ASKER_WAIT_MS = (2 * SAVE_WAIT_MS) + 20_000;
+export const ASKER_WAIT_MS = 2 * SAVE_WAIT_MS + 20_000;
 
 /** How long a client waits for the GM to reply to a batch of operations. */
 export const OPERATION_TIMEOUT_MS = 15_000;
@@ -62,7 +62,10 @@ export interface TransportAdapter {
   /** Returns null when the saving actor does not exist on this client. */
   saveUsers(actorUuid: string): SaveUser[] | null;
   rollSave(actorUuid: string, request: SaveRequest, configure: boolean): Promise<SaveOutcome | null>;
-  promptSaveDialog(request: SaveRequest, onReady: (close: () => void) => void): Promise<"roll" | "declined" | "missing">;
+  promptSaveDialog(
+    request: SaveRequest,
+    onReady: (close: () => void) => void,
+  ): Promise<"roll" | "declined" | "missing">;
 }
 
 export interface Transport {
@@ -74,43 +77,49 @@ export interface Transport {
 
 /** The player who rolls: an active non-GM owner, preferring the one whose character it is; null lets the GM roll. */
 export function pickSaveUser(users: readonly SaveUser[]): string | null {
-  const owners = users.filter(user => user.active && !user.isGM && user.owner);
-  return (owners.find(user => user.character) ?? owners[0])?.id ?? null;
+  const owners = users.filter((user) => user.active && !user.isGM && user.owner);
+  return (owners.find((user) => user.character) ?? owners[0])?.id ?? null;
 }
 
 /** Requests that wait for an answer by id, or resolve to null after a timeout. */
-export function createWaiter<T>(): { wait(id: string, ms: number): Promise<T | null>; answer(id: string, value: T): boolean } {
+export function createWaiter<T>(): {
+  wait(id: string, ms: number): Promise<T | null>;
+  answer(id: string, value: T): boolean;
+} {
   const pending = new Map<string, (value: T | null) => void>();
   return {
-    wait: (id, ms) => new Promise(resolve => {
-      const timer = setTimeout(() => {
-        pending.delete(id);
-        resolve(null);
-      }, ms);
-      pending.set(id, value => {
-        clearTimeout(timer);
-        pending.delete(id);
-        resolve(value);
-      });
-    }),
+    wait: (id, ms) =>
+      new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          pending.delete(id);
+          resolve(null);
+        }, ms);
+        pending.set(id, (value) => {
+          clearTimeout(timer);
+          pending.delete(id);
+          resolve(value);
+        });
+      }),
     answer: (id, value) => {
       const settle = pending.get(id);
       if (!settle) return false;
       settle(value);
       return true;
-    }
+    },
   };
 }
 
 function isSaveRequest(value: unknown): value is SaveRequest {
-  return (typeof read(value, "actorUuid") === "string")
-    && (typeof read(value, "ability") === "string")
-    && (typeof read(value, "dc") === "number");
+  return (
+    typeof read(value, "actorUuid") === "string" &&
+    typeof read(value, "ability") === "string" &&
+    typeof read(value, "dc") === "number"
+  );
 }
 
 function asSaveOutcome(value: unknown): SaveOutcome | null {
-  return (value && (typeof value === "object") && (typeof read(value, "total") === "number"))
-    ? value as SaveOutcome
+  return value && typeof value === "object" && typeof read(value, "total") === "number"
+    ? (value as SaveOutcome)
     : null;
 }
 
@@ -140,17 +149,17 @@ export function createTransport(adapter: TransportAdapter): Transport {
       adapter.emit({ type: "saveAsk", id, user: player, request });
       let answer = await answers.wait(id, SAVE_WAIT_MS);
       // A player who pressed "Roll" is in the roll dialog (bonuses, Midi choices): give them another wait.
-      if ((answer === null) && rolling.has(id)) answer = await answers.wait(id, SAVE_WAIT_MS);
+      if (answer === null && rolling.has(id)) answer = await answers.wait(id, SAVE_WAIT_MS);
       rolling.delete(id);
       asked.delete(id);
-      if (answer && (answer !== "declined")) return answer;
+      if (answer && answer !== "declined") return answer;
       adapter.emit({ type: "saveCancel", id, user: player });
     }
     return adapter.rollSave(request.actorUuid, request, false);
   }
 
   async function promptPlayer(id: string, request: SaveRequest): Promise<void> {
-    const action = await adapter.promptSaveDialog(request, close => prompts.set(id, close));
+    const action = await adapter.promptSaveDialog(request, (close) => prompts.set(id, close));
     prompts.delete(id);
     if (action === "missing") return;
     let outcome: SaveOutcome | null = null;
@@ -163,24 +172,34 @@ export function createTransport(adapter: TransportAdapter): Transport {
     adapter.emit({ type: "saveAnswer", id, outcome: outcome ?? "declined" });
   }
 
-  async function handleSaveMessage(type: string, id: string, message: unknown, senderId: string): Promise<void> {
+  async function handleSaveMessage(
+    type: string,
+    id: string,
+    message: unknown,
+    senderId: string,
+  ): Promise<void> {
     const request = read(message, "request");
     const userId = adapter.userId();
     const isActiveGM = adapter.isActiveGM();
     const fromGM = senderId === adapter.activeGMId();
-    const fromAsked = isActiveGM && (asked.get(id) === senderId);
-    if ((type === "saveRequest") && isActiveGM && (read(message, "gm") === userId) && isSaveRequest(request)) {
+    const fromAsked = isActiveGM && asked.get(id) === senderId;
+    if (type === "saveRequest" && isActiveGM && read(message, "gm") === userId && isSaveRequest(request)) {
       const outcome = await coordinateSave(request);
       adapter.emit({ type: "saveResult", id, recipient: senderId, outcome });
-    } else if ((type === "saveResult") && fromGM && (read(message, "recipient") === userId)) {
+    } else if (type === "saveResult" && fromGM && read(message, "recipient") === userId) {
       results.answer(id, asSaveOutcome(read(message, "outcome")));
-    } else if ((type === "saveAsk") && fromGM && (read(message, "user") === userId) && isSaveRequest(request)) {
+    } else if (type === "saveAsk" && fromGM && read(message, "user") === userId && isSaveRequest(request)) {
       await promptPlayer(id, request);
-    } else if ((type === "saveRolling") && fromAsked) {
+    } else if (type === "saveRolling" && fromAsked) {
       rolling.add(id);
-    } else if ((type === "saveAnswer") && fromAsked) {
+    } else if (type === "saveAnswer" && fromAsked) {
       answers.answer(id, asSaveOutcome(read(message, "outcome")) ?? "declined");
-    } else if ((type === "saveCancel") && fromGM && (read(message, "user") === userId) && (prompts.has(id) || rollingHere.has(id))) {
+    } else if (
+      type === "saveCancel" &&
+      fromGM &&
+      read(message, "user") === userId &&
+      (prompts.has(id) || rollingHere.has(id))
+    ) {
       prompts.get(id)?.();
       prompts.delete(id);
       adapter.notify("info", "BNA.Save.TakenByGM");
@@ -188,7 +207,7 @@ export function createTransport(adapter: TransportAdapter): Transport {
   }
 
   async function handleOperations(id: string, message: unknown, senderId: string): Promise<void> {
-    if (!adapter.isGM() || (read(message, "gm") !== adapter.userId())) return;
+    if (!adapter.isGM() || read(message, "gm") !== adapter.userId()) return;
     let error: string | null = null;
     for (const raw of listOf(read(message, "operations"))) {
       const op = readOperation(raw);
@@ -200,7 +219,7 @@ export function createTransport(adapter: TransportAdapter): Transport {
       try {
         await adapter.executeOperation(op);
       } catch (failure) {
-        error = (failure instanceof Error) ? failure.message : String(failure);
+        error = failure instanceof Error ? failure.message : String(failure);
         adapter.warn("a requested change failed", op, failure);
       }
     }
@@ -247,7 +266,8 @@ export function createTransport(adapter: TransportAdapter): Transport {
     sendTrigger(event, actorUuid, key) {
       const gm = adapter.activeGMId();
       if (!gm) {
-        if (!warnedNoTriggerGM) adapter.warn("no GM is connected, so turn, region and rest events do not run.");
+        if (!warnedNoTriggerGM)
+          adapter.warn("no GM is connected, so turn, region and rest events do not run.");
         warnedNoTriggerGM = true;
         return false;
       }
@@ -273,23 +293,30 @@ export function createTransport(adapter: TransportAdapter): Transport {
       const id = asString(read(message, "id"));
       if (!adapter.hasUser(senderId)) return;
       if (type === "reply") {
-        if ((read(message, "recipient") !== adapter.userId()) || (replyGms.get(id) !== senderId)) return;
-        replies.answer(id, { ok: read(message, "ok") === true, error: asString(read(message, "error")) || null });
+        if (read(message, "recipient") !== adapter.userId() || replyGms.get(id) !== senderId) return;
+        replies.answer(id, {
+          ok: read(message, "ok") === true,
+          error: asString(read(message, "error")) || null,
+        });
         return;
       }
-      if ((typeof type === "string") && type.startsWith("save")) {
+      if (typeof type === "string" && type.startsWith("save")) {
         await handleSaveMessage(type, id, message, senderId);
         return;
       }
       if (type === "trigger") {
-        if (!adapter.isGM() || (read(message, "gm") !== adapter.userId())) return;
+        if (!adapter.isGM() || read(message, "gm") !== adapter.userId()) return;
         const event = asString(read(message, "event"));
         const actorUuid = asString(read(message, "actorUuid"));
-        if (!(TRIGGER_EVENTS as readonly string[]).includes(event) || !adapter.mayRequestTrigger(actorUuid, senderId)) return;
+        if (
+          !(TRIGGER_EVENTS as readonly string[]).includes(event) ||
+          !adapter.mayRequestTrigger(actorUuid, senderId)
+        )
+          return;
         await adapter.onTrigger(event as EventType, actorUuid, asString(read(message, "key")));
         return;
       }
       if (type === "operations") await handleOperations(id, message, senderId);
-    }
+    },
   };
 }

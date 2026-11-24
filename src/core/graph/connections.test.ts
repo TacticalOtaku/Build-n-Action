@@ -13,9 +13,9 @@ const graph = {
     makeNode("event", "afterAttack", "after"),
     makeCondition("if", []),
     makeCondition("if2", []),
-    makeNode("result", "rollBonus", "bonus")
+    makeNode("result", "rollBonus", "bonus"),
   ],
-  edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "if2")]
+  edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "if2")],
 };
 
 describe("outputPins", () => {
@@ -25,7 +25,7 @@ describe("outputPins", () => {
     expect(outputPins({ kind: "event", type: "nope", data: {} })).toEqual([]);
   });
 
-  it("gives conditions yes/no and results an output only with \"And then\" on", () => {
+  it('gives conditions yes/no and results an output only with "And then" on', () => {
     expect(outputPins(makeCondition("c", []))).toEqual(["yes", "no"]);
     expect(outputPins(makeNode("result", "rollBonus", "r"))).toEqual([]);
     expect(outputPins(withThen(makeNode("result", "rollBonus", "r")))).toEqual(["then"]);
@@ -33,7 +33,7 @@ describe("outputPins", () => {
 });
 
 describe("outputPins of a demanded save", () => {
-  it("gives a demanded save its own outputs and never \"And then\"", () => {
+  it('gives a demanded save its own outputs and never "And then"', () => {
     expect(outputPins(makeNode("result", "demandSave", "save"))).toEqual(["succeeded", "failed"]);
     expect(outputPins(withThen(makeNode("result", "demandSave", "save")))).toEqual(["succeeded", "failed"]);
   });
@@ -48,10 +48,18 @@ describe("canConnect", () => {
     expect(canConnect(graph, { source: "after", sourcePin: "hit", target: "if" })).toEqual({ ok: true });
   });
 
-  it("accepts a wire from a result's \"And then\" output", () => {
-    const withOutput = { ...graph, nodes: [...graph.nodes, withThen(makeNode("result", "applyEffect", "effect"))] };
-    expect(canConnect(withOutput, { source: "effect", sourcePin: "then", target: "if2" })).toEqual({ ok: true });
-    expect(canConnect(withOutput, { source: "effect", sourcePin: "yes", target: "if2" })).toEqual({ ok: false, reason: "unknownPin" });
+  it('accepts a wire from a result\'s "And then" output', () => {
+    const withOutput = {
+      ...graph,
+      nodes: [...graph.nodes, withThen(makeNode("result", "applyEffect", "effect"))],
+    };
+    expect(canConnect(withOutput, { source: "effect", sourcePin: "then", target: "if2" })).toEqual({
+      ok: true,
+    });
+    expect(canConnect(withOutput, { source: "effect", sourcePin: "yes", target: "if2" })).toEqual({
+      ok: false,
+      reason: "unknownPin",
+    });
   });
 
   it.each([
@@ -61,7 +69,7 @@ describe("canConnect", () => {
     ["fromResult", { source: "bonus", sourcePin: "out", target: "if" }],
     ["unknownPin", { source: "ev", sourcePin: "hit", target: "bonus" }],
     ["duplicate", { source: "ev", sourcePin: "out", target: "if" }],
-    ["cycle", { source: "if2", sourcePin: "no", target: "if" }]
+    ["cycle", { source: "if2", sourcePin: "no", target: "if" }],
   ])("rejects %s", (reason, request) => {
     expect(canConnect(graph, request)).toEqual({ ok: false, reason });
   });
@@ -69,7 +77,16 @@ describe("canConnect", () => {
 
 describe("wouldCreateCycle", () => {
   it("detects a path back to the source", () => {
-    expect(wouldCreateCycle([{ source: "a", target: "b" }, { source: "b", target: "c" }], "c", "a")).toBe(true);
+    expect(
+      wouldCreateCycle(
+        [
+          { source: "a", target: "b" },
+          { source: "b", target: "c" },
+        ],
+        "c",
+        "a",
+      ),
+    ).toBe(true);
   });
 
   it("allows unrelated wires", () => {

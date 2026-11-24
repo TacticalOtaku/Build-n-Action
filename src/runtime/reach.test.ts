@@ -3,15 +3,26 @@ import { isBlocked, matchDisposition, reachOutcome, regionTokensOutcome, type So
 
 function context(partial: Partial<SourceContext>): SourceContext {
   return {
-    kind: "self", sourceDisposition: 1, rollerDisposition: 1, own: false, sourceStatuses: [], sourceImmunities: [],
-    evaluateRange: formula => (formula.trim() ? Number(formula) : null),
+    kind: "self",
+    sourceDisposition: 1,
+    rollerDisposition: 1,
+    own: false,
+    sourceStatuses: [],
+    sourceImmunities: [],
+    evaluateRange: (formula) => (formula.trim() ? Number(formula) : null),
     withinRange: () => true,
-    ...partial
+    ...partial,
   };
 }
 
 const aura = (extra: Record<string, unknown> = {}) => ({
-  mode: "aura", range: "30", disposition: "1", includeSelf: true, blockers: [], require: { sight: false, move: false }, ...extra
+  mode: "aura",
+  range: "30",
+  disposition: "1",
+  includeSelf: true,
+  blockers: [],
+  require: { sight: false, move: false },
+  ...extra,
 });
 
 describe("dispositions", () => {
@@ -39,8 +50,13 @@ describe("reachOutcome", () => {
 
   it("lets my aura affect me only when it includes me and is not blocked", () => {
     expect(reachOutcome(aura(), context({})).pass).toBe(true);
-    expect(reachOutcome(aura({ includeSelf: false }), context({}))).toEqual({ pass: false, reason: { code: "outOfReach", values: { actual: "self" } } });
-    expect(reachOutcome(aura({ blockers: ["dead"] }), context({ sourceStatuses: ["dead"] })).reason.values).toEqual({ actual: "blocked" });
+    expect(reachOutcome(aura({ includeSelf: false }), context({}))).toEqual({
+      pass: false,
+      reason: { code: "outOfReach", values: { actual: "self" } },
+    });
+    expect(
+      reachOutcome(aura({ blockers: ["dead"] }), context({ sourceStatuses: ["dead"] })).reason.values,
+    ).toEqual({ actual: "blocked" });
   });
 
   it("leaves template and region blueprints to their template or region", () => {
@@ -52,19 +68,34 @@ describe("reachOutcome", () => {
     const token = (partial: Partial<SourceContext> = {}) => context({ kind: "token", ...partial });
     expect(reachOutcome(aura(), token()).pass).toBe(true);
     expect(reachOutcome({ mode: "self" }, token()).reason.values).toEqual({ actual: "self" });
-    expect(reachOutcome(aura(), token({ sourceDisposition: -1 })).reason.values).toEqual({ actual: "disposition" });
-    expect(reachOutcome(aura(), token({ withinRange: () => false })).reason.values).toEqual({ actual: "range" });
+    expect(reachOutcome(aura(), token({ sourceDisposition: -1 })).reason.values).toEqual({
+      actual: "disposition",
+    });
+    expect(reachOutcome(aura(), token({ withinRange: () => false })).reason.values).toEqual({
+      actual: "range",
+    });
     expect(reachOutcome(aura({ range: "0" }), token()).reason.values).toEqual({ actual: "range" });
     expect(reachOutcome(aura({ range: "" }), token()).reason.values).toEqual({ actual: "range" });
-    expect(reachOutcome(aura({ blockers: ["dead"] }), token({ sourceStatuses: ["dead"] })).reason.values).toEqual({ actual: "blocked" });
+    expect(
+      reachOutcome(aura({ blockers: ["dead"] }), token({ sourceStatuses: ["dead"] })).reason.values,
+    ).toEqual({ actual: "blocked" });
   });
 
   it("treats a range of -1 as unlimited and passes requirements to the geometry", () => {
     const calls: [number, readonly string[]][] = [];
-    const token = context({ kind: "token", withinRange: (range, require) => { calls.push([range, require]); return true; } });
+    const token = context({
+      kind: "token",
+      withinRange: (range, require) => {
+        calls.push([range, require]);
+        return true;
+      },
+    });
     expect(reachOutcome(aura({ range: "-1" }), token).pass).toBe(true);
     reachOutcome(aura({ require: { sight: true, move: false, light: true } }), token);
-    expect(calls).toEqual([[-1, []], [30, ["sight", "light"]]]);
+    expect(calls).toEqual([
+      [-1, []],
+      [30, ["sight", "light"]],
+    ]);
   });
 
   it("applies templates by ownership and disposition", () => {

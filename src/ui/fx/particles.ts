@@ -20,7 +20,7 @@ export const MAX_PARTICLES = 80;
 export function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
-    state = (state + 0x6D2B79F5) >>> 0;
+    state = (state + 0x6d2b79f5) >>> 0;
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -29,7 +29,7 @@ export function seededRandom(seed: number): () => number {
 }
 
 function between(range: readonly [number, number], r: number): number {
-  return range[0] + ((range[1] - range[0]) * r);
+  return range[0] + (range[1] - range[0]) * r;
 }
 
 export class ParticleSystem {
@@ -80,7 +80,7 @@ export class ParticleSystem {
     const { width, height } = this;
     let x = random() * width;
     let y = random() * height;
-    if (spec.spawn === "bottom") y = height - (random() * 6);
+    if (spec.spawn === "bottom") y = height - random() * 6;
     else if (spec.spawn === "top") y = random() * 6;
     else if (spec.spawn === "edges") {
       const side = Math.floor(random() * 4);
@@ -98,7 +98,7 @@ export class ParticleSystem {
       life: between(spec.life, random()),
       size: between(spec.size, random()),
       color: this.colors[Math.floor(random() * this.colors.length)] ?? "#ffffff",
-      seed: random()
+      seed: random(),
     };
   }
 }

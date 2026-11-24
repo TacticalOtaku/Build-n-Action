@@ -23,22 +23,22 @@ function foundryPackage(): Plugin {
         this.emitFile({
           type: "asset",
           fileName: extra,
-          source: readFileSync(new URL(`./${extra}`, import.meta.url), "utf8")
+          source: readFileSync(new URL(`./${extra}`, import.meta.url), "utf8"),
         });
       }
       for (const lang of ["en", "ru"]) {
         this.emitFile({
           type: "asset",
           fileName: `lang/${lang}.json`,
-          source: readFileSync(new URL(`./src/lang/${lang}.json`, import.meta.url), "utf8")
+          source: readFileSync(new URL(`./src/lang/${lang}.json`, import.meta.url), "utf8"),
         });
       }
-    }
+    },
   };
 }
 
 function filesUnder(directory: string): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
     return entry.isDirectory() ? filesUnder(path) : [path];
   });
@@ -51,17 +51,19 @@ function releasePackage(): Plugin {
     apply: (_config, env) => env.mode === "release",
     closeBundle() {
       const entries = filesUnder(OUT)
-        .filter(path => !path.endsWith(".map"))
-        .map(path => ({ path: relative(OUT, path).split(sep).join("/"), data: readFileSync(path) }))
+        .filter((path) => !path.endsWith(".map"))
+        .map((path) => ({ path: relative(OUT, path).split(sep).join("/"), data: readFileSync(path) }))
         .sort((a, b) => a.path.localeCompare(b.path, "en"));
       const zip = join(ROOT, "dist", `build-n-action-v${MODULE_VERSION}.zip`);
       // A released archive is a record of what users downloaded: never replace it by accident.
-      if (existsSync(zip) && (process.env.BNA_REPLACE_ARCHIVE !== "1")) {
-        throw new Error(`${relative(ROOT, zip)} already exists. Bump the version, or set BNA_REPLACE_ARCHIVE=1 to replace an unreleased archive.`);
+      if (existsSync(zip) && process.env.BNA_REPLACE_ARCHIVE !== "1") {
+        throw new Error(
+          `${relative(ROOT, zip)} already exists. Bump the version, or set BNA_REPLACE_ARCHIVE=1 to replace an unreleased archive.`,
+        );
       }
       writeFileSync(zip, createZip(entries));
       console.log(`Build-n-Action | ${entries.length} files → ${relative(ROOT, zip)}`);
-    }
+    },
   };
 }
 
@@ -80,7 +82,9 @@ export default defineConfig(({ mode }) => ({
     assetsInlineLimit: () => true,
     lib: { entry: "src/module.ts", formats: ["es"], fileName: () => "module.mjs", cssFileName: "module" },
     rolldownOptions: {
-      output: { chunkFileNames: chunk => `chunks/${(chunk.name === "mount") ? "editor" : chunk.name}-[hash].mjs` }
-    }
-  }
+      output: {
+        chunkFileNames: (chunk) => `chunks/${chunk.name === "mount" ? "editor" : chunk.name}-[hash].mjs`,
+      },
+    },
+  },
 }));

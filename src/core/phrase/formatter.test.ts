@@ -3,19 +3,31 @@ import { createTranslator } from "../i18n";
 import { STATIC } from "../registry/choices";
 import { createPhraseFormatter, type ChoiceProvider } from "./formatter";
 
-const translator = createTranslator({
-  BNA: {
-    Phrase: {
-      And: "and", Or: "or", Any: "anything", NotValues: "anything but {values}", ButNot: "{values}, but not {excluded}"
+const translator = createTranslator(
+  {
+    BNA: {
+      Phrase: {
+        And: "and",
+        Or: "or",
+        Any: "anything",
+        NotValues: "anything but {values}",
+        ButNot: "{values}, but not {excluded}",
+      },
+      Choice: { who: { self: "myself", target: "the target" } },
     },
-    Choice: { who: { self: "myself", target: "the target" } }
-  }
-}, { strict: true });
+  },
+  { strict: true },
+);
 
 const provider: ChoiceProvider = {
-  choices: source => (source === "creatureTypes")
-    ? [{ value: "undead", label: "Undead" }, { value: "fiend", label: "Fiend" }, { value: "beast", label: "Beast" }]
-    : []
+  choices: (source) =>
+    source === "creatureTypes"
+      ? [
+          { value: "undead", label: "Undead" },
+          { value: "fiend", label: "Fiend" },
+          { value: "beast", label: "Beast" },
+        ]
+      : [],
 };
 
 const fmt = createPhraseFormatter(translator, provider);

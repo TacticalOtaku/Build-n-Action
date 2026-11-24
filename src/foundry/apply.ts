@@ -4,8 +4,14 @@ import { resolveModifiers } from "../runtime/dice";
 import type { ModifierTracker, PlayApplyContext } from "../runtime/play";
 import { read } from "../runtime/read";
 import {
-  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, applyAdvantageMode,
-  sanitizeCritical, type ProcessConfig
+  addCriticalBonus,
+  adjustCriticalRanges,
+  adjustSavingThrowRanges,
+  appendDamagePart,
+  appendRollPart,
+  applyAdvantageMode,
+  sanitizeCritical,
+  type ProcessConfig,
 } from "../runtime/roll-config";
 import { originRollData } from "./documents";
 import { modifyFormulaParts, replaceData, resolveForeign, simplifyNumber } from "./formulas";
@@ -29,7 +35,12 @@ function rollable(formula: string, intent: ChainIntent, ctx: ApplyContext): bool
   return false;
 }
 
-export type ApplyContext = PlayApplyContext<FoundryDocument, FoundryDocument, FoundryDocument, TokenPlaceable>;
+export type ApplyContext = PlayApplyContext<
+  FoundryDocument,
+  FoundryDocument,
+  FoundryDocument,
+  TokenPlaceable
+>;
 
 export type { ModifierTracker };
 
@@ -45,7 +56,7 @@ function foreignData(intent: ChainIntent, ctx: ApplyContext): Record<string, unk
   const info = ctx.sources.get(intent.entry);
   const origin = info?.origin;
   if (!info || !origin) return null;
-  if ((origin.uuid === ctx.roller.actor.uuid) || (origin.uuid === ctx.roller.item?.uuid)) return null;
+  if (origin.uuid === ctx.roller.actor.uuid || origin.uuid === ctx.roller.item?.uuid) return null;
   return originRollData(info.document);
 }
 
@@ -76,20 +87,20 @@ export function applyModifiers(
   ctx: ApplyContext,
   tracker: ModifierTracker,
   start: readonly number[],
-  critical: boolean
+  critical: boolean,
 ): void {
   const key = modifierKey(intent);
   if (tracker.halted.has(key)) return;
   const info = ctx.sources.get(intent.entry);
   const originData = info ? originRollData(info.document, true) : {};
-  const spec = resolveModifiers(intent.data, formula => simplifyNumber(formula, originData));
+  const spec = resolveModifiers(intent.data, (formula) => simplifyNumber(formula, originData));
   if (!spec) return;
   if (!tracker.active.includes(intent)) tracker.active.push(intent);
   const halt = () => {
     tracker.halted.add(key);
-    tracker.active = tracker.active.filter(entry => entry !== intent);
+    tracker.active = tracker.active.filter((entry) => entry !== intent);
   };
-  const damage = critical && (ctx.event === "damageRoll");
+  const damage = critical && ctx.event === "damageRoll";
 
   for (const [index, roll] of (config.rolls ?? []).entries()) {
     const parts = (roll.parts ??= []);
@@ -99,7 +110,7 @@ export function applyModifiers(
     parts.splice(from, slice.length, ...slice);
     if (stopped) return halt();
     const rollCritical = asRecord(roll.options?.critical);
-    if (damage && (typeof rollCritical.bonusDamage === "string") && rollCritical.bonusDamage) {
+    if (damage && typeof rollCritical.bonusDamage === "string" && rollCritical.bonusDamage) {
       const formula = [rollCritical.bonusDamage];
       const done = modifyFormulaParts(formula, originData, spec);
       rollCritical.bonusDamage = String(formula[0]);
@@ -120,7 +131,7 @@ export function applyRollIntents(
   intents: readonly ChainIntent[],
   ctx: ApplyContext,
   tracker: ModifierTracker,
-  options: ApplyOptions = {}
+  options: ApplyOptions = {},
 ): void {
   let success = 0;
   let failure = 0;
@@ -146,14 +157,21 @@ export function applyRollIntents(
         failure += numberOf(intent, "fumble", ctx, options);
         break;
       case "critDamage":
-        addCriticalBonus(config, numberOf(intent, "dice", ctx, options), formulaOf(intent, "damage", ctx, options));
+        addCriticalBonus(
+          config,
+          numberOf(intent, "dice", ctx, options),
+          formulaOf(intent, "damage", ctx, options),
+        );
         break;
       case "saveThresholds":
         target += numberOf(intent, "targetValue", ctx, options);
         deathCritical += numberOf(intent, "deathSaveCritical", ctx, options);
         break;
       case "rollAdvantage":
-        applyAdvantageMode(config, (asString(intent.data.mode, "advantage") === "disadvantage") ? "disadvantage" : "advantage");
+        applyAdvantageMode(
+          config,
+          asString(intent.data.mode, "advantage") === "disadvantage" ? "disadvantage" : "advantage",
+        );
         break;
       default:
         break;
@@ -161,11 +179,12 @@ export function applyRollIntents(
   }
 
   if (success || failure) adjustCriticalRanges(config, success, failure, setting(SETTINGS.fumbleBelowOne));
-  if (target || deathCritical) adjustSavingThrowRanges(config, target, deathCritical, ctx.roller.details.isDeath === true);
+  if (target || deathCritical)
+    adjustSavingThrowRanges(config, target, deathCritical, ctx.roller.details.isDeath === true);
   for (const intent of intents) {
     if (intent.type === "diceModifiers") applyModifiers(config, intent, ctx, tracker, [], true);
   }
-  if (ctx.event === "damageRoll") sanitizeCritical(config, formula => Roll.validate(formula));
+  if (ctx.event === "damageRoll") sanitizeCritical(config, (formula) => Roll.validate(formula));
 }
 
 const saveDCs = new WeakMap<object, { original: number; applied: number }>();
@@ -176,15 +195,15 @@ const saveDCs = new WeakMap<object, { original: number; applied: number }>();
  */
 export function applySaveDC(activity: unknown, intents: readonly ChainIntent[], ctx: ApplyContext): void {
   const dc = read(activity, "save.dc");
-  if (!dc || (typeof dc !== "object")) return;
+  if (!dc || typeof dc !== "object") return;
   const record = dc as Record<string, unknown>;
   const total = intents
-    .filter(intent => intent.type === "dcBonus")
+    .filter((intent) => intent.type === "dcBonus")
     .reduce((sum, intent) => sum + numberOf(intent, "formula", ctx, {}), 0);
   const current = asNumber(record.value) ?? 0;
   const previous = saveDCs.get(record);
-  const base = (previous && (previous.applied === current)) ? previous.original : current;
-  if (!total && (base === current)) return;
+  const base = previous && previous.applied === current ? previous.original : current;
+  if (!total && base === current) return;
   record.value = base + total;
   saveDCs.set(record, { original: base, applied: base + total });
 }

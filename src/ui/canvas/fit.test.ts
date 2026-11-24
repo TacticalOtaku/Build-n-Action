@@ -8,11 +8,21 @@ function stage(height: number, stampHeight: number): HTMLElement {
 
 describe("fitOptions", () => {
   it("keeps the title block's strip free, measured on the stage", () => {
-    expect(fitOptions(stage(740, 176)).padding).toEqual({ top: "72px", right: "48px", bottom: "200px", left: "48px" });
+    expect(fitOptions(stage(740, 176)).padding).toEqual({
+      top: "72px",
+      right: "48px",
+      bottom: "200px",
+      left: "48px",
+    });
   });
 
   it("falls back to proportional room on a stage too short for it", () => {
-    expect(fitOptions(stage(300, 176)).padding).toEqual({ top: "10%", right: "6%", bottom: "30%", left: "6%" });
+    expect(fitOptions(stage(300, 176)).padding).toEqual({
+      top: "10%",
+      right: "6%",
+      bottom: "30%",
+      left: "6%",
+    });
     expect(fitOptions(null).padding).toEqual({ top: "10%", right: "6%", bottom: "30%", left: "6%" });
   });
 

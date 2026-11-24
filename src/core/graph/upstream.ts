@@ -6,7 +6,7 @@ import { CONTINUATION_EVENT_BY_PIN, type EventType, type PinId } from "../regist
  * only compatible results, hide fields that do not apply, and flag irrelevant checks.
  */
 export function upstreamEvents(graph: BlueprintGraph, nodeId: string): EventType[] {
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const start = nodes.get(nodeId);
   if (!start) return [];
   if (start.kind === "event") return [start.type as EventType];
@@ -42,7 +42,7 @@ export function upstreamEvents(graph: BlueprintGraph, nodeId: string): EventType
  * save's outcomes) and hides what came before it; conditions pass the search on.
  */
 export function resultEvents(graph: BlueprintGraph, nodeId: string, pin?: PinId): EventType[] {
-  const nodes = new Map(graph.nodes.map(node => [node.id, node]));
+  const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   const incoming = new Map<string, { id: string; pin: PinId }[]>();
   for (const edge of graph.edges) {
     const list = incoming.get(edge.target) ?? [];
@@ -61,7 +61,8 @@ export function resultEvents(graph: BlueprintGraph, nodeId: string, pin?: PinId)
     const node = nodes.get(current.id);
     if (!node) continue;
     if (node.kind === "event") add(node.type as EventType);
-    else if (node.kind === "result") add((current.pin && CONTINUATION_EVENT_BY_PIN[current.pin]) || "afterResult");
+    else if (node.kind === "result")
+      add((current.pin && CONTINUATION_EVENT_BY_PIN[current.pin]) || "afterResult");
     else queue.push(...(incoming.get(current.id) ?? []));
   }
   return found;

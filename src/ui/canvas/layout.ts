@@ -19,19 +19,21 @@ const OPTIONS = {
   "elk.edgeRouting": "ORTHOGONAL",
   "elk.layered.spacing.nodeNodeBetweenLayers": "72",
   "elk.spacing.nodeNode": "36",
-  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF"
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
 };
 
 /** Positions that arrange the blueprint as left-to-right chains. */
 export async function autoLayout(
   blueprint: BlueprintSource,
-  sizes: Readonly<Record<string, Size>>
+  sizes: Readonly<Record<string, Size>>,
 ): Promise<Record<string, Position>> {
-  const result = await (await layoutEngine()).layout({
+  const result = await (
+    await layoutEngine()
+  ).layout({
     id: "root",
     layoutOptions: OPTIONS,
-    children: blueprint.nodes.map(node => ({ id: node.id, ...(sizes[node.id] ?? FALLBACK_SIZE) })),
-    edges: blueprint.edges.map(edge => ({ id: edge.id, sources: [edge.source], targets: [edge.target] }))
+    children: blueprint.nodes.map((node) => ({ id: node.id, ...(sizes[node.id] ?? FALLBACK_SIZE) })),
+    edges: blueprint.edges.map((edge) => ({ id: edge.id, sources: [edge.source], targets: [edge.target] })),
   });
   const positions: Record<string, Position> = {};
   for (const child of result.children ?? []) positions[child.id] = { x: child.x ?? 0, y: child.y ?? 0 };

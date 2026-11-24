@@ -4,7 +4,13 @@ import { asRecord } from "../registry/data";
 import { getEvent, getResult } from "../registry/index";
 
 export const CONNECT_REJECTIONS = [
-  "missingNode", "selfLoop", "intoEvent", "fromResult", "unknownPin", "duplicate", "cycle"
+  "missingNode",
+  "selfLoop",
+  "intoEvent",
+  "fromResult",
+  "unknownPin",
+  "duplicate",
+  "cycle",
 ] as const;
 
 /** Why a wire was refused; the message key is `BNA.Connect.<reason>`. */
@@ -24,13 +30,15 @@ const THEN_PINS: readonly PinId[] = ["then"];
 /** The outputs a node has: an event's outcomes, a condition's yes/no, a result's "And then" while it is on. */
 export function outputPins(node: Pick<BlueprintNode, "kind" | "type" | "data">): readonly PinId[] {
   switch (node.kind) {
-    case "event": return getEvent(node.type)?.pins ?? [];
-    case "condition": return (node.type === CONDITION_NODE_TYPE) ? CONDITION_PINS : [];
+    case "event":
+      return getEvent(node.type)?.pins ?? [];
+    case "condition":
+      return node.type === CONDITION_NODE_TYPE ? CONDITION_PINS : [];
     case "result": {
       const definition = getResult(node.type);
       if (!definition) return [];
       if (definition.pins?.length) return definition.pins;
-      return (asRecord(node.data.common).then === true) ? THEN_PINS : [];
+      return asRecord(node.data.common).then === true ? THEN_PINS : [];
     }
   }
 }
@@ -39,7 +47,7 @@ export function outputPins(node: Pick<BlueprintNode, "kind" | "type" | "data">):
 export function wouldCreateCycle(
   edges: readonly Pick<BlueprintEdge, "source" | "target">[],
   source: string,
-  target: string
+  target: string,
 ): boolean {
   const outgoing = new Map<string, string[]>();
   for (const edge of edges) {
@@ -59,16 +67,17 @@ export function wouldCreateCycle(
 }
 
 export function canConnect(graph: BlueprintGraph, request: ConnectRequest): ConnectResult {
-  const source = graph.nodes.find(node => node.id === request.source);
-  const target = graph.nodes.find(node => node.id === request.target);
+  const source = graph.nodes.find((node) => node.id === request.source);
+  const target = graph.nodes.find((node) => node.id === request.target);
   if (!source || !target) return reject("missingNode");
   if (source.id === target.id) return reject("selfLoop");
   if (target.kind === "event") return reject("intoEvent");
   const pins = outputPins(source);
-  if ((source.kind === "result") && !pins.length) return reject("fromResult");
+  if (source.kind === "result" && !pins.length) return reject("fromResult");
   if (!pins.includes(request.sourcePin as PinId)) return reject("unknownPin");
-  const duplicate = graph.edges.some(edge => (edge.source === source.id)
-    && (edge.sourcePin === request.sourcePin) && (edge.target === target.id));
+  const duplicate = graph.edges.some(
+    (edge) => edge.source === source.id && edge.sourcePin === request.sourcePin && edge.target === target.id,
+  );
   if (duplicate) return reject("duplicate");
   if (wouldCreateCycle(graph.edges, source.id, target.id)) return reject("cycle");
   return { ok: true };

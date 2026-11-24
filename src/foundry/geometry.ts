@@ -31,8 +31,13 @@ export function tokenCenters(token: TokenPlaceable): Point[] {
 }
 
 /** The area an aura of `range` feet around `source` covers, limited by walls per requirement; null for none or infinite. */
-export function auraShape(source: TokenPlaceable, range: number, require: readonly string[], pad: boolean): ShapeLike | null {
-  if (!canvas.ready || (range <= 0)) return null;
+export function auraShape(
+  source: TokenPlaceable,
+  range: number,
+  require: readonly string[],
+  pad: boolean,
+): ShapeLike | null {
+  if (!canvas.ready || range <= 0) return null;
   let radius = range;
   if (pad) radius += canvas.grid.distance * Math.max(source.document.width, source.document.height) * 0.5;
   const center = source.center;
@@ -43,7 +48,7 @@ export function auraShape(source: TokenPlaceable, range: number, require: readon
       type,
       debug: false,
       useThreshold: type !== "move",
-      boundaryShapes: [shape]
+      boundaryShapes: [shape],
     });
   }
   return shape;
@@ -53,10 +58,16 @@ export function auraShape(source: TokenPlaceable, range: number, require: readon
  * Whether `roller` stands within `range` feet of `source` (-1 = anywhere), limited by walls for each
  * requirement ("sight", "move", "sound", "light"), as v1's TokenAura.
  */
-export function withinAura(source: TokenPlaceable, roller: TokenPlaceable, range: number, require: readonly string[], pad: boolean): boolean {
+export function withinAura(
+  source: TokenPlaceable,
+  roller: TokenPlaceable,
+  range: number,
+  require: readonly string[],
+  pad: boolean,
+): boolean {
   if (range === -1) return true;
   const shape = auraShape(source, range, require, pad);
-  return !!shape && tokenCenters(roller).some(point => shape.contains(point.x, point.y));
+  return !!shape && tokenCenters(roller).some((point) => shape.contains(point.x, point.y));
 }
 
 /**
@@ -66,7 +77,7 @@ export function withinAura(source: TokenPlaceable, roller: TokenPlaceable, range
  */
 export function templateContains(template: TemplatePlaceable, point: Point): boolean {
   let shape: ShapeLike | null | undefined = template.shape;
-  if (!shape && (typeof template._computeShape === "function")) {
+  if (!shape && typeof template._computeShape === "function") {
     try {
       shape = template._computeShape();
     } catch {

@@ -9,13 +9,13 @@ import { Drawer } from "./Drawer";
 import { IssuesPanel } from "./IssuesPanel";
 
 const blueprint = createBlueprint({
-  nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r")]
+  nodes: [makeNode("event", "damageRoll", "ev"), makeNode("result", "rollBonus", "r")],
 });
 
 const issues: LintIssue[] = [
   { code: "orphan-node", level: "warning", nodeId: "r" },
   { code: "migrated", level: "info" },
-  { code: "cost-without-optional", level: "error", nodeId: "r" }
+  { code: "cost-without-optional", level: "error", nodeId: "r" },
 ];
 
 describe("IssuesPanel", () => {
@@ -40,7 +40,14 @@ describe("Drawer", () => {
     const onTab = vi.fn();
     const onClose = vi.fn();
     renderWithServices(
-      <Drawer tab="issues" onTab={onTab} onClose={onClose} issueCount={3} test={<p>test body</p>} issues={<p>issues body</p>} />
+      <Drawer
+        tab="issues"
+        onTab={onTab}
+        onClose={onClose}
+        issueCount={3}
+        test={<p>test body</p>}
+        issues={<p>issues body</p>}
+      />,
     );
     expect(screen.getByRole("tab", { name: /Issues/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel")).toHaveTextContent("issues body");
@@ -51,7 +58,9 @@ describe("Drawer", () => {
   });
 
   it("hides the Test tab without a simulator", () => {
-    renderWithServices(<Drawer tab="issues" onTab={vi.fn()} onClose={vi.fn()} issueCount={0} issues={<p>issues body</p>} />);
+    renderWithServices(
+      <Drawer tab="issues" onTab={vi.fn()} onClose={vi.fn()} issueCount={0} issues={<p>issues body</p>} />,
+    );
     expect(screen.queryByRole("tab", { name: "Test" })).toBeNull();
   });
 });

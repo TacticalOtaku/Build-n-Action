@@ -6,11 +6,11 @@ body,
 }
 
 body {
-  background: #0C1522;
+  background: #0c1522;
 }
 
 body[data-theme="light"] {
-  background: #EEF2F7;
+  background: #eef2f7;
 }
 
 .playground {
@@ -24,13 +24,15 @@ body[data-theme="light"] {
   align-items: center;
   gap: 16px;
   padding: 6px 14px;
-  background: #060B12;
-  color: #8796AD;
-  font: 12px/1.4 system-ui, sans-serif;
+  background: #060b12;
+  color: #8796ad;
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
 }
 
 .playground__bar strong {
-  color: #D5DEEA;
+  color: #d5deea;
   font-weight: 600;
 }
 
@@ -42,7 +44,7 @@ body[data-theme="light"] {
 
 .playground__langs button {
   padding: 2px 8px;
-  border: 1px solid #2A3547;
+  border: 1px solid #2a3547;
   border-radius: 3px;
   background: transparent;
   color: inherit;
@@ -51,6 +53,6 @@ body[data-theme="light"] {
 }
 
 .playground__langs button[aria-pressed="true"] {
-  border-color: #D5DEEA;
-  color: #D5DEEA;
+  border-color: #d5deea;
+  color: #d5deea;
 }

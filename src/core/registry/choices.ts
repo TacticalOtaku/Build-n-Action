@@ -1,7 +1,7 @@
 import type { StaticChoice } from "./fields";
 
 function choices(group: string, values: readonly string[]): readonly StaticChoice[] {
-  return values.map(value => ({ value, label: `BNA.Choice.${group}.${value}` }));
+  return values.map((value) => ({ value, label: `BNA.Choice.${group}.${value}` }));
 }
 
 /** Choice lists owned by the module. Labels are i18n keys `BNA.Choice.<group>.<value>`. */
@@ -12,7 +12,7 @@ export const STATIC = {
   disposition: [
     { value: "2", label: "BNA.Choice.disposition.any" },
     { value: "1", label: "BNA.Choice.disposition.ally" },
-    { value: "-1", label: "BNA.Choice.disposition.enemy" }
+    { value: "-1", label: "BNA.Choice.disposition.enemy" },
   ],
   conditionMode: choices("conditionMode", ["all", "any"]),
   threshold: choices("threshold", ["atMost", "atLeast"]),
@@ -37,11 +37,19 @@ export const STATIC = {
   resourceType: choices("resourceType", ["uses", "slots", "hp", "tempHp", "hitDice", "currency"]),
   signalScope: choices("signalScope", ["actor", "document"]),
   costType: choices("costType", [
-    "none", "uses", "quantity", "slots", "health", "hitdice", "currency", "inspiration", "effect"
+    "none",
+    "uses",
+    "quantity",
+    "slots",
+    "health",
+    "hitdice",
+    "currency",
+    "inspiration",
+    "effect",
   ]),
   hitDieSize: choices("hitDieSize", ["smallest", "largest", "d6", "d8", "d10", "d12"]),
   limit: choices("limit", ["none", "turn", "round", "shortRest", "longRest"]),
-  comparisonOperator: choices("comparisonOperator", ["EQ", "LT", "GT", "LE", "GE"])
+  comparisonOperator: choices("comparisonOperator", ["EQ", "LT", "GT", "LE", "GE"]),
 } as const satisfies Record<string, readonly StaticChoice[]>;
 
 export type StaticChoiceGroup = keyof typeof STATIC;

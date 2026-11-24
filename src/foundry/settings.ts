@@ -10,7 +10,7 @@ export const SETTINGS = {
   showAuraRanges: "showAuraRanges",
   allowPlayers: "allowPlayers",
   headerLabel: "headerLabel",
-  showSheetTab: "showSheetTab"
+  showSheetTab: "showSheetTab",
 } as const;
 
 /** Per-user settings the editor keeps; not shown in the settings window. */
@@ -18,13 +18,19 @@ export const CLIENT_SETTINGS = {
   editorTheme: "editorTheme",
   editorEffects: "editorEffects",
   coachSeen: "coachSeen",
-  debug: "debug"
+  debug: "debug",
 } as const;
 
 type SettingKey = (typeof SETTINGS)[keyof typeof SETTINGS];
 type ClientSettingKey = (typeof CLIENT_SETTINGS)[keyof typeof CLIENT_SETTINGS];
 
-function register(key: SettingKey, name: string, initial: boolean, config = true, onChange?: () => void): void {
+function register(
+  key: SettingKey,
+  name: string,
+  initial: boolean,
+  config = true,
+  onChange?: () => void,
+): void {
   game.settings.register(MODULE_SCOPE, key, {
     name: `BNA.Setting.${name}.name`,
     hint: `BNA.Setting.${name}.hint`,
@@ -32,18 +38,23 @@ function register(key: SettingKey, name: string, initial: boolean, config = true
     config,
     type: Boolean,
     default: initial,
-    ...(onChange ? { onChange } : {})
+    ...(onChange ? { onChange } : {}),
   });
 }
 
 /** Re-render open document sheets so header controls follow the settings. */
 function refreshSheets(): void {
   for (const application of foundry.applications.instances.values()) {
-    if (read(application, "document") && read(application, "rendered")) void (application as ApplicationV2Instance).render();
+    if (read(application, "document") && read(application, "rendered"))
+      void (application as ApplicationV2Instance).render();
   }
 }
 
-function registerClient(key: ClientSettingKey, type: typeof String | typeof Boolean, initial: string | boolean): void {
+function registerClient(
+  key: ClientSettingKey,
+  type: typeof String | typeof Boolean,
+  initial: string | boolean,
+): void {
   game.settings.register(MODULE_SCOPE, key, { scope: "client", config: false, type, default: initial });
 }
 
@@ -66,7 +77,7 @@ export function registerSettings(): void {
     config: true,
     type: Boolean,
     default: false,
-    onChange: (enabled: unknown) => setDebugLogging(enabled === true)
+    onChange: (enabled: unknown) => setDebugLogging(enabled === true),
   });
   setDebugLogging(clientSetting(CLIENT_SETTINGS.debug) === true);
 }
@@ -92,8 +103,12 @@ export function setClientSetting(key: ClientSettingKey, value: unknown): Promise
 }
 
 /** The editor's theme: its own choice, else Foundry's application scheme, else the browser's. */
-export function resolveEditorTheme(stored: unknown, applications: unknown, prefersLight: boolean): "dark" | "light" {
-  if ((stored === "dark") || (stored === "light")) return stored;
-  if ((applications === "dark") || (applications === "light")) return applications;
+export function resolveEditorTheme(
+  stored: unknown,
+  applications: unknown,
+  prefersLight: boolean,
+): "dark" | "light" {
+  if (stored === "dark" || stored === "light") return stored;
+  if (applications === "dark" || applications === "light") return applications;
   return prefersLight ? "light" : "dark";
 }

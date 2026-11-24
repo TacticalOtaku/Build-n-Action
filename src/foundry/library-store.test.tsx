@@ -16,9 +16,9 @@ describe("the library host as a React store", () => {
           onChange = config.onChange;
         },
         // Foundry 14 builds a new value from the default on every read until the setting is first saved.
-        get: () => ({ blueprints: [] })
+        get: () => ({ blueprints: [] }),
       },
-      user: { isGM: true }
+      user: { isGM: true },
     });
     registerLibrary();
     onChange?.();

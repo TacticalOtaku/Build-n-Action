@@ -31,14 +31,16 @@ export function combineAdvantageFlags(advantage: boolean, disadvantage: boolean)
 }
 
 function hasAdvantageFlag(config: ProcessConfig): boolean {
-  return Boolean(config.advantage) || entries(config).some(roll =>
-    (roll.options?.advantage === true) || (roll.options?.advantageMode === 1)
+  return (
+    Boolean(config.advantage) ||
+    entries(config).some((roll) => roll.options?.advantage === true || roll.options?.advantageMode === 1)
   );
 }
 
 function hasDisadvantageFlag(config: ProcessConfig): boolean {
-  return Boolean(config.disadvantage) || entries(config).some(roll =>
-    (roll.options?.disadvantage === true) || (roll.options?.advantageMode === -1)
+  return (
+    Boolean(config.disadvantage) ||
+    entries(config).some((roll) => roll.options?.disadvantage === true || roll.options?.advantageMode === -1)
   );
 }
 
@@ -51,32 +53,35 @@ export function resolvedAdvantageMode(config: ProcessConfig): ResolvedAdvantageM
 export function resolvedConfigRollMode(config: ProcessConfig, workflow?: unknown): RollMode {
   const wf = asRecord(workflow);
   return combineAdvantageFlags(
-    hasAdvantageFlag(config) || (wf.advantage === true),
-    hasDisadvantageFlag(config) || (wf.disadvantage === true)
+    hasAdvantageFlag(config) || wf.advantage === true,
+    hasDisadvantageFlag(config) || wf.disadvantage === true,
   );
 }
 
 /** Extract the resolved roll mode from a single submitted d20 roll, or null when the roll carries none. */
 export function rollModeFromRoll(roll: unknown): RollMode | null {
-  if (!roll || (typeof roll !== "object")) return null;
+  if (!roll || typeof roll !== "object") return null;
   const record = roll as Record<string, unknown>;
   const options = asRecord(record.options);
-  if ((typeof options.advantageMode === "number") && Number.isFinite(options.advantageMode)) {
+  if (typeof options.advantageMode === "number" && Number.isFinite(options.advantageMode)) {
     if (options.advantageMode > 0) return "advantage";
     if (options.advantageMode < 0) return "disadvantage";
     return "normal";
   }
-  if ((typeof record.hasAdvantage === "boolean") || (typeof record.hasDisadvantage === "boolean")) {
+  if (typeof record.hasAdvantage === "boolean" || typeof record.hasDisadvantage === "boolean") {
     return combineAdvantageFlags(record.hasAdvantage === true, record.hasDisadvantage === true);
   }
-  if ((typeof options.advantage === "boolean") || (typeof options.disadvantage === "boolean")) {
+  if (typeof options.advantage === "boolean" || typeof options.disadvantage === "boolean") {
     return combineAdvantageFlags(options.advantage === true, options.disadvantage === true);
   }
   return null;
 }
 
 /** Resolve the mode of submitted rolls (dialog choices override stale pre-roll config), falling back to config. */
-export function resolvedSubmittedRollMode(rolls: readonly unknown[], config?: ProcessConfig): RollMode | null {
+export function resolvedSubmittedRollMode(
+  rolls: readonly unknown[],
+  config?: ProcessConfig,
+): RollMode | null {
   for (const roll of rolls) {
     const mode = rollModeFromRoll(roll);
     if (mode) return mode;
@@ -86,12 +91,12 @@ export function resolvedSubmittedRollMode(rolls: readonly unknown[], config?: Pr
 
 /** Resolve the attack roll mode from a Midi-QOL workflow (attackRoll first, then flags once an attack ran). */
 export function workflowAttackRollMode(workflow: unknown, allowFlags = false): RollMode | null {
-  if (!workflow || (typeof workflow !== "object")) return null;
+  if (!workflow || typeof workflow !== "object") return null;
   const record = workflow as Record<string, unknown>;
   const fromRoll = rollModeFromRoll(record.attackRoll);
   if (fromRoll) return fromRoll;
-  const hasAttack = allowFlags || (record.attackRoll != null) || (typeof record.attackTotal === "number");
-  if (hasAttack && ((typeof record.advantage === "boolean") || (typeof record.disadvantage === "boolean"))) {
+  const hasAttack = allowFlags || record.attackRoll != null || typeof record.attackTotal === "number";
+  if (hasAttack && (typeof record.advantage === "boolean" || typeof record.disadvantage === "boolean")) {
     return combineAdvantageFlags(record.advantage === true, record.disadvantage === true);
   }
   return null;
@@ -99,11 +104,11 @@ export function workflowAttackRollMode(workflow: unknown, allowFlags = false): R
 
 /** Apply advantage or disadvantage onto the roll configuration while preserving mutual cancellation. */
 export function applyAdvantageMode(config: ProcessConfig, mode: RollAdvantageMode): void {
-  const advantage = (mode === "advantage") || hasAdvantageFlag(config);
-  const disadvantage = (mode === "disadvantage") || hasDisadvantageFlag(config);
+  const advantage = mode === "advantage" || hasAdvantageFlag(config);
+  const disadvantage = mode === "disadvantage" || hasDisadvantageFlag(config);
   config.advantage = advantage;
   config.disadvantage = disadvantage;
-  const numericMode = (advantage === disadvantage) ? 0 : (advantage ? 1 : -1);
+  const numericMode = advantage === disadvantage ? 0 : advantage ? 1 : -1;
   for (const roll of entries(config)) {
     roll.options ??= {};
     roll.options.advantage = advantage;
@@ -113,7 +118,7 @@ export function applyAdvantageMode(config: ProcessConfig, mode: RollAdvantageMod
 }
 
 function isEntry(roll: unknown): roll is RollConfigEntry {
-  return !!roll && (typeof roll === "object");
+  return !!roll && typeof roll === "object";
 }
 
 function entries(config: ProcessConfig): RollConfigEntry[] {
@@ -132,23 +137,28 @@ export function appendRollPart(config: ProcessConfig, part: string): void {
  * object are copied; everything else, and the actor, stays as it is.
  */
 function withoutSenseShims(value: unknown, seen = new Map<object, unknown>()): unknown {
-  if (!value || (typeof value !== "object")) return value;
+  if (!value || typeof value !== "object") return value;
   if (seen.has(value)) return seen.get(value);
   seen.set(value, value);
   let result: unknown = value;
   const prototype = Object.getPrototypeOf(value);
   if (Array.isArray(value)) {
-    const items = value.map(item => withoutSenseShims(item, seen));
+    const items = value.map((item) => withoutSenseShims(item, seen));
     if (items.some((item, index) => item !== value[index])) result = items;
-  } else if ((prototype === Object.prototype) || (prototype === null)) {
+  } else if (prototype === Object.prototype || prototype === null) {
     const descriptors: PropertyDescriptorMap = Object.getOwnPropertyDescriptors(value);
     const ranges = descriptors.ranges;
-    const shimmed = (ranges && ("value" in ranges)) ? ranges.value as Record<string, unknown> : null;
+    const shimmed = ranges && "value" in ranges ? (ranges.value as Record<string, unknown>) : null;
     let changed = false;
     for (const [key, descriptor] of Object.entries(descriptors)) {
       if (!("value" in descriptor)) {
         if (!shimmed) continue;
-        descriptors[key] = { value: shimmed[key], enumerable: descriptor.enumerable, writable: true, configurable: true };
+        descriptors[key] = {
+          value: shimmed[key],
+          enumerable: descriptor.enumerable,
+          writable: true,
+          configurable: true,
+        };
         changed = true;
         continue;
       }
@@ -166,29 +176,39 @@ function withoutSenseShims(value: unknown, seen = new Map<object, unknown>()): u
 /** Make `@target` available to every roll (dnd5e merges its own roll data into these containers later). */
 export function injectTargetData(config: ProcessConfig, targetData: Record<string, unknown>): void {
   const target = withoutSenseShims(targetData);
-  if (config.data && (typeof config.data === "object")) config.data.target = target;
+  if (config.data && typeof config.data === "object") config.data.target = target;
   for (const roll of entries(config)) (roll.data ??= {}).target = target;
 }
 
 /** A stored number, or the fallback when absent or not a number (0 is kept). */
 function numberOr(value: unknown, fallback: number): number {
-  const number = ((value === undefined) || (value === null)) ? Number.NaN : Number(value);
+  const number = value === undefined || value === null ? Number.NaN : Number(value);
   return Number.isFinite(number) ? number : fallback;
 }
 
 /** Widen the critical range by `success` and the fumble range by `failure` on every roll. */
-export function adjustCriticalRanges(config: ProcessConfig, success: number, failure: number, allowFailureBelowOne: boolean): void {
+export function adjustCriticalRanges(
+  config: ProcessConfig,
+  success: number,
+  failure: number,
+  allowFailureBelowOne: boolean,
+): void {
   for (const roll of entries(config)) {
     const options = (roll.options ??= {});
     options.criticalSuccess = Math.max(1, numberOr(options.criticalSuccess, 20) - success);
     let fumble = numberOr(options.criticalFailure, 1) + failure;
-    if ((fumble < 1) && !allowFailureBelowOne) fumble = 1;
+    if (fumble < 1 && !allowFailureBelowOne) fumble = 1;
     options.criticalFailure = fumble;
   }
 }
 
 /** Lower a save's target by `targetBonus`; for death saves also widen the critical success range. */
-export function adjustSavingThrowRanges(config: ProcessConfig, targetBonus: number, criticalBonus: number, isDeath: boolean): void {
+export function adjustSavingThrowRanges(
+  config: ProcessConfig,
+  targetBonus: number,
+  criticalBonus: number,
+  isDeath: boolean,
+): void {
   if (Number.isFinite(Number(config.target))) config.target = Number(config.target) - targetBonus;
   if (!isDeath) return;
   for (const roll of entries(config)) {
@@ -213,12 +233,17 @@ function typesOf(roll: RollConfigEntry): unknown[] {
  * Add a damage bonus: untyped bonuses join the first roll, a single type joins a roll of that
  * type, and anything else becomes its own roll carrying the bonus's types.
  */
-export function appendDamagePart(config: ProcessConfig, formula: string, types: readonly string[], rollData: Record<string, unknown>): void {
+export function appendDamagePart(
+  config: ProcessConfig,
+  formula: string,
+  types: readonly string[],
+  rollData: Record<string, unknown>,
+): void {
   const rolls = entries(config);
   const first = rolls[0];
   let roll: RollConfigEntry | undefined;
   if (!types.length) roll = first;
-  else if (types.length === 1) roll = rolls.find(candidate => typesOf(candidate).includes(types[0]));
+  else if (types.length === 1) roll = rolls.find((candidate) => typesOf(candidate).includes(types[0]));
   if (roll) {
     (roll.parts ??= []).push(formula);
     return;
@@ -227,7 +252,11 @@ export function appendDamagePart(config: ProcessConfig, formula: string, types: 
   (config.rolls ??= []).push({
     data: rollData,
     parts: [formula],
-    options: { properties: Array.isArray(properties) ? [...properties] : [], type: types[0], types: [...types] }
+    options: {
+      properties: Array.isArray(properties) ? [...properties] : [],
+      type: types[0],
+      types: [...types],
+    },
   });
 }
 

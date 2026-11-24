@@ -25,16 +25,19 @@ function rounded(formula: unknown, evaluate: Evaluate): number | null {
   const text = asString(formula).trim();
   if (!text) return null;
   const value = evaluate(text);
-  return ((value === null) || !Number.isFinite(value)) ? null : Math.round(value);
+  return value === null || !Number.isFinite(value) ? null : Math.round(value);
 }
 
 function positive(formula: unknown, evaluate: Evaluate): number | null {
   const value = rounded(formula, evaluate);
-  return ((value !== null) && (value > 0)) ? value : null;
+  return value !== null && value > 0 ? value : null;
 }
 
 /** Evaluate a diceModifiers result's values (as v1's ModifiersModel#prepareDerivedData); null when inactive. */
-export function resolveModifiers(data: Readonly<Record<string, unknown>>, evaluate: Evaluate): ModifierSpec | null {
+export function resolveModifiers(
+  data: Readonly<Record<string, unknown>>,
+  evaluate: Evaluate,
+): ModifierSpec | null {
   const part = (key: string) => asRecord(data[key]);
   const enabled = (key: string) => asBoolean(part(key).enabled);
   const value = (key: string) => rounded(part(key).value, evaluate);
@@ -44,22 +47,38 @@ export function resolveModifiers(data: Readonly<Record<string, unknown>>, evalua
   const minimum = value("minimum");
   const maximum = value("maximum");
   const spec: ModifierSpec = {
-    amount: (enabled("amount") && (amount !== null)) ? { multiply: asString(part("amount").mode) === "multiply", value: amount } : null,
-    size: (enabled("size") && (size !== null)) ? { multiply: asString(part("size").mode) === "multiply", value: size } : null,
+    amount:
+      enabled("amount") && amount !== null
+        ? { multiply: asString(part("amount").mode) === "multiply", value: amount }
+        : null,
+    size:
+      enabled("size") && size !== null
+        ? { multiply: asString(part("size").mode) === "multiply", value: size }
+        : null,
     reroll: enabled("reroll")
       ? {
-        value: value("reroll"), invert: asBoolean(part("reroll").invert), recursive: asBoolean(part("reroll").recursive),
-        limit: positive(part("reroll").limit, evaluate)
-      }
+          value: value("reroll"),
+          invert: asBoolean(part("reroll").invert),
+          recursive: asBoolean(part("reroll").recursive),
+          limit: positive(part("reroll").limit, evaluate),
+        }
       : null,
     explode: enabled("explode")
-      ? { value: value("explode"), once: asBoolean(part("explode").once), limit: positive(part("explode").limit, evaluate) }
+      ? {
+          value: value("explode"),
+          once: asBoolean(part("explode").once),
+          limit: positive(part("explode").limit, evaluate),
+        }
       : null,
-    minimum: (enabled("minimum") && (asBoolean(part("minimum").maximize) || ((minimum !== null) && (minimum !== 0))))
-      ? { value: minimum, maximize: asBoolean(part("minimum").maximize) }
-      : null,
-    maximum: (enabled("maximum") && (maximum !== null)) ? { value: maximum, zero: asBoolean(part("maximum").zero) } : null,
-    firstOnly: asBoolean(data.firstOnly)
+    minimum:
+      enabled("minimum") && (asBoolean(part("minimum").maximize) || (minimum !== null && minimum !== 0))
+        ? { value: minimum, maximize: asBoolean(part("minimum").maximize) }
+        : null,
+    maximum:
+      enabled("maximum") && maximum !== null
+        ? { value: maximum, zero: asBoolean(part("maximum").zero) }
+        : null,
+    firstOnly: asBoolean(data.firstOnly),
   };
   const active = spec.amount || spec.size || spec.reroll || spec.explode || spec.minimum || spec.maximum;
   return active ? spec : null;
@@ -69,11 +88,11 @@ const EXISTING = {
   reroll: /rr?([0-9]+)?([<>=]+)?([0-9]+)?/i,
   explode: /xo?([0-9]+)?([<>=]+)?([0-9]+)?/i,
   minimum: /(?:min)([0-9]+)/i,
-  maximum: /(?:max)([0-9]+)/i
+  maximum: /(?:max)([0-9]+)/i,
 };
 
 function has(die: DieLike, kind: keyof typeof EXISTING): boolean {
-  return die.modifiers.some(modifier => EXISTING[kind].test(modifier));
+  return die.modifiers.some((modifier) => EXISTING[kind].test(modifier));
 }
 
 function reroll(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["reroll"]>): void {
@@ -82,15 +101,15 @@ function reroll(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["rer
   const v = rule.value ?? 1;
   let modifier: string;
   if (rule.invert) {
-    if (v > 0) modifier = (v >= faces) ? `${prefix}=${faces}` : `${prefix}>${v}`;
+    if (v > 0) modifier = v >= faces ? `${prefix}=${faces}` : `${prefix}>${v}`;
     else if (v === 0) modifier = `${prefix}=${faces}`;
-    else modifier = ((faces + v) <= 1) ? `${prefix}=1` : `${prefix}>${faces + v}`;
+    else modifier = faces + v <= 1 ? `${prefix}=1` : `${prefix}>${faces + v}`;
   } else if (v > 0) {
-    modifier = (v === 1) ? `${prefix}=1` : `${prefix}<${Math.min(faces, v)}`;
+    modifier = v === 1 ? `${prefix}=1` : `${prefix}<${Math.min(faces, v)}`;
   } else if (v === 0) {
     modifier = `${prefix}=1`;
   } else {
-    modifier = ((faces + v) <= 1) ? `${prefix}=1` : `${prefix}<${faces + v}`;
+    modifier = faces + v <= 1 ? `${prefix}=1` : `${prefix}<${faces + v}`;
   }
   if (faces > 1) die.modifiers.push(modifier);
 }
@@ -99,20 +118,20 @@ function explode(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["ex
   if (has(die, "explode")) return;
   const v = rule.value ?? 0;
   const limit = rule.limit;
-  const prefix = (rule.once || (limit === 1)) ? "xo" : (limit ? `x${limit}` : "x");
+  const prefix = rule.once || limit === 1 ? "xo" : limit ? `x${limit}` : "x";
   const atMax = /x\d+/.test(prefix) ? `${prefix}=${faces}` : prefix;
   let modifier: string;
   let valid: boolean;
   if (v === 0) {
     modifier = atMax;
-    valid = (faces > 1) || (prefix === "xo");
+    valid = faces > 1 || prefix === "xo";
   } else if (v > 0) {
-    modifier = (v >= faces) ? atMax : `${prefix}>=${v}`;
-    valid = (v <= faces) && (((v === 1) && (prefix === "xo")) || (v > 1));
+    modifier = v >= faces ? atMax : `${prefix}>=${v}`;
+    valid = v <= faces && ((v === 1 && prefix === "xo") || v > 1);
   } else {
     const threshold = Math.max(1, faces + v);
     modifier = `${prefix}>=${threshold}`;
-    valid = (threshold > 1) || (prefix === "xo");
+    valid = threshold > 1 || prefix === "xo";
   }
   if (valid || limit) die.modifiers.push(modifier);
 }
@@ -120,7 +139,9 @@ function explode(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["ex
 function minimum(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["minimum"]>): void {
   if (has(die, "minimum")) return;
   const min = rule.value ?? 0;
-  const modifier = rule.maximize ? `min${faces}` : `min${(min > 0) ? Math.min(min, faces) : Math.max(1, faces + min)}`;
+  const modifier = rule.maximize
+    ? `min${faces}`
+    : `min${min > 0 ? Math.min(min, faces) : Math.max(1, faces + min)}`;
   if (modifier !== "min1") die.modifiers.push(modifier);
 }
 
@@ -128,7 +149,7 @@ function maximum(die: DieLike, faces: number, rule: NonNullable<ModifierSpec["ma
   if (has(die, "maximum")) return;
   const v = rule.value;
   const floor = rule.zero ? 0 : 1;
-  const max = (v === 0) ? floor : ((v > 0) ? v : Math.max(floor, faces + v));
+  const max = v === 0 ? floor : v > 0 ? v : Math.max(floor, faces + v);
   if (max < faces) die.modifiers.push(`max${max}`);
 }
 

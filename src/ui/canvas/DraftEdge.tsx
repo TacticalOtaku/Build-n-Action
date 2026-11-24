@@ -27,16 +27,30 @@ export function ArrowMarker() {
 
 /** An orthogonal drafting line; during a test run the taken wires carry a travelling pulse. */
 export function DraftEdge({
-  id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
 }: EdgeProps<BnaFlowEdge>) {
   const [path] = getSmoothStepPath({
-    sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, borderRadius: 6, offset: 18
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 6,
+    offset: 18,
   });
   const status = data?.status ?? null;
   return (
     <g className="bna-edge" data-pin={data?.pin} data-status={status ?? undefined}>
       <BaseEdge id={id} path={path} markerEnd={`url(#${ARROW_MARKER_ID})`} />
-      {(status === "taken") ? (
+      {status === "taken" ? (
         <circle r="3.5" className="bna-edge__pulse">
           <animateMotion dur="1.4s" repeatCount="indefinite" path={path} />
         </circle>

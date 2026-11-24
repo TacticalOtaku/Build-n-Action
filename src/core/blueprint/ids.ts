@@ -11,5 +11,5 @@ export function randomId(length = 16): string {
 
 /** Whether a value has the shape of a Foundry document id (and thus a blueprint id). */
 export function isValidId(value: unknown): value is string {
-  return (typeof value === "string") && /^[A-Za-z0-9]{16}$/.test(value);
+  return typeof value === "string" && /^[A-Za-z0-9]{16}$/.test(value);
 }

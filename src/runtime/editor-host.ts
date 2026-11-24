@@ -7,8 +7,18 @@ import { TRIGGER_EVENTS, type EventType } from "../core/registry/constants";
 import { asRecord, asString } from "../core/registry/data";
 import { parseBlueprintUuid } from "../core/storage/repository";
 import type {
-  CounterRow, CountersHost, EditorHost, EffectsHost, LibraryHost, PreferencesHost,
-  SimulationItem, SimulationNote, SimulationOption, SimulationRequest, SimulationResult, SimulatorHost
+  CounterRow,
+  CountersHost,
+  EditorHost,
+  EffectsHost,
+  LibraryHost,
+  PreferencesHost,
+  SimulationItem,
+  SimulationNote,
+  SimulationOption,
+  SimulationRequest,
+  SimulationResult,
+  SimulatorHost,
 } from "../ui/host";
 
 export const BLUEPRINT_DRAG = "Blueprint";
@@ -46,9 +56,9 @@ export function readDroppedBlueprint(data: unknown): BlueprintSource | null {
 /** Parses a dropped blueprint payload (UUID link or inline blueprint data); ignores unrelated drags. */
 export function parseBlueprintDrop(data: unknown): BlueprintDrop | null {
   const record = asRecord(data);
-  if ((record.type !== BLUEPRINT_DRAG) && (record.type !== LEGACY_DRAG)) return null;
+  if (record.type !== BLUEPRINT_DRAG && record.type !== LEGACY_DRAG) return null;
   const uuid = asString(record.uuid);
-  if (uuid) return (parseBlueprintUuid(uuid) && /^[\w.-]+$/.test(uuid)) ? { kind: "uuid", uuid } : null;
+  if (uuid) return parseBlueprintUuid(uuid) && /^[\w.-]+$/.test(uuid) ? { kind: "uuid", uuid } : null;
   if (record.type !== BLUEPRINT_DRAG) return null;
   const result = validateBlueprintSource(record.data);
   return result.ok ? { kind: "data", blueprint: result.value } : null;
@@ -57,14 +67,20 @@ export function parseBlueprintDrop(data: unknown): BlueprintDrop | null {
 /** Parses an ActiveEffect drop payload at the host boundary; null when unrelated or not JSON. */
 export function parseEffectDrop(raw: string): { uuid: string; valid: boolean } | null {
   const parsed = parseDragText(raw);
-  if (!parsed || (typeof parsed !== "object")) return null;
+  if (!parsed || typeof parsed !== "object") return null;
   const data = asRecord(parsed);
   if (data.type !== "ActiveEffect") return null;
   const uuid = asString(data.uuid).trim();
   return { uuid, valid: isEffectUuid(uuid) };
 }
 
-const D20_EVENTS: readonly EventType[] = ["attackRoll", "savingThrow", "abilityCheck", "afterAttack", "afterCheck"];
+const D20_EVENTS: readonly EventType[] = [
+  "attackRoll",
+  "savingThrow",
+  "abilityCheck",
+  "afterAttack",
+  "afterCheck",
+];
 
 /** Simulated roll mode from the test request, defaulting to normal on inherently d20 events. */
 export function simulatedRollMode(request: SimulationRequest): RollMode | null {
@@ -80,10 +96,17 @@ export interface SimulationPrepared {
 }
 
 /** Executes one Test-tab simulation run through the full interpreter (including continuations and assumed saves). */
-export function runSimulation(prepared: SimulationPrepared | null, request: SimulationRequest): SimulationResult | null {
+export function runSimulation(
+  prepared: SimulationPrepared | null,
+  request: SimulationRequest,
+): SimulationResult | null {
   if (!prepared) return null;
   const { entry, facts, suppressed, hasToken } = prepared;
-  const trigger = { event: request.event, pins: request.pins, ...(request.signal ? { signal: request.signal } : {}) };
+  const trigger = {
+    event: request.event,
+    pins: request.pins,
+    ...(request.signal ? { signal: request.signal } : {}),
+  };
   const notes: SimulationNote[] = [];
   if (suppressed) notes.push("suppressed");
   if (!hasToken) notes.push("noToken");
@@ -132,52 +155,53 @@ export interface EditorHostSpec {
 
 /** Shared EditorHost factory unifying linting, formula previews, transfer, effect selection, and simulations across hosts. */
 export function createEditorHost(spec: EditorHostSpec): EditorHost {
-  const { lint, formula, effectSelection, transfer, simulator, library, effects, counters, preferences } = spec;
+  const { lint, formula, effectSelection, transfer, simulator, library, effects, counters, preferences } =
+    spec;
   return {
     library,
     effects,
     counters,
     preferences,
-    lintEnv: blueprint => {
+    lintEnv: (blueprint) => {
       const { sent, received } = blueprintSignals([...lint.neighbourBlueprints(blueprint.id), blueprint]);
       return {
         validateFormula: lint.validateFormula,
-        hasPath: path => ROLL_ROOTS.some(root => path.startsWith(root)) || lint.hasKnownPath(path),
+        hasPath: (path) => ROLL_ROOTS.some((root) => path.startsWith(root)) || lint.hasKnownPath(path),
         signalsSent: sent,
         signalsReceived: received,
         itemCarrier: lint.itemCarrier,
         regionCarrier: lint.regionCarrier,
-        counterNames: lint.counterNames?.(blueprint)
+        counterNames: lint.counterNames?.(blueprint),
       };
     },
     formula: {
       paths: () => formula.paths(),
-      preview: expression => formula.preview(expression)
+      preview: (expression) => formula.preview(expression),
     },
     effectSelection: effectSelection
       ? {
-        choices: () => effectSelection.choices(),
-        resolve: uuid => isEffectUuid(uuid) ? effectSelection.resolve(uuid) : Promise.resolve(null),
-        parseDrop: parseEffectDrop
-      }
+          choices: () => effectSelection.choices(),
+          resolve: (uuid) => (isEffectUuid(uuid) ? effectSelection.resolve(uuid) : Promise.resolve(null)),
+          parseDrop: parseEffectDrop,
+        }
       : undefined,
     transfer: transfer
       ? {
-        dragData: blueprint => transfer.dragData(blueprint),
-        resolveDrop: data => transfer.resolveDrop(data)
-      }
+          dragData: (blueprint) => transfer.dragData(blueprint),
+          resolveDrop: (data) => transfer.resolveDrop(data),
+        }
       : undefined,
     simulator: simulator
       ? {
-        actors: () => simulator.actors(),
-        subscribe: simulator.subscribe,
-        revision: simulator.revision,
-        items: actorUuid => simulator.items(actorUuid),
-        targets: () => simulator.targets(),
-        defaults: () => simulator.defaults(),
-        counterValues: simulator.counterValues,
-        run: (blueprint, request) => runSimulation(simulator.prepare(blueprint, request), request)
-      }
-      : undefined
+          actors: () => simulator.actors(),
+          subscribe: simulator.subscribe,
+          revision: simulator.revision,
+          items: (actorUuid) => simulator.items(actorUuid),
+          targets: () => simulator.targets(),
+          defaults: () => simulator.defaults(),
+          counterValues: simulator.counterValues,
+          run: (blueprint, request) => runSimulation(simulator.prepare(blueprint, request), request),
+        }
+      : undefined,
   };
 }

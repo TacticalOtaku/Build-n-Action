@@ -10,23 +10,39 @@ import type { EditorHost } from "../host";
 import { ServicesProvider, createEditorServices, type EditorServices } from "../services";
 
 const CHOICES: Partial<Record<DynamicChoiceSource, Choice[]>> = {
-  creatureTypes: [{ value: "undead", label: "Undead" }, { value: "fiend", label: "Fiend" }],
-  statusEffects: [{ value: "prone", label: "Prone" }, { value: "poisoned", label: "Poisoned" }],
-  damageAndHealingTypes: [{ value: "fire", label: "Fire" }, { value: "slashing", label: "Slashing" }],
+  creatureTypes: [
+    { value: "undead", label: "Undead" },
+    { value: "fiend", label: "Fiend" },
+  ],
+  statusEffects: [
+    { value: "prone", label: "Prone" },
+    { value: "poisoned", label: "Poisoned" },
+  ],
+  damageAndHealingTypes: [
+    { value: "fire", label: "Fire" },
+    { value: "slashing", label: "Slashing" },
+  ],
   currencies: [{ value: "gp", label: "Gold" }],
-  abilities: [{ value: "str", label: "Strength" }, { value: "dex", label: "Dexterity" }],
-  skills: [{ value: "ste", label: "Stealth" }]
+  abilities: [
+    { value: "str", label: "Strength" },
+    { value: "dex", label: "Dexterity" },
+  ],
+  skills: [{ value: "ste", label: "Stealth" }],
 };
 
-const provider: ChoiceProvider = { choices: source => CHOICES[source] ?? [] };
+const provider: ChoiceProvider = { choices: (source) => CHOICES[source] ?? [] };
 
 export function testServices(language: "en" | "ru" = "en", host: EditorHost = {}): EditorServices {
-  return createEditorServices(createTranslator(language === "ru" ? ru : en, { strict: true }), provider, host);
+  return createEditorServices(
+    createTranslator(language === "ru" ? ru : en, { strict: true }),
+    provider,
+    host,
+  );
 }
 
 export function renderWithServices(
   ui: ReactElement,
-  options: RenderOptions & { language?: "en" | "ru"; host?: EditorHost } = {}
+  options: RenderOptions & { language?: "en" | "ru"; host?: EditorHost } = {},
 ) {
   const services = testServices(options.language, options.host);
   const Wrapper = ({ children }: { children: ReactNode }) => (

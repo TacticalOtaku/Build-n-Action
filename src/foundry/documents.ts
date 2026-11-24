@@ -4,7 +4,13 @@ import type { LimitPeriod } from "../core/engine/interpreter";
 import type { LegacyCarrier } from "../core/legacy/adapter";
 import { asNumber, asRecord, asString } from "../core/registry/data";
 import {
-  deleteBlueprint, flagChanges, MODULE_SCOPE, parseBlueprintUuid, readBlueprints, upsertBlueprint, type ReadResult
+  deleteBlueprint,
+  flagChanges,
+  MODULE_SCOPE,
+  parseBlueprintUuid,
+  readBlueprints,
+  upsertBlueprint,
+  type ReadResult,
 } from "../core/storage/repository";
 import { isEffectActive } from "../runtime/facts";
 import { limitAvailable, usageKey, type UsageClock } from "../runtime/play";
@@ -13,12 +19,20 @@ import { listOf, read } from "../runtime/read";
 const EMPTY: ReadResult = { blueprints: [], issues: [] };
 
 const CARRIERS: Readonly<Record<string, LegacyCarrier>> = {
-  Actor: "actor", Item: "item", ActiveEffect: "effect", Region: "region", MeasuredTemplate: "template"
+  Actor: "actor",
+  Item: "item",
+  ActiveEffect: "effect",
+  Region: "region",
+  MeasuredTemplate: "template",
 };
 
 export function isDocument(value: unknown): value is FoundryDocument {
-  return !!value && (typeof value === "object")
-    && (typeof read(value, "documentName") === "string") && (typeof read(value, "uuid") === "string");
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof read(value, "documentName") === "string" &&
+    typeof read(value, "uuid") === "string"
+  );
 }
 
 /** Whether a value is a document of one of these types (not a type guard, so "false" narrows nothing). */
@@ -60,7 +74,7 @@ export function documentBlueprints(document: FoundryDocument): ReadResult {
   const blueprints = read(scope, "blueprints");
   const bonuses = read(scope, "bonuses");
   const cached = cache.get(document);
-  if (cached && (cached.blueprints === blueprints) && (cached.bonuses === bonuses)) return cached.result;
+  if (cached && cached.blueprints === blueprints && cached.bonuses === bonuses) return cached.result;
   const result = readBlueprints(scope, carrier);
   cache.set(document, { blueprints, bonuses, result });
   return result;
@@ -72,7 +86,7 @@ export interface FoundBlueprint {
 }
 
 function findBlueprint(document: FoundryDocument, id: string): FoundBlueprint | null {
-  const blueprint = documentBlueprints(document).blueprints.find(entry => entry.id === id);
+  const blueprint = documentBlueprints(document).blueprints.find((entry) => entry.id === id);
   return blueprint ? { document, blueprint } : null;
 }
 
@@ -80,7 +94,7 @@ function findBlueprint(document: FoundryDocument, id: string): FoundBlueprint | 
 export function blueprintFromUuidSync(uuid: string): FoundBlueprint | null {
   const parsed = parseBlueprintUuid(uuid);
   const document = parsed ? documentFromUuid(parsed.parentUuid) : null;
-  return (parsed && document) ? findBlueprint(document, parsed.id) : null;
+  return parsed && document ? findBlueprint(document, parsed.id) : null;
 }
 
 export async function blueprintFromUuid(uuid: string): Promise<FoundBlueprint | null> {
@@ -94,7 +108,7 @@ export async function blueprintFromUuid(uuid: string): Promise<FoundBlueprint | 
 export async function saveBlueprint(document: FoundryDocument, blueprint: unknown): Promise<BlueprintSource> {
   const result = validateBlueprintSource(blueprint);
   if (!result.ok) {
-    const problems = result.issues.map(issue => `${issue.path || "(root)"}: ${issue.code}`).join(", ");
+    const problems = result.issues.map((issue) => `${issue.path || "(root)"}: ${issue.code}`).join(", ");
     throw new Error(`Build-n-Action | the blueprint is not valid (${problems})`);
   }
   await document.update(flagChanges(upsertBlueprint(read(document, `flags.${MODULE_SCOPE}`), result.value)));
@@ -104,7 +118,9 @@ export async function saveBlueprint(document: FoundryDocument, blueprint: unknow
 export async function removeBlueprint(document: FoundryDocument, id: string): Promise<boolean> {
   const found = findBlueprint(document, id);
   if (!found) return false;
-  await document.update(flagChanges(deleteBlueprint(read(document, `flags.${MODULE_SCOPE}`), found.blueprint)));
+  await document.update(
+    flagChanges(deleteBlueprint(read(document, `flags.${MODULE_SCOPE}`), found.blueprint)),
+  );
   return true;
 }
 
@@ -120,7 +136,7 @@ export function isSuppressed(document: FoundryDocument): boolean {
       if (!actor) return false;
       if (read(actor, "type") === "vehicle") {
         const system = asRecord(read(document, "system"));
-        return ("crewed" in system) && (system.crewed !== true);
+        return "crewed" in system && system.crewed !== true;
       }
       return read(document, "areEffectsSuppressed") === true;
     }
@@ -154,11 +170,11 @@ export function ownerActor(document: FoundryDocument): FoundryDocument | null {
     case "ActiveEffect": {
       const parent = document.parent;
       if (isA(parent, "Actor")) return parent;
-      return (isA(parent, "Item") && isA(parent?.parent, "Actor")) ? (parent?.parent ?? null) : null;
+      return isA(parent, "Item") && isA(parent?.parent, "Actor") ? (parent?.parent ?? null) : null;
     }
     case "MeasuredTemplate": {
       const item = templateOriginItem(document);
-      return (item && isA(item.parent, "Actor")) ? item.parent : null;
+      return item && isA(item.parent, "Actor") ? item.parent : null;
     }
     default:
       return null;
@@ -207,7 +223,8 @@ export function rollDataOf(source: unknown, deterministic = false): Record<strin
 export function originRollData(document: FoundryDocument, deterministic = false): Record<string, unknown> {
   const data = rollDataOf(rollDataOrigin(document), deterministic);
   const level = asNumber(read(document, "flags.dnd5e.spellLevel"));
-  if ((document.documentName === "MeasuredTemplate") && (level !== null)) data.item = { ...asRecord(data.item), level };
+  if (document.documentName === "MeasuredTemplate" && level !== null)
+    data.item = { ...asRecord(data.item), level };
   return data;
 }
 
@@ -223,9 +240,9 @@ export function actorToken(actor: FoundryDocument): TokenPlaceable | null {
 /** Whether a document update touched this module's flags (blueprints or v1 bonuses). */
 export function touchesBlueprints(changes: unknown): boolean {
   const record = asRecord(changes);
-  if (Object.keys(record).some(key => key.startsWith(`flags.${MODULE_SCOPE}`))) return true;
+  if (Object.keys(record).some((key) => key.startsWith(`flags.${MODULE_SCOPE}`))) return true;
   const flags = asRecord(record.flags);
-  return (MODULE_SCOPE in flags) || (`-=${MODULE_SCOPE}` in flags);
+  return MODULE_SCOPE in flags || `-=${MODULE_SCOPE}` in flags;
 }
 
 /** An update value that deletes its key (Foundry v14's ForcedDeletion; the "-=key" syntax is deprecated). */
@@ -258,14 +275,14 @@ function rests(actor: FoundryDocument): { short: number; long: number } {
 /** Now, for limits: the started combat's round and turn, and the actor's rest counters. */
 export function usageClock(actor: FoundryDocument): UsageClock {
   const combat = game.combat;
-  const started = !!combat && (combat.started === true);
+  const started = !!combat && combat.started === true;
   const counted = rests(actor);
   return {
     combatId: started ? combat.id : null,
     round: started ? combat.round : 0,
     turn: started ? (combat.turn ?? 0) : 0,
     shortRests: counted.short,
-    longRests: counted.long
+    longRests: counted.long,
   };
 }
 
@@ -273,29 +290,41 @@ function asClock(value: unknown): UsageClock | null {
   const record = asRecord(value);
   if (!Object.keys(record).length) return null;
   return {
-    combatId: (typeof record.combatId === "string") ? record.combatId : null,
+    combatId: typeof record.combatId === "string" ? record.combatId : null,
     round: asNumber(record.round) ?? 0,
     turn: asNumber(record.turn) ?? 0,
     shortRests: asNumber(record.shortRests) ?? 0,
-    longRests: asNumber(record.longRests) ?? 0
+    longRests: asNumber(record.longRests) ?? 0,
   };
 }
 
-export function isLimitAvailable(actor: FoundryDocument, blueprintId: string, nodeId: string, limit: LimitPeriod): boolean {
+export function isLimitAvailable(
+  actor: FoundryDocument,
+  blueprintId: string,
+  nodeId: string,
+  limit: LimitPeriod,
+): boolean {
   const record = asClock(read(actor, `flags.${MODULE_SCOPE}.usage.${usageKey(blueprintId, nodeId)}`));
   return limitAvailable(record, usageClock(actor), limit);
 }
 
 /** Remember that a limited result applied now. */
-export async function recordUsage(actor: FoundryDocument, blueprintId: string, nodeId: string): Promise<void> {
+export async function recordUsage(
+  actor: FoundryDocument,
+  blueprintId: string,
+  nodeId: string,
+): Promise<void> {
   await actor.setFlag(MODULE_SCOPE, `usage.${usageKey(blueprintId, nodeId)}`, usageClock(actor));
 }
 
 /** dnd5e.restCompleted: count short and long rests so rest limits reset. */
 export async function countRest(actor: unknown, result: unknown): Promise<void> {
-  if (!actor || (typeof actor !== "object") || !("setFlag" in actor)) return;
+  if (!actor || typeof actor !== "object" || !("setFlag" in actor)) return;
   const document = actor as FoundryDocument;
   const counted = rests(document);
   const long = read(result, "type") === "long";
-  await document.setFlag(MODULE_SCOPE, "rests", { short: counted.short + (long ? 0 : 1), long: counted.long + (long ? 1 : 0) });
+  await document.setFlag(MODULE_SCOPE, "rests", {
+    short: counted.short + (long ? 0 : 1),
+    long: counted.long + (long ? 1 : 0),
+  });
 }

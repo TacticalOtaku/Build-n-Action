@@ -11,11 +11,13 @@ export function rollDataPaths(data: unknown, maxDepth = 5): string[] {
       if (prefix) paths.push(`@${prefix}`);
       return;
     }
-    if (!value || (typeof value !== "object") || Array.isArray(value) || seen.has(value) || (depth >= maxDepth)) return;
+    if (!value || typeof value !== "object" || Array.isArray(value) || seen.has(value) || depth >= maxDepth)
+      return;
     seen.add(value);
     // Only data properties: dnd5e keeps deprecated keys (senses.darkvision) as getters that warn when read.
     for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
-      if (!descriptor.enumerable || !("value" in descriptor) || (typeof descriptor.value === "function")) continue;
+      if (!descriptor.enumerable || !("value" in descriptor) || typeof descriptor.value === "function")
+        continue;
       walk(descriptor.value, prefix ? `${prefix}.${key}` : key, depth + 1);
     }
   };

@@ -1,5 +1,5 @@
 /** Cyanotype tokens (spec 7.1): "if" green when the roller is inside, "then" coral when outside. */
-export const AURA_COLORS = { inside: 0x6CCBAE, outside: 0xEE7A63 } as const;
+export const AURA_COLORS = { inside: 0x6ccbae, outside: 0xee7a63 } as const;
 
 const HOLD = 1800;
 const FADE = 450;
@@ -17,7 +17,10 @@ function remove(key: string): void {
 function fade(key: string): void {
   const entry = shown.get(key);
   if (!entry) return;
-  foundry.canvas.animation.CanvasAnimation.animate([{ parent: entry.graphics, attribute: "alpha", to: 0 }], { name: `bna-aura-${key}`, duration: FADE })
+  foundry.canvas.animation.CanvasAnimation.animate([{ parent: entry.graphics, attribute: "alpha", to: 0 }], {
+    name: `bna-aura-${key}`,
+    duration: FADE,
+  })
     .catch(() => undefined)
     .finally(() => {
       if (shown.get(key) === entry) remove(key);

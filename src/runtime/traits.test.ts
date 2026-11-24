@@ -3,8 +3,11 @@ import { expandTraits, traitDescendants, traitPath, type TraitTree } from "./tra
 
 const languages: TraitTree = {
   standard: { label: "Standard", children: { common: { label: "Common" }, dwarvish: { label: "Dwarvish" } } },
-  exotic: { label: "Exotic", children: { primordial: { label: "Primordial", children: { ignan: { label: "Ignan" } } } } },
-  cant: { label: "Thieves' Cant" }
+  exotic: {
+    label: "Exotic",
+    children: { primordial: { label: "Primordial", children: { ignan: { label: "Ignan" } } } },
+  },
+  cant: { label: "Thieves' Cant" },
 };
 
 describe("trait trees", () => {

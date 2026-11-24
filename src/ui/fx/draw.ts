@@ -4,20 +4,26 @@ import type { Particle, ParticleSystem } from "./particles";
 const TAU = Math.PI * 2;
 
 /** Three translucent, independently moving flame tongues along the bottom edge. */
-function flameBand(ctx: CanvasRenderingContext2D, width: number, height: number, time: number, colors: readonly string[]): void {
+function flameBand(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  time: number,
+  colors: readonly string[],
+): void {
   for (let layer = 0; layer < 3; layer++) {
-    const base = 3 + (layer * 3);
-    const amplitude = 3 + (layer * 2);
+    const base = 3 + layer * 3;
+    const amplitude = 3 + layer * 2;
     ctx.beginPath();
     ctx.moveTo(0, height);
     for (let x = 0; x <= width + 6; x += 6) {
-      const wave = (Math.sin((x * 0.045) + (time * 3.1) + (layer * 1.7)) * 0.6)
-        + (Math.sin((x * 0.11) - (time * 4.7) + layer) * 0.4);
-      ctx.lineTo(x, height - base - (amplitude * (0.5 + (wave * 0.5))));
+      const wave =
+        Math.sin(x * 0.045 + time * 3.1 + layer * 1.7) * 0.6 + Math.sin(x * 0.11 - time * 4.7 + layer) * 0.4;
+      ctx.lineTo(x, height - base - amplitude * (0.5 + wave * 0.5));
     }
     ctx.lineTo(width, height);
     ctx.closePath();
-    ctx.globalAlpha = 0.24 - (layer * 0.06);
+    ctx.globalAlpha = 0.24 - layer * 0.06;
     ctx.fillStyle = colors[layer % colors.length] ?? "#FF8A3D";
     ctx.fill();
   }
@@ -28,18 +34,23 @@ function circle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: num
   ctx.arc(x, y, Math.max(0.1, radius), 0, TAU);
 }
 
-function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle, spec: FlavorSpec, progress: number): void {
+function drawParticle(
+  ctx: CanvasRenderingContext2D,
+  particle: Particle,
+  spec: FlavorSpec,
+  progress: number,
+): void {
   const { x, y, size, seed } = particle;
   switch (spec.shape) {
     case "ember": {
       circle(ctx, x, y, size);
       ctx.fill();
       ctx.globalAlpha *= 0.35;
-      ctx.fillRect(x - (size * 0.5), y, size, size * 4);
+      ctx.fillRect(x - size * 0.5, y, size, size * 4);
       break;
     }
     case "mote": {
-      circle(ctx, x, y, size * (1 + (0.4 * Math.sin((progress * 6) + (seed * TAU)))));
+      circle(ctx, x, y, size * (1 + 0.4 * Math.sin(progress * 6 + seed * TAU)));
       ctx.fill();
       break;
     }
@@ -47,9 +58,9 @@ function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle, spec: F
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let arm = 0; arm < 3; arm++) {
-        const angle = (seed * TAU) + (progress * 2) + ((arm * Math.PI) / 3);
-        ctx.moveTo(x - (Math.cos(angle) * size), y - (Math.sin(angle) * size));
-        ctx.lineTo(x + (Math.cos(angle) * size), y + (Math.sin(angle) * size));
+        const angle = seed * TAU + progress * 2 + (arm * Math.PI) / 3;
+        ctx.moveTo(x - Math.cos(angle) * size, y - Math.sin(angle) * size);
+        ctx.lineTo(x + Math.cos(angle) * size, y + Math.sin(angle) * size);
       }
       ctx.stroke();
       break;
@@ -64,8 +75,8 @@ function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle, spec: F
       ctx.moveTo(px, py);
       for (let i = 1; i <= segments; i++) {
         const offset = Math.sin(seed * 97 * i) * size * 0.3;
-        px += (Math.cos(angle) * (size / segments)) - (Math.sin(angle) * offset);
-        py += (Math.sin(angle) * (size / segments)) + (Math.cos(angle) * offset);
+        px += Math.cos(angle) * (size / segments) - Math.sin(angle) * offset;
+        py += Math.sin(angle) * (size / segments) + Math.cos(angle) * offset;
         ctx.lineTo(px, py);
       }
       ctx.stroke();
@@ -88,12 +99,12 @@ function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle, spec: F
     }
     case "ring": {
       ctx.lineWidth = 2 * (1 - progress);
-      circle(ctx, x, y, size + (progress * size * 4));
+      circle(ctx, x, y, size + progress * size * 4);
       ctx.stroke();
       break;
     }
     case "shard": {
-      const angle = (seed * TAU) + (progress * 3);
+      const angle = seed * TAU + progress * 3;
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(angle);
@@ -124,7 +135,7 @@ export function drawFrame(
   spec: FlavorSpec,
   time: number,
   dark: boolean,
-  { clear = true, band = true }: DrawOptions = {}
+  { clear = true, band = true }: DrawOptions = {},
 ): void {
   const { width, height } = system;
   if (clear) ctx.clearRect(0, 0, width, height);

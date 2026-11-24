@@ -14,8 +14,14 @@ export function fitOptions(stage: HTMLElement | null, extra: Partial<FitViewOpti
   const height = stage?.clientHeight ?? 0;
   const stamp = stage?.querySelector<HTMLElement>(".bna-stamp")?.offsetHeight ?? 0;
   const bottom = stamp + STAMP_GAP;
-  const padding = (height < TOOLBAR_ROOM + bottom + MIN_GRAPH)
-    ? { top: "10%", right: "6%", bottom: "30%", left: "6%" } as const
-    : { top: `${TOOLBAR_ROOM}px`, right: `${SIDE_ROOM}px`, bottom: `${bottom}px`, left: `${SIDE_ROOM}px` } as const;
+  const padding =
+    height < TOOLBAR_ROOM + bottom + MIN_GRAPH
+      ? ({ top: "10%", right: "6%", bottom: "30%", left: "6%" } as const)
+      : ({
+          top: `${TOOLBAR_ROOM}px`,
+          right: `${SIDE_ROOM}px`,
+          bottom: `${bottom}px`,
+          left: `${SIDE_ROOM}px`,
+        } as const);
   return { padding, maxZoom: 1, minZoom: 0.7, ...extra };
 }

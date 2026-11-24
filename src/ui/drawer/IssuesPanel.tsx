@@ -20,19 +20,25 @@ export function IssuesPanel({ blueprint, issues, onFocus }: IssuesPanelProps) {
   return (
     <ul className="bna-issues">
       {sorted.map((issue, index) => {
-        const node = issue.nodeId ? blueprint.nodes.find(entry => entry.id === issue.nodeId) : undefined;
+        const node = issue.nodeId ? blueprint.nodes.find((entry) => entry.id === issue.nodeId) : undefined;
         const content = (
           <>
             <LintMark level={issue.level} />
-            <span className="bna-issues__where">{node ? nodeTitle(node, t) : t("BNA.UI.Issues.blueprint")}</span>
+            <span className="bna-issues__where">
+              {node ? nodeTitle(node, t) : t("BNA.UI.Issues.blueprint")}
+            </span>
             <span className="bna-issues__text">{lintMessage(issue, t)}</span>
           </>
         );
         return (
           <li key={`${issue.code}:${issue.nodeId ?? ""}:${issue.checkId ?? ""}:${index}`}>
-            {node
-              ? <button type="button" className="bna-issues__row" onClick={() => onFocus(node.id)}>{content}</button>
-              : <div className="bna-issues__row">{content}</div>}
+            {node ? (
+              <button type="button" className="bna-issues__row" onClick={() => onFocus(node.id)}>
+                {content}
+              </button>
+            ) : (
+              <div className="bna-issues__row">{content}</div>
+            )}
           </li>
         );
       })}

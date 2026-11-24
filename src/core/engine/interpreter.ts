@@ -74,8 +74,8 @@ export function readCommon(data: Readonly<Record<string, unknown>>, nodeId: stri
     optional: asBoolean(common.optional),
     choiceGroup: asString(common.choiceGroup).trim() || nodeId,
     cost: asRecord(common.cost),
-    limit: LIMITS.includes(limit) ? limit as LimitPeriod : "none",
-    then: asBoolean(common.then)
+    limit: LIMITS.includes(limit) ? (limit as LimitPeriod) : "none",
+    then: asBoolean(common.then),
   };
 }
 
@@ -84,17 +84,22 @@ function evaluateGuard(
   facts: RollFacts,
   env: BlueprintEnv,
   cache: Map<string, boolean>,
-  nodes: Record<string, NodeTrace>
+  nodes: Record<string, NodeTrace>,
 ): boolean {
   const cached = cache.get(guard.node.id);
   if (cached !== undefined) return cached;
   // Every check is evaluated (no short-circuit) so the trace can explain all of them.
-  const checks = guard.checks.map(check => ({
-    checkId: check.id, type: check.type, outcome: evaluateCheck(check.type, check.data, facts, env)
+  const checks = guard.checks.map((check) => ({
+    checkId: check.id,
+    type: check.type,
+    outcome: evaluateCheck(check.type, check.data, facts, env),
   }));
   let value = true;
   if (checks.length) {
-    value = (guard.mode === "any") ? checks.some(check => check.outcome.pass) : checks.every(check => check.outcome.pass);
+    value =
+      guard.mode === "any"
+        ? checks.some((check) => check.outcome.pass)
+        : checks.every((check) => check.outcome.pass);
   }
   // "Only this item" is required on top of the checks, whatever the mode; the trace lists it first.
   if (guard.thisItem) {
@@ -114,16 +119,16 @@ export function runBlueprint(
   blueprint: BlueprintSource | CompiledBlueprint,
   trigger: Trigger,
   facts: RollFacts,
-  env: BlueprintEnv
+  env: BlueprintEnv,
 ): BlueprintRun {
-  const compiled = ("paths" in blueprint) ? blueprint : compileBlueprint(blueprint);
+  const compiled = "paths" in blueprint ? blueprint : compileBlueprint(blueprint);
   const { source } = compiled;
   const run: BlueprintRun = {
     blueprintId: source.id,
     intents: [],
-    nodes: Object.fromEntries(source.nodes.map(node => [node.id, { status: "skipped" } as NodeTrace])),
+    nodes: Object.fromEntries(source.nodes.map((node) => [node.id, { status: "skipped" } as NodeTrace])),
     edges: [],
-    skipped: null
+    skipped: null,
   };
   if (!source.enabled) {
     run.skipped = { code: "disabled" };
@@ -143,12 +148,15 @@ export function runBlueprint(
   for (const path of paths) {
     if (!trigger.pins.includes(path.pin)) continue;
     if (!trigger.from) {
-      if ((trigger.event === "signal") && (asString(path.event.data.name).trim() !== (trigger.signal ?? ""))) continue;
+      if (trigger.event === "signal" && asString(path.event.data.name).trim() !== (trigger.signal ?? ""))
+        continue;
       let reach = reaches.get(path.event.id);
       if (!reach) {
         reach = env.reach(path.event);
         reaches.set(path.event.id, reach);
-        run.nodes[path.event.id] = reach.pass ? { status: "passed" } : { status: "failed", reason: reach.reason };
+        run.nodes[path.event.id] = reach.pass
+          ? { status: "passed" }
+          : { status: "failed", reason: reach.reason };
       }
       if (!reach.pass) continue;
     }
@@ -165,7 +173,7 @@ export function runBlueprint(
     if (!open || applied.has(path.result.id)) continue;
 
     const common = readCommon(path.result.data, path.result.id);
-    if ((common.limit !== "none") && !env.limitAvailable(source.id, path.result.id, common.limit)) {
+    if (common.limit !== "none" && !env.limitAvailable(source.id, path.result.id, common.limit)) {
       run.nodes[path.result.id] = { status: "failed", reason: { code: "limitUsed" } };
       continue;
     }
@@ -177,7 +185,7 @@ export function runBlueprint(
       type: path.result.type,
       data: path.result.data,
       common,
-      eventNodeId: path.event.id
+      eventNodeId: path.event.id,
     });
   }
 
@@ -209,15 +217,21 @@ export function runThrough(
   trigger: Trigger,
   facts: RollFacts,
   env: BlueprintEnv,
-  options: ThroughOptions = {}
+  options: ThroughOptions = {},
 ): ThroughRun {
   const maxDepth = options.maxDepth ?? MAX_SIGNAL_DEPTH;
   const outcome = options.outcome ?? "failed";
-  const compiled = ("paths" in blueprint) ? blueprint : compileBlueprint(blueprint);
+  const compiled = "paths" in blueprint ? blueprint : compileBlueprint(blueprint);
   const run = runBlueprint(compiled, trigger, facts, env);
-  const through: ThroughRun = { ...run, intents: [...run.intents], nodes: { ...run.nodes }, edges: [...run.edges], assumedChoice: false };
+  const through: ThroughRun = {
+    ...run,
+    intents: [...run.intents],
+    nodes: { ...run.nodes },
+    edges: [...run.edges],
+    assumedChoice: false,
+  };
   let wave: readonly ResultIntent[] = run.intents;
-  for (let depth = 0; wave.length && (depth < maxDepth); depth++) {
+  for (let depth = 0; wave.length && depth < maxDepth; depth++) {
     const next: ResultIntent[] = [];
     for (const intent of wave) {
       const pin = followedPin(intent, outcome);
@@ -225,7 +239,8 @@ export function runThrough(
       if (!pin || !event || !compiled.continuationsOf(intent.nodeId).length) continue;
       if (intent.common.optional) through.assumedChoice = true;
       const more = runBlueprint(compiled, { event, pins: [pin], from: intent.nodeId }, facts, env);
-      for (const [id, trace] of Object.entries(more.nodes)) if (trace.status !== "skipped") through.nodes[id] = trace;
+      for (const [id, trace] of Object.entries(more.nodes))
+        if (trace.status !== "skipped") through.nodes[id] = trace;
       for (const edge of more.edges) if (!through.edges.includes(edge)) through.edges.push(edge);
       through.intents.push(...more.intents);
       next.push(...more.intents);
@@ -279,19 +294,21 @@ export function runWithSignals(
   entries: readonly ChainEntry[],
   trigger: Trigger,
   facts: RollFacts,
-  options: ChainOptions = {}
+  options: ChainOptions = {},
 ): ChainResult {
   const maxDepth = options.maxDepth ?? MAX_SIGNAL_DEPTH;
   const result: ChainResult = { runs: [], intents: [], signals: [], sent: [], truncated: false };
   const sent = new Set<string>();
-  let wave: { trigger: Trigger; receivers: readonly ChainEntry[] }[] = [{ trigger, receivers: options.starters ?? entries }];
+  let wave: { trigger: Trigger; receivers: readonly ChainEntry[] }[] = [
+    { trigger, receivers: options.starters ?? entries },
+  ];
 
   for (let depth = 0; wave.length; depth++) {
     const next: typeof wave = [];
     for (const step of wave) {
       for (const entry of step.receivers) {
         const run = runBlueprint(entry.compiled, step.trigger, facts, entry.env);
-        const tookPart = (depth === 0) || Object.values(run.nodes).some(node => node.status !== "skipped");
+        const tookPart = depth === 0 || Object.values(run.nodes).some((node) => node.status !== "skipped");
         if (!tookPart) continue;
         result.runs.push(run);
         for (const intent of run.intents) {
@@ -302,7 +319,7 @@ export function runWithSignals(
           const name = asString(intent.data.name).trim();
           if (!name) continue;
           const key = `${intent.blueprintId}:${intent.nodeId}:${name}`;
-          if (sent.has(key) || (depth + 1 > maxDepth)) {
+          if (sent.has(key) || depth + 1 > maxDepth) {
             result.truncated = true;
             continue;
           }
@@ -312,9 +329,11 @@ export function runWithSignals(
           const byDocument = asString(intent.data.scope, "actor") === "document";
           next.push({
             trigger: { event: "signal", pins: ["out"], signal: name },
-            receivers: entries.filter(other => byDocument
-              ? (other.documentUuid === entry.documentUuid)
-              : ((entry.actorUuid !== null) && (other.actorUuid === entry.actorUuid)))
+            receivers: entries.filter((other) =>
+              byDocument
+                ? other.documentUuid === entry.documentUuid
+                : entry.actorUuid !== null && other.actorUuid === entry.actorUuid,
+            ),
           });
         }
       }

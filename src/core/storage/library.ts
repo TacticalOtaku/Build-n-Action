@@ -31,14 +31,17 @@ export function readLibrary(value: unknown): BlueprintSource[] {
   return list;
 }
 
-export function withLibraryEntry(list: readonly BlueprintSource[], blueprint: BlueprintSource): BlueprintSource[] {
-  return list.some(entry => entry.id === blueprint.id)
-    ? list.map(entry => ((entry.id === blueprint.id) ? blueprint : entry))
+export function withLibraryEntry(
+  list: readonly BlueprintSource[],
+  blueprint: BlueprintSource,
+): BlueprintSource[] {
+  return list.some((entry) => entry.id === blueprint.id)
+    ? list.map((entry) => (entry.id === blueprint.id ? blueprint : entry))
     : [...list, blueprint];
 }
 
 export function withoutLibraryEntry(list: readonly BlueprintSource[], id: string): BlueprintSource[] {
-  return list.filter(entry => entry.id !== id);
+  return list.filter((entry) => entry.id !== id);
 }
 
 export function exportBlueprints(blueprints: readonly BlueprintSource[]): string {
@@ -49,7 +52,10 @@ export function exportBlueprints(blueprints: readonly BlueprintSource[]): string
 /** A v1 bonus has a v1 roll type and no schema version. */
 function isLegacyBonus(raw: unknown): boolean {
   const record = asRecord(raw);
-  return (record.schemaVersion === undefined) && ["attack", "damage", "save", "throw", "test", "hitdie"].includes(String(record.type));
+  return (
+    record.schemaVersion === undefined &&
+    ["attack", "damage", "save", "throw", "test", "hitdie"].includes(String(record.type))
+  );
 }
 
 function readEntry(raw: unknown): BlueprintSource | null {
@@ -69,7 +75,7 @@ export function importBlueprints(text: string): ImportResult {
   const record = asRecord(data);
   let raws: unknown[];
   if (Array.isArray(data)) raws = data;
-  else if ((record.type === EXPORT_TYPE) && Array.isArray(record.blueprints)) raws = record.blueprints;
+  else if (record.type === EXPORT_TYPE && Array.isArray(record.blueprints)) raws = record.blueprints;
   else raws = [data];
   const blueprints: BlueprintSource[] = [];
   let rejected = 0;

@@ -20,10 +20,13 @@ export interface DrawerProps {
 
 export function Drawer({ tab, onTab, onClose, issueCount, test, issues }: DrawerProps) {
   const t = useT();
-  const shown: DrawerTab = (tab === "test" && !test) ? "issues" : tab;
+  const shown: DrawerTab = tab === "test" && !test ? "issues" : tab;
   const tabs: { id: DrawerTab; label: string }[] = [
     ...(test ? [{ id: "test" as const, label: t("BNA.UI.Drawer.test") }] : []),
-    { id: "issues", label: issueCount ? t("BNA.UI.Drawer.issuesCount", { count: issueCount }) : t("BNA.UI.Drawer.issues") }
+    {
+      id: "issues",
+      label: issueCount ? t("BNA.UI.Drawer.issuesCount", { count: issueCount }) : t("BNA.UI.Drawer.issues"),
+    },
   ];
   return (
     <motion.section
@@ -36,7 +39,7 @@ export function Drawer({ tab, onTab, onClose, issueCount, test, issues }: Drawer
     >
       <div className="bna-drawer__bar">
         <div className="bna-drawer__tabs" role="tablist">
-          {tabs.map(entry => (
+          {tabs.map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -51,12 +54,23 @@ export function Drawer({ tab, onTab, onClose, issueCount, test, issues }: Drawer
             </button>
           ))}
         </div>
-        <button type="button" className="bna-iconbtn" aria-label={t("BNA.UI.Drawer.close")} title={t("BNA.UI.Drawer.close")} onClick={onClose}>
+        <button
+          type="button"
+          className="bna-iconbtn"
+          aria-label={t("BNA.UI.Drawer.close")}
+          title={t("BNA.UI.Drawer.close")}
+          onClick={onClose}
+        >
           <Icon name="x" size={16} />
         </button>
       </div>
-      <div className="bna-drawer__body" role="tabpanel" id="bna-drawer-panel" aria-labelledby={`bna-drawer-tab-${shown}`}>
-        {(shown === "test") ? test : issues}
+      <div
+        className="bna-drawer__body"
+        role="tabpanel"
+        id="bna-drawer-panel"
+        aria-labelledby={`bna-drawer-tab-${shown}`}
+      >
+        {shown === "test" ? test : issues}
       </div>
     </motion.section>
   );

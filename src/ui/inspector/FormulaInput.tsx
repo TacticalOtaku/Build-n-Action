@@ -20,10 +20,10 @@ export function FormulaInput({ id, value, describedBy, onChange }: FormulaInputP
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
-  const token = (formula && (caret !== null)) ? tokenAt(value, caret) : null;
-  const suggestions = (formula && token) ? matchPaths(formula.paths(), token.query) : [];
-  const open = !dismissed && (suggestions.length > 0);
-  const preview = useMemo(() => ((formula && value.trim()) ? formula.preview(value) : null), [formula, value]);
+  const token = formula && caret !== null ? tokenAt(value, caret) : null;
+  const suggestions = formula && token ? matchPaths(formula.paths(), token.query) : [];
+  const open = !dismissed && suggestions.length > 0;
+  const preview = useMemo(() => (formula && value.trim() ? formula.preview(value) : null), [formula, value]);
 
   const accept = (path: string) => {
     if (!token) return;
@@ -38,11 +38,11 @@ export function FormulaInput({ id, value, describedBy, onChange }: FormulaInputP
     if (!open) return;
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActive(index => (index + 1) % suggestions.length);
+      setActive((index) => (index + 1) % suggestions.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActive(index => (index - 1 + suggestions.length) % suggestions.length);
-    } else if ((event.key === "Enter") || (event.key === "Tab")) {
+      setActive((index) => (index - 1 + suggestions.length) % suggestions.length);
+    } else if (event.key === "Enter" || event.key === "Tab") {
       const path = suggestions[Math.min(active, suggestions.length - 1)];
       if (path) {
         event.preventDefault();
@@ -55,7 +55,8 @@ export function FormulaInput({ id, value, describedBy, onChange }: FormulaInputP
     }
   };
 
-  const describedByIds = [describedBy, formula ? previewId : undefined].filter(Boolean).join(" ") || undefined;
+  const describedByIds =
+    [describedBy, formula ? previewId : undefined].filter(Boolean).join(" ") || undefined;
 
   return (
     <div className="bna-formula">
@@ -72,25 +73,30 @@ export function FormulaInput({ id, value, describedBy, onChange }: FormulaInputP
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open ? `${listId}-${Math.min(active, suggestions.length - 1)}` : undefined}
         aria-describedby={describedByIds}
-        onChange={event => {
+        onChange={(event) => {
           onChange(event.target.value);
           setCaret(event.target.selectionStart);
           setActive(0);
           setDismissed(false);
         }}
-        onSelect={event => setCaret(event.currentTarget.selectionStart)}
+        onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
         onBlur={() => setDismissed(true)}
         onKeyDown={onKeyDown}
       />
       {open ? (
-        <ul className="bna-formula__list" id={listId} role="listbox" aria-label={t("BNA.UI.Formula.suggestions")}>
+        <ul
+          className="bna-formula__list"
+          id={listId}
+          role="listbox"
+          aria-label={t("BNA.UI.Formula.suggestions")}
+        >
           {suggestions.map((path, index) => (
             <li
               key={path}
               id={`${listId}-${index}`}
               role="option"
               aria-selected={index === active}
-              onPointerDown={event => {
+              onPointerDown={(event) => {
                 event.preventDefault();
                 accept(path);
               }}
@@ -102,7 +108,11 @@ export function FormulaInput({ id, value, describedBy, onChange }: FormulaInputP
       ) : null}
       {formula ? (
         <p className="bna-formula__preview" id={previewId} aria-live="polite">
-          {!value.trim() ? null : (preview === null) ? t("BNA.UI.Formula.invalid") : t("BNA.UI.Formula.preview", { value: preview })}
+          {!value.trim()
+            ? null
+            : preview === null
+              ? t("BNA.UI.Formula.invalid")
+              : t("BNA.UI.Formula.preview", { value: preview })}
         </p>
       ) : null}
     </div>

@@ -11,10 +11,10 @@ export function createPhraseFormatter(translator: Translator, provider: ChoicePr
   const label = (value: string, spec: ChoiceSpec): string => {
     if (!value) return "";
     if ("static" in spec) {
-      const match = spec.static.find(choice => choice.value === value);
+      const match = spec.static.find((choice) => choice.value === value);
       return match ? translator.t(match.label) : value;
     }
-    return provider.choices(spec.source).find(choice => choice.value === value)?.label ?? value;
+    return provider.choices(spec.source).find((choice) => choice.value === value)?.label ?? value;
   };
 
   const join = (items: readonly string[], conjunctionKey: string): string => {
@@ -45,6 +45,6 @@ export function createPhraseFormatter(translator: Translator, provider: ChoicePr
       return /^[+-]/.test(trimmed) ? trimmed : `+${trimmed}`;
     },
     joinAnd,
-    joinOr
+    joinOr,
   };
 }

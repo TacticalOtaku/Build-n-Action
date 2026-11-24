@@ -1,16 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
-  addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, applyAdvantageMode,
-  injectTargetData, joinFormula, resolvedAdvantageMode, resolvedConfigRollMode, resolvedSubmittedRollMode,
-  rollModeFromRoll, sanitizeCritical, workflowAttackRollMode, type ProcessConfig
+  addCriticalBonus,
+  adjustCriticalRanges,
+  adjustSavingThrowRanges,
+  appendDamagePart,
+  appendRollPart,
+  applyAdvantageMode,
+  injectTargetData,
+  joinFormula,
+  resolvedAdvantageMode,
+  resolvedConfigRollMode,
+  resolvedSubmittedRollMode,
+  rollModeFromRoll,
+  sanitizeCritical,
+  workflowAttackRollMode,
+  type ProcessConfig,
 } from "./roll-config";
 
 function damageConfig(): ProcessConfig {
   return {
     rolls: [
       { parts: ["1d8"], data: { mod: 3 }, options: { types: ["slashing"], properties: ["mgc"] } },
-      { parts: ["1d6"], data: { mod: 3 }, options: { types: ["fire", "cold"] } }
-    ]
+      { parts: ["1d6"], data: { mod: 3 }, options: { types: ["fire", "cold"] } },
+    ],
   };
 }
 
@@ -18,7 +30,7 @@ describe("roll parts and target data", () => {
   it("appends a part to every roll", () => {
     const config: ProcessConfig = { rolls: [{ parts: ["1d20"] }, {}] };
     appendRollPart(config, "1d4");
-    expect(config.rolls?.map(roll => roll.parts)).toEqual([["1d20", "1d4"], ["1d4"]]);
+    expect(config.rolls?.map((roll) => roll.parts)).toEqual([["1d20", "1d4"], ["1d4"]]);
   });
 
   it("puts the target's roll data on every roll", () => {
@@ -42,7 +54,10 @@ describe("roll parts and target data", () => {
 
     const target = config.rolls?.[0]?.data?.target as typeof data;
     expect(target).toBe(config.data?.target);
-    expect(Object.getOwnPropertyDescriptor(target.attributes.senses, "darkvision")).toMatchObject({ value: 60, enumerable: true });
+    expect(Object.getOwnPropertyDescriptor(target.attributes.senses, "darkvision")).toMatchObject({
+      value: 60,
+      enumerable: true,
+    });
     expect(target.attributes.senses).toEqual({ ranges: { darkvision: 60 }, units: "ft", darkvision: 60 });
     expect(reads).toBe(0);
     expect(Object.getOwnPropertyDescriptor(senses, "darkvision")?.get).toBeTypeOf("function");
@@ -63,7 +78,10 @@ describe("critical and fumble ranges", () => {
   it("widens critical and fumble ranges on every roll", () => {
     const config: ProcessConfig = { rolls: [{ options: { criticalSuccess: 19 } }, {}] };
     adjustCriticalRanges(config, 1, 1, false);
-    expect(config.rolls?.map(roll => roll.options)).toEqual([{ criticalSuccess: 18, criticalFailure: 2 }, { criticalSuccess: 19, criticalFailure: 2 }]);
+    expect(config.rolls?.map((roll) => roll.options)).toEqual([
+      { criticalSuccess: 18, criticalFailure: 2 },
+      { criticalSuccess: 19, criticalFailure: 2 },
+    ]);
   });
 
   it("keeps the fumble range at 1 unless allowed to go below", () => {
@@ -101,13 +119,21 @@ describe("damage parts", () => {
     appendDamagePart(config, "1d4", ["cold"], {});
     expect(config.rolls?.[1]?.parts).toEqual(["1d6", "1d4"]);
     appendDamagePart(config, "1d4", ["radiant"], { level: 3 });
-    expect(config.rolls?.[2]).toEqual({ data: { level: 3 }, parts: ["1d4"], options: { properties: ["mgc"], type: "radiant", types: ["radiant"] } });
+    expect(config.rolls?.[2]).toEqual({
+      data: { level: 3 },
+      parts: ["1d4"],
+      options: { properties: ["mgc"], type: "radiant", types: ["radiant"] },
+    });
   });
 
   it("puts a bonus with several types in its own roll", () => {
     const config = damageConfig();
     appendDamagePart(config, "1d6", ["fire", "cold"], {});
-    expect(config.rolls?.[2]?.options).toEqual({ properties: ["mgc"], type: "fire", types: ["fire", "cold"] });
+    expect(config.rolls?.[2]?.options).toEqual({
+      properties: ["mgc"],
+      type: "fire",
+      types: ["fire", "cold"],
+    });
   });
 
   it("accumulates and sanitizes critical bonuses", () => {
@@ -115,10 +141,10 @@ describe("damage parts", () => {
     addCriticalBonus(config, 1, "1d6");
     addCriticalBonus(config, -3, "2");
     expect(config.critical).toEqual({ bonusDice: -2, bonusDamage: "1d6 + 2" });
-    sanitizeCritical(config, formula => !formula.includes("?"));
+    sanitizeCritical(config, (formula) => !formula.includes("?"));
     expect(config.critical).toEqual({ bonusDice: 0, bonusDamage: "1d6 + 2" });
     addCriticalBonus(config, 0, "??");
-    sanitizeCritical(config, formula => !formula.includes("?"));
+    sanitizeCritical(config, (formula) => !formula.includes("?"));
     expect(config.critical?.bonusDamage).toBe("");
   });
 
@@ -133,12 +159,20 @@ describe("advantage and disadvantage", () => {
   it("sets advantage or disadvantage on config and rolls, and resolves 5e mutual cancellation", () => {
     const config: ProcessConfig = { rolls: [{ parts: ["1d20"] }] };
     applyAdvantageMode(config, "advantage");
-    expect(config).toMatchObject({ advantage: true, disadvantage: false, rolls: [{ options: { advantage: true, disadvantage: false, advantageMode: 1 } }] });
+    expect(config).toMatchObject({
+      advantage: true,
+      disadvantage: false,
+      rolls: [{ options: { advantage: true, disadvantage: false, advantageMode: 1 } }],
+    });
     expect(resolvedAdvantageMode(config)).toBe("advantage");
 
     // Adding disadvantage cancels out existing advantage (stays normal even if another advantage arrives).
     applyAdvantageMode(config, "disadvantage");
-    expect(config).toMatchObject({ advantage: true, disadvantage: true, rolls: [{ options: { advantage: true, disadvantage: true, advantageMode: 0 } }] });
+    expect(config).toMatchObject({
+      advantage: true,
+      disadvantage: true,
+      rolls: [{ options: { advantage: true, disadvantage: true, advantageMode: 0 } }],
+    });
     expect(resolvedAdvantageMode(config)).toBe("normal");
     applyAdvantageMode(config, "advantage");
     expect(resolvedAdvantageMode(config)).toBe("normal");
@@ -151,21 +185,31 @@ describe("advantage and disadvantage", () => {
   });
 
   it("extracts roll modes from pre-roll configs, submitted rolls, and Midi workflows", () => {
-    expect(resolvedConfigRollMode({ advantage: false }, { advantage: true, disadvantage: false })).toBe("advantage");
+    expect(resolvedConfigRollMode({ advantage: false }, { advantage: true, disadvantage: false })).toBe(
+      "advantage",
+    );
     expect(resolvedConfigRollMode({ advantage: true }, { disadvantage: true })).toBe("normal");
 
     // Dialog choice on the submitted roll (advantageMode: 0) overrides stale pre-roll config.advantage.
-    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 0 } }], { advantage: true })).toBe("normal");
-    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 1 } }], { disadvantage: true })).toBe("advantage");
+    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 0 } }], { advantage: true })).toBe(
+      "normal",
+    );
+    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 1 } }], { disadvantage: true })).toBe(
+      "advantage",
+    );
     expect(resolvedSubmittedRollMode([{ hasAdvantage: false, hasDisadvantage: true }])).toBe("disadvantage");
-    expect(resolvedSubmittedRollMode([{ options: { advantage: true, disadvantage: false } }])).toBe("advantage");
+    expect(resolvedSubmittedRollMode([{ options: { advantage: true, disadvantage: false } }])).toBe(
+      "advantage",
+    );
     expect(resolvedSubmittedRollMode([{}], { advantage: true })).toBe("advantage");
     expect(rollModeFromRoll({ parts: ["1d8"] })).toBeNull();
 
     // Midi-QOL workflow mode ignores save workflows without an attack unless allowFlags is set.
     expect(workflowAttackRollMode({ advantage: true, disadvantage: false })).toBeNull();
     expect(workflowAttackRollMode({ advantage: true, disadvantage: false }, true)).toBe("advantage");
-    expect(workflowAttackRollMode({ attackRoll: { options: { advantageMode: -1 } }, advantage: true })).toBe("disadvantage");
+    expect(workflowAttackRollMode({ attackRoll: { options: { advantageMode: -1 } }, advantage: true })).toBe(
+      "disadvantage",
+    );
     expect(workflowAttackRollMode({ attackTotal: 14, advantage: true, disadvantage: true })).toBe("normal");
   });
 });

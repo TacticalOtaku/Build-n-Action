@@ -6,7 +6,7 @@ import ru from "../lang/ru.json";
 const sources = import.meta.glob<string>(["./**/*.ts", "./**/*.tsx", "!./**/*.test.ts", "!./**/*.test.tsx"], {
   query: "?raw",
   import: "default",
-  eager: true
+  eager: true,
 });
 
 const KEY_PATTERN = /["'`](BNA\.(?:UI|Palette)\.[A-Za-z0-9_.]+)["'`]/g;
@@ -20,9 +20,12 @@ function usedKeys(): string[] {
 }
 
 describe("editor strings", () => {
-  it.each([["en", en], ["ru", ru]] as const)("%s defines every UI key used in src/ui", (_language, dictionary) => {
+  it.each([
+    ["en", en],
+    ["ru", ru],
+  ] as const)("%s defines every UI key used in src/ui", (_language, dictionary) => {
     const translator = createTranslator(dictionary);
-    expect(usedKeys().filter(key => !translator.has(key))).toEqual([]);
+    expect(usedKeys().filter((key) => !translator.has(key))).toEqual([]);
   });
 
   it("finds the keys it is meant to guard", () => {

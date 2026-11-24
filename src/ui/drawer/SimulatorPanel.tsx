@@ -21,7 +21,12 @@ const ABILITIES = { source: "abilities" } as const;
 const SKILLS = { source: "skills" } as const;
 const NEEDS_ABILITY: readonly EventType[] = ["abilityCheck", "savingThrow", "afterCheck"];
 const NEEDS_SKILL: readonly EventType[] = ["abilityCheck", "afterCheck"];
-const NOTE_KEYS = { suppressed: "BNA.UI.Sim.noteSuppressed", noToken: "BNA.UI.Sim.noteNoToken", trigger: "BNA.UI.Sim.noteTrigger", chosen: "BNA.UI.Sim.noteChosen" } as const;
+const NOTE_KEYS = {
+  suppressed: "BNA.UI.Sim.noteSuppressed",
+  noToken: "BNA.UI.Sim.noteNoToken",
+  trigger: "BNA.UI.Sim.noteTrigger",
+  chosen: "BNA.UI.Sim.noteChosen",
+} as const;
 const KIND_ORDER: Record<NodeKind, number> = { event: 0, condition: 1, result: 2 };
 const LISTED_REASON_VALUES = ["actual", "expected"] as const;
 
@@ -62,11 +67,20 @@ const OUTCOMES: Partial<Record<EventType, readonly OutcomeOption[]>> = {
     { id: "hit", pins: ["hit"] },
     { id: "crit", pins: ["hit", "crit"] },
     { id: "miss", pins: ["miss"] },
-    { id: "fumble", pins: ["miss", "fumble"] }
+    { id: "fumble", pins: ["miss", "fumble"] },
   ],
-  afterTargetSave: [{ id: "failed", pins: ["failed"] }, { id: "succeeded", pins: ["succeeded"] }],
-  afterDamage: [{ id: "dealt", pins: ["dealt"] }, { id: "dropped", pins: ["dealt", "dropped"] }],
-  afterCheck: [{ id: "success", pins: ["success"] }, { id: "failure", pins: ["failure"] }]
+  afterTargetSave: [
+    { id: "failed", pins: ["failed"] },
+    { id: "succeeded", pins: ["succeeded"] },
+  ],
+  afterDamage: [
+    { id: "dealt", pins: ["dealt"] },
+    { id: "dropped", pins: ["dealt", "dropped"] },
+  ],
+  afterCheck: [
+    { id: "success", pins: ["success"] },
+    { id: "failure", pins: ["failure"] },
+  ],
 };
 
 export function outcomeOptions(event: EventType): readonly OutcomeOption[] {
@@ -77,7 +91,7 @@ export function outcomeOptions(event: EventType): readonly OutcomeOption[] {
 export function eventOptions(blueprint: BlueprintSource): EventOption[] {
   const options = new Map<string, EventOption>();
   for (const node of blueprint.nodes) {
-    if ((node.kind !== "event") || !(EVENT_TYPES as readonly string[]).includes(node.type)) continue;
+    if (node.kind !== "event" || !(EVENT_TYPES as readonly string[]).includes(node.type)) continue;
     const event = node.type as EventType;
     if (event === "signal") {
       const name = asString(node.data.name).trim();
@@ -96,17 +110,20 @@ export function subjectStore(simulator: SimulatorHost): {
 } {
   let cached: { revision: number; subjects: Subjects } | null = null;
   return {
-    subscribe: listener => simulator.subscribe?.(listener) ?? (() => undefined),
+    subscribe: (listener) => simulator.subscribe?.(listener) ?? (() => undefined),
     getSnapshot: () => {
       const revision = simulator.revision?.() ?? 0;
-      if (cached?.revision !== revision) cached = { revision, subjects: { actors: simulator.actors(), targets: simulator.targets() } };
+      if (cached?.revision !== revision)
+        cached = { revision, subjects: { actors: simulator.actors(), targets: simulator.targets() } };
       return cached.subjects;
-    }
+    },
   };
 }
 
 function readingOrder(a: BlueprintNode, b: BlueprintNode): number {
-  return (KIND_ORDER[a.kind] - KIND_ORDER[b.kind]) || (a.position.x - b.position.x) || (a.position.y - b.position.y);
+  return (
+    KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.position.x - b.position.x || a.position.y - b.position.y
+  );
 }
 
 export function summarizeRun(blueprint: BlueprintSource, run: BlueprintRun): RunSummary {
@@ -114,18 +131,26 @@ export function summarizeRun(blueprint: BlueprintSource, run: BlueprintRun): Run
   for (const node of blueprint.nodes) nodes[node.id] = run.nodes[node.id]?.status ?? "skipped";
   const trace: CanvasTrace = { nodes, edges: new Set(run.edges) };
 
-  const steps: RunStep[] = [...blueprint.nodes].sort(readingOrder).flatMap(node => {
+  const steps: RunStep[] = [...blueprint.nodes].sort(readingOrder).flatMap((node) => {
     const traced = run.nodes[node.id];
-    if (!traced || (traced.status === "skipped")) return [];
-    return [{ nodeId: node.id, kind: node.kind, status: traced.status, reason: traced.reason ?? null, checks: traced.checks ?? [] }];
+    if (!traced || traced.status === "skipped") return [];
+    return [
+      {
+        nodeId: node.id,
+        kind: node.kind,
+        status: traced.status,
+        reason: traced.reason ?? null,
+        checks: traced.checks ?? [],
+      },
+    ];
   });
 
   let firstFailure: RunSummary["firstFailure"] = null;
   if (run.skipped) {
     firstFailure = { nodeId: null, checkId: null, reason: run.skipped };
   } else if (!run.intents.length) {
-    const failed = steps.find(step => step.status === "failed");
-    const check = failed?.checks.find(entry => !entry.outcome.pass);
+    const failed = steps.find((step) => step.status === "failed");
+    const check = failed?.checks.find((entry) => !entry.outcome.pass);
     const reason = check?.outcome.reason ?? failed?.reason;
     if (failed && reason) firstFailure = { nodeId: failed.nodeId, checkId: check?.checkId ?? null, reason };
   }
@@ -138,13 +163,22 @@ export function checkChoices(type: string): ChoiceSpec | null {
 }
 
 /** A reason as text; with a choice list, stored values ("humanoid, elf") show as their labels. */
-export function reasonText(reason: Reason, t: Translator["t"], fmt?: PhraseFormatter, spec?: ChoiceSpec | null): string {
+export function reasonText(
+  reason: Reason,
+  t: Translator["t"],
+  fmt?: PhraseFormatter,
+  spec?: ChoiceSpec | null,
+): string {
   if (!reason.values) return t(`BNA.Reason.${reason.code}`);
   const values: Record<string, string | number> = { ...reason.values };
   if (fmt && spec) {
     for (const key of LISTED_REASON_VALUES) {
       const value = values[key];
-      if ((typeof value === "string") && (value !== "—")) values[key] = value.split(", ").map(part => fmt.choice(part, spec)).join(", ");
+      if (typeof value === "string" && value !== "—")
+        values[key] = value
+          .split(", ")
+          .map((part) => fmt.choice(part, spec))
+          .join(", ");
     }
   }
   return t(`BNA.Reason.${reason.code}`, values);
@@ -178,7 +212,9 @@ type Outcome = { result: SimulationResult; summary: RunSummary } | { error: stri
 /** The type of the check behind a run's first failure, for labelling its values. */
 function failedCheckType(summary: RunSummary): string {
   const id = summary.firstFailure?.checkId;
-  return (id && summary.steps.flatMap(step => step.checks).find(check => check.checkId === id)?.type) || "";
+  return (
+    (id && summary.steps.flatMap((step) => step.checks).find((check) => check.checkId === id)?.type) || ""
+  );
 }
 
 function itemKey(itemUuid: string, activityId: string): string {
@@ -186,14 +222,20 @@ function itemKey(itemUuid: string, activityId: string): string {
 }
 
 function usesRollModes(blueprint: BlueprintSource): boolean {
-  return blueprint.nodes.some(node => (node.kind === "condition") && Array.isArray(node.data.checks)
-    && (node.data.checks as { type?: unknown }[]).some(check => check.type === "rollModes"));
+  return blueprint.nodes.some(
+    (node) =>
+      node.kind === "condition" &&
+      Array.isArray(node.data.checks) &&
+      (node.data.checks as { type?: unknown }[]).some((check) => check.type === "rollModes"),
+  );
 }
 
 function initialSetup(simulator: SimulatorHost): Setup {
   const defaults = simulator.defaults();
   const actorUuid = defaults.actorUuid ?? simulator.actors()[0]?.value ?? "";
-  const item = actorUuid ? simulator.items(actorUuid).find(entry => entry.uuid === defaults.itemUuid) : undefined;
+  const item = actorUuid
+    ? simulator.items(actorUuid).find((entry) => entry.uuid === defaults.itemUuid)
+    : undefined;
   return {
     actorUuid,
     item: item ? itemKey(item.uuid, item.activities[0]?.value ?? "") : "",
@@ -204,7 +246,7 @@ function initialSetup(simulator: SimulatorHost): Setup {
     saveOutcome: "failed",
     abilityId: "",
     skillId: "",
-    counters: {}
+    counters: {},
   };
 }
 
@@ -222,40 +264,45 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
   const t = useT();
   const { fmt } = useServices();
   const [setup, setSetup] = useState<Setup>(() => initialSetup(simulator));
-  const change = (patch: Partial<Setup>) => setSetup(previous => ({ ...previous, ...patch }));
+  const change = (patch: Partial<Setup>) => setSetup((previous) => ({ ...previous, ...patch }));
 
   const subjects = useMemo(() => subjectStore(simulator), [simulator]);
-    const { actors, targets } = useSyncExternalStore(subjects.subscribe, subjects.getSnapshot);
-  const actorGroups = [...new Set(actors.map(actor => actor.group ?? ""))];
+  const { actors, targets } = useSyncExternalStore(subjects.subscribe, subjects.getSnapshot);
+  const actorGroups = [...new Set(actors.map((actor) => actor.group ?? ""))];
   // A chosen roller or target whose token was deleted falls back to the first roller, or to no target.
-  const actorUuid = actors.some(actor => actor.value === setup.actorUuid) ? setup.actorUuid : (actors[0]?.value ?? "");
-  const targetUuid = targets.some(target => target.value === setup.targetUuid) ? setup.targetUuid : "";
+  const actorUuid = actors.some((actor) => actor.value === setup.actorUuid)
+    ? setup.actorUuid
+    : (actors[0]?.value ?? "");
+  const targetUuid = targets.some((target) => target.value === setup.targetUuid) ? setup.targetUuid : "";
   const items = useMemo(() => (actorUuid ? simulator.items(actorUuid) : []), [simulator, actorUuid]);
   const abilities = useChoiceOptions(ABILITIES);
   const skills = useChoiceOptions(SKILLS);
 
   const events = useMemo(() => eventOptions(blueprint), [blueprint]);
-  const event = events.find(entry => entry.key === setup.eventKey) ?? events[0] ?? null;
+  const event = events.find((entry) => entry.key === setup.eventKey) ?? events[0] ?? null;
   const outcomes = event ? outcomeOptions(event.event) : [];
-  const outcome = outcomes.find(entry => entry.id === setup.outcome) ?? outcomes[0] ?? null;
+  const outcome = outcomes.find((entry) => entry.id === setup.outcome) ?? outcomes[0] ?? null;
   const needsAbility = !!event && NEEDS_ABILITY.includes(event.event);
   const needsSkill = !!event && NEEDS_SKILL.includes(event.event);
-  const abilityId = needsAbility ? (setup.abilityId || abilities[0]?.value || null) : null;
-  const skillId = needsSkill ? (setup.skillId || null) : null;
+  const abilityId = needsAbility ? setup.abilityId || abilities[0]?.value || null : null;
+  const skillId = needsSkill ? setup.skillId || null : null;
 
   const counterRows = useMemo(
     () => (actorUuid ? (simulator.counterValues?.(actorUuid, blueprint) ?? []) : []),
-    [simulator, actorUuid, blueprint]
+    [simulator, actorUuid, blueprint],
   );
   const counterKey = (row: { scope: string; name: string }) => `${row.scope}:${row.name}`;
-  const needsRollMode = !!event && usesRollModes(blueprint) && !!getCheck("rollModes")?.relevantTo.includes(event.event);
-  const demands = blueprint.nodes.some(node => (node.kind === "result") && !!getResult(node.type)?.pins?.length);
+  const needsRollMode =
+    !!event && usesRollModes(blueprint) && !!getCheck("rollModes")?.relevantTo.includes(event.event);
+  const demands = blueprint.nodes.some(
+    (node) => node.kind === "result" && !!getResult(node.type)?.pins?.length,
+  );
   const eventKey = event?.key ?? null;
   const result = useMemo<Outcome>(() => {
-    const chosen = events.find(entry => entry.key === eventKey);
+    const chosen = events.find((entry) => entry.key === eventKey);
     if (!chosen || !actorUuid) return null;
     const options = outcomeOptions(chosen.event);
-    const pins = (options.find(entry => entry.id === setup.outcome) ?? options[0])?.pins ?? ["out"];
+    const pins = (options.find((entry) => entry.id === setup.outcome) ?? options[0])?.pins ?? ["out"];
     const [itemUuid = "", activityId = ""] = setup.item.split("#");
     const request: SimulationRequest = {
       actorUuid,
@@ -269,24 +316,45 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
       skillId,
       ...(needsRollMode ? { rollMode: setup.rollMode } : {}),
       saveOutcome: setup.saveOutcome,
-      counters: Object.fromEntries(counterRows.map(row => [counterKey(row), Number(setup.counters[counterKey(row)] ?? row.value) || 0]))
+      counters: Object.fromEntries(
+        counterRows.map((row) => [
+          counterKey(row),
+          Number(setup.counters[counterKey(row)] ?? row.value) || 0,
+        ]),
+      ),
     };
     try {
       const run = simulator.run(blueprint, request);
       return run ? { result: run, summary: summarizeRun(blueprint, run.run) } : null;
     } catch (error) {
-      return { error: (error instanceof Error) ? error.message : String(error) };
+      return { error: error instanceof Error ? error.message : String(error) };
     }
-  }, [simulator, blueprint, events, eventKey, setup.outcome, needsRollMode, setup.rollMode, setup.saveOutcome, actorUuid, setup.item, targetUuid, abilityId, skillId, setup.counters, counterRows]);
+  }, [
+    simulator,
+    blueprint,
+    events,
+    eventKey,
+    setup.outcome,
+    needsRollMode,
+    setup.rollMode,
+    setup.saveOutcome,
+    actorUuid,
+    setup.item,
+    targetUuid,
+    abilityId,
+    skillId,
+    setup.counters,
+    counterRows,
+  ]);
 
-  const trace = (result && ("summary" in result)) ? result.summary.trace : null;
+  const trace = result && "summary" in result ? result.summary.trace : null;
   useEffect(() => onTrace(trace), [trace, onTrace]);
   useEffect(() => () => onTrace(null), [onTrace]);
 
   if (!actors.length) return <p className="bna-drawer__empty">{t("BNA.UI.Sim.noActors")}</p>;
   if (!events.length) return <p className="bna-drawer__empty">{t("BNA.UI.Sim.noEvents")}</p>;
 
-  const byId = new Map(blueprint.nodes.map(node => [node.id, node]));
+  const byId = new Map(blueprint.nodes.map((node) => [node.id, node]));
   const title = (nodeId: string) => {
     const node = byId.get(nodeId);
     return node ? nodeTitle(node, t) : nodeId;
@@ -294,46 +362,101 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
 
   return (
     <div className="bna-sim">
-      <form className="bna-sim__setup" aria-label={t("BNA.UI.Sim.setup")} onSubmit={submit => submit.preventDefault()}>
+      <form
+        className="bna-sim__setup"
+        aria-label={t("BNA.UI.Sim.setup")}
+        onSubmit={(submit) => submit.preventDefault()}
+      >
         <Field label={t("BNA.UI.Sim.actor")}>
-          {id => (
-            <select id={id} className="bna-select" value={actorUuid} onChange={input => change({ actorUuid: input.target.value, item: "" })}>
-              {actorGroups.map(group => group ? (
-                <optgroup key={group} label={group}>
-                  {actors.filter(actor => actor.group === group).map(actor => <option key={actor.value} value={actor.value}>{actor.label}</option>)}
-                </optgroup>
-              ) : actors.filter(actor => !actor.group).map(actor => <option key={actor.value} value={actor.value}>{actor.label}</option>))}
+          {(id) => (
+            <select
+              id={id}
+              className="bna-select"
+              value={actorUuid}
+              onChange={(input) => change({ actorUuid: input.target.value, item: "" })}
+            >
+              {actorGroups.map((group) =>
+                group ? (
+                  <optgroup key={group} label={group}>
+                    {actors
+                      .filter((actor) => actor.group === group)
+                      .map((actor) => (
+                        <option key={actor.value} value={actor.value}>
+                          {actor.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : (
+                  actors
+                    .filter((actor) => !actor.group)
+                    .map((actor) => (
+                      <option key={actor.value} value={actor.value}>
+                        {actor.label}
+                      </option>
+                    ))
+                ),
+              )}
             </select>
           )}
         </Field>
         <Field label={t("BNA.UI.Sim.item")}>
-          {id => (
-            <select id={id} className="bna-select" value={setup.item} onChange={input => change({ item: input.target.value })}>
+          {(id) => (
+            <select
+              id={id}
+              className="bna-select"
+              value={setup.item}
+              onChange={(input) => change({ item: input.target.value })}
+            >
               <option value="">{t("BNA.UI.Sim.noItem")}</option>
-              {items.map(item => (item.activities.length ? (
-                <optgroup key={item.uuid} label={item.name}>
-                  {item.activities.map(activity => (
-                    <option key={activity.value} value={itemKey(item.uuid, activity.value)}>{`${item.name}: ${activity.label}`}</option>
-                  ))}
-                </optgroup>
-              ) : <option key={item.uuid} value={itemKey(item.uuid, "")}>{item.name}</option>))}
+              {items.map((item) =>
+                item.activities.length ? (
+                  <optgroup key={item.uuid} label={item.name}>
+                    {item.activities.map((activity) => (
+                      <option
+                        key={activity.value}
+                        value={itemKey(item.uuid, activity.value)}
+                      >{`${item.name}: ${activity.label}`}</option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={item.uuid} value={itemKey(item.uuid, "")}>
+                    {item.name}
+                  </option>
+                ),
+              )}
             </select>
           )}
         </Field>
         <Field label={t("BNA.UI.Sim.target")}>
-          {id => (
-            <select id={id} className="bna-select" value={targetUuid} onChange={input => change({ targetUuid: input.target.value })}>
+          {(id) => (
+            <select
+              id={id}
+              className="bna-select"
+              value={targetUuid}
+              onChange={(input) => change({ targetUuid: input.target.value })}
+            >
               <option value="">{t("BNA.UI.Sim.noTarget")}</option>
-              {targets.map(target => <option key={target.value} value={target.value}>{target.label}</option>)}
+              {targets.map((target) => (
+                <option key={target.value} value={target.value}>
+                  {target.label}
+                </option>
+              ))}
             </select>
           )}
         </Field>
         <Field label={t("BNA.UI.Sim.event")}>
-          {id => (
-            <select id={id} className="bna-select" value={event?.key ?? ""} onChange={input => change({ eventKey: input.target.value, outcome: "" })}>
-              {events.map(entry => (
+          {(id) => (
+            <select
+              id={id}
+              className="bna-select"
+              value={event?.key ?? ""}
+              onChange={(input) => change({ eventKey: input.target.value, outcome: "" })}
+            >
+              {events.map((entry) => (
                 <option key={entry.key} value={entry.key}>
-                  {entry.signal ? t("BNA.UI.Node.signal", { name: entry.signal }) : t(`BNA.Event.${entry.event}.Label`)}
+                  {entry.signal
+                    ? t("BNA.UI.Node.signal", { name: entry.signal })
+                    : t(`BNA.Event.${entry.event}.Label`)}
                 </option>
               ))}
             </select>
@@ -343,7 +466,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
           <div className="bna-sim__field" role="group" aria-label={t("BNA.UI.Sim.outcome")}>
             <span className="bna-sim__legend">{t("BNA.UI.Sim.outcome")}</span>
             <div className="bna-sim__outcomes">
-              {outcomes.map(entry => (
+              {outcomes.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
@@ -361,7 +484,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
           <div className="bna-sim__field" role="group" aria-label={t("BNA.UI.Sim.rollMode")}>
             <span className="bna-sim__legend">{t("BNA.UI.Sim.rollMode")}</span>
             <div className="bna-sim__outcomes">
-              {STATIC.rollMode.map(option => (
+              {STATIC.rollMode.map((option) => (
                 <button
                   key={option.value}
                   type="button"
@@ -379,7 +502,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
           <div className="bna-sim__field" role="group" aria-label={t("BNA.Event.demandedSave.Label")}>
             <span className="bna-sim__legend">{t("BNA.Event.demandedSave.Label")}</span>
             <div className="bna-sim__outcomes">
-              {(["failed", "succeeded"] as const).map(pin => (
+              {(["failed", "succeeded"] as const).map((pin) => (
                 <button
                   key={pin}
                   type="button"
@@ -396,15 +519,17 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
         {counterRows.length ? (
           <div className="bna-sim__field" role="group" aria-label={t("BNA.UI.Sim.counters")}>
             <span className="bna-sim__legend">{t("BNA.UI.Sim.counters")}</span>
-            {counterRows.map(row => (
+            {counterRows.map((row) => (
               <Field key={counterKey(row)} label={row.name}>
-                {id => (
+                {(id) => (
                   <input
                     id={id}
                     className="bna-input"
                     inputMode="numeric"
                     value={setup.counters[counterKey(row)] ?? String(row.value)}
-                    onChange={input => change({ counters: { ...setup.counters, [counterKey(row)]: input.target.value } })}
+                    onChange={(input) =>
+                      change({ counters: { ...setup.counters, [counterKey(row)]: input.target.value } })
+                    }
                   />
                 )}
               </Field>
@@ -413,19 +538,37 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
         ) : null}
         {needsAbility ? (
           <Field label={t("BNA.UI.Sim.ability")}>
-            {id => (
-              <select id={id} className="bna-select" value={abilityId ?? ""} onChange={input => change({ abilityId: input.target.value })}>
-                {abilities.map(ability => <option key={ability.value} value={ability.value}>{ability.label}</option>)}
+            {(id) => (
+              <select
+                id={id}
+                className="bna-select"
+                value={abilityId ?? ""}
+                onChange={(input) => change({ abilityId: input.target.value })}
+              >
+                {abilities.map((ability) => (
+                  <option key={ability.value} value={ability.value}>
+                    {ability.label}
+                  </option>
+                ))}
               </select>
             )}
           </Field>
         ) : null}
         {needsSkill ? (
           <Field label={t("BNA.UI.Sim.skill")}>
-            {id => (
-              <select id={id} className="bna-select" value={skillId ?? ""} onChange={input => change({ skillId: input.target.value })}>
+            {(id) => (
+              <select
+                id={id}
+                className="bna-select"
+                value={skillId ?? ""}
+                onChange={(input) => change({ skillId: input.target.value })}
+              >
                 <option value="">{t("BNA.UI.Sim.noSkill")}</option>
-                {skills.map(skill => <option key={skill.value} value={skill.value}>{skill.label}</option>)}
+                {skills.map((skill) => (
+                  <option key={skill.value} value={skill.value}>
+                    {skill.label}
+                  </option>
+                ))}
               </select>
             )}
           </Field>
@@ -433,18 +576,26 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
       </form>
 
       <div className="bna-sim__report" aria-live="polite">
-        {(result && ("error" in result)) ? <p className="bna-sim__error">{t("BNA.UI.Sim.failed", { message: result.error })}</p> : null}
-        {(result && ("summary" in result)) ? (
+        {result && "error" in result ? (
+          <p className="bna-sim__error">{t("BNA.UI.Sim.failed", { message: result.error })}</p>
+        ) : null}
+        {result && "summary" in result ? (
           <>
-            {result.result.notes.map(note => <p key={note} className="bna-sim__note">{t(NOTE_KEYS[note])}</p>)}
+            {result.result.notes.map((note) => (
+              <p key={note} className="bna-sim__note">
+                {t(NOTE_KEYS[note])}
+              </p>
+            ))}
             {result.result.run.intents.length ? (
               <section className="bna-sim__verdict" data-verdict="applies">
                 <h3>{t("BNA.UI.Sim.applies", { count: result.result.run.intents.length })}</h3>
                 <ul>
-                  {result.result.run.intents.map(intent => (
+                  {result.result.run.intents.map((intent) => (
                     <li key={intent.nodeId}>
                       <span>{getResult(intent.type)?.phrase(intent.data, fmt) ?? intent.type}</span>
-                      {intent.common.optional ? <span className="bna-sim__tag">{t("BNA.UI.Node.optional")}</span> : null}
+                      {intent.common.optional ? (
+                        <span className="bna-sim__tag">{t("BNA.UI.Node.optional")}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -454,12 +605,23 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
                 <h3>{t("BNA.UI.Sim.nothing")}</h3>
                 {result.summary.firstFailure ? (
                   <p>
-                    {result.summary.firstFailure.nodeId ? `${title(result.summary.firstFailure.nodeId)}: ` : ""}
-                    {reasonText(result.summary.firstFailure.reason, t, fmt, checkChoices(failedCheckType(result.summary)))}
+                    {result.summary.firstFailure.nodeId
+                      ? `${title(result.summary.firstFailure.nodeId)}: `
+                      : ""}
+                    {reasonText(
+                      result.summary.firstFailure.reason,
+                      t,
+                      fmt,
+                      checkChoices(failedCheckType(result.summary)),
+                    )}
                   </p>
                 ) : null}
                 {result.summary.firstFailure?.nodeId ? (
-                  <button type="button" className="bna-button" onClick={() => onFocus(result.summary.firstFailure?.nodeId ?? "")}>
+                  <button
+                    type="button"
+                    className="bna-button"
+                    onClick={() => onFocus(result.summary.firstFailure?.nodeId ?? "")}
+                  >
                     {t("BNA.UI.Sim.whyNot")}
                   </button>
                 ) : null}
@@ -467,20 +629,28 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
             )}
             <h4 className="bna-sim__subhead">{t("BNA.UI.Sim.path")}</h4>
             <ol className="bna-sim__steps">
-              {result.summary.steps.map(step => (
+              {result.summary.steps.map((step) => (
                 <li key={step.nodeId} data-status={step.status} data-kind={step.kind}>
-                  <Icon name={(step.status === "passed") ? "check" : "x"} size={14} />
-                  <span className="bna-visually-hidden">{t((step.status === "passed") ? "BNA.UI.Node.passed" : "BNA.UI.Node.failed")}</span>
+                  <Icon name={step.status === "passed" ? "check" : "x"} size={14} />
+                  <span className="bna-visually-hidden">
+                    {t(step.status === "passed" ? "BNA.UI.Node.passed" : "BNA.UI.Node.failed")}
+                  </span>
                   <span className="bna-sim__step-title">{title(step.nodeId)}</span>
                   {step.reason ? <span className="bna-sim__reason">{reasonText(step.reason, t)}</span> : null}
                   {step.checks.length ? (
                     <ul>
-                      {step.checks.map(check => (
+                      {step.checks.map((check) => (
                         <li key={check.checkId} data-status={check.outcome.pass ? "passed" : "failed"}>
                           <Icon name={check.outcome.pass ? "check" : "x"} size={12} />
-                          <span className="bna-visually-hidden">{t(check.outcome.pass ? "BNA.UI.Node.passed" : "BNA.UI.Node.failed")}</span>
-                          <span>{getCheck(check.type) ? t(`BNA.Check.${check.type}.Label`) : check.type}</span>
-                          <span className="bna-sim__reason">{reasonText(check.outcome.reason, t, fmt, checkChoices(check.type))}</span>
+                          <span className="bna-visually-hidden">
+                            {t(check.outcome.pass ? "BNA.UI.Node.passed" : "BNA.UI.Node.failed")}
+                          </span>
+                          <span>
+                            {getCheck(check.type) ? t(`BNA.Check.${check.type}.Label`) : check.type}
+                          </span>
+                          <span className="bna-sim__reason">
+                            {reasonText(check.outcome.reason, t, fmt, checkChoices(check.type))}
+                          </span>
                         </li>
                       ))}
                     </ul>

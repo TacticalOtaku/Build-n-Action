@@ -5,7 +5,7 @@
 export function read(source: unknown, path: string): unknown {
   let value: unknown = source;
   for (const key of path.split(".")) {
-    if ((value === null) || (value === undefined)) return undefined;
+    if (value === null || value === undefined) return undefined;
     value = (value as Record<string, unknown>)[key];
   }
   return value;
@@ -14,7 +14,8 @@ export function read(source: unknown, path: string): unknown {
 /** Entries of an array, Set or other iterable object; [] for anything else (strings included). */
 export function listOf(value: unknown): unknown[] {
   if (Array.isArray(value)) return value;
-  if (value && (typeof value === "object") && (Symbol.iterator in value)) return [...(value as Iterable<unknown>)];
+  if (value && typeof value === "object" && Symbol.iterator in value)
+    return [...(value as Iterable<unknown>)];
   return [];
 }
 
@@ -26,5 +27,5 @@ export function stringList(value: unknown): string[] {
 /** Call a method that returns an iterable (e.g. allApplicableEffects) and list the result; [] when absent. */
 export function callList(source: unknown, method: string): unknown[] {
   const fn = read(source, method);
-  return (typeof fn === "function") ? listOf(fn.call(source)) : [];
+  return typeof fn === "function" ? listOf(fn.call(source)) : [];
 }

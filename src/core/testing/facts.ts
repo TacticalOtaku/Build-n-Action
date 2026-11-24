@@ -1,9 +1,23 @@
-import type { ActivityFacts, ActorFacts, CreatureFacts, ItemFacts, RollDetails, RollFacts } from "../facts/types";
+import type {
+  ActivityFacts,
+  ActorFacts,
+  CreatureFacts,
+  ItemFacts,
+  RollDetails,
+  RollFacts,
+} from "../facts/types";
 
 export function creatureFacts(partial: Partial<CreatureFacts> = {}): CreatureFacts {
   return {
-    creatureTypes: ["humanoid"], size: "med", armor: [], statuses: [], conditionImmunities: [], markers: [], tokenSize: 1, hpPercent: 100,
-    ...partial
+    creatureTypes: ["humanoid"],
+    size: "med",
+    armor: [],
+    statuses: [],
+    conditionImmunities: [],
+    markers: [],
+    tokenSize: 1,
+    hpPercent: 100,
+    ...partial,
   };
 }
 
@@ -13,7 +27,7 @@ export function actorFacts(partial: Partial<ActorFacts> = {}): ActorFacts {
     uuid: "Actor.hero",
     languages: ["common", "standard"],
     spellSlots: [],
-    ...partial
+    ...partial,
   };
 }
 
@@ -28,22 +42,34 @@ export function itemFacts(partial: Partial<ItemFacts> = {}): ItemFacts {
     featureSubtype: null,
     spell: null,
     markers: [],
-    ...partial
+    ...partial,
   };
 }
 
 export function activityFacts(partial: Partial<ActivityFacts> = {}): ActivityFacts {
   return {
-    type: "attack", ability: "str", attackType: "melee", attackClassification: "weapon", damageTypes: ["slashing"], dcAbility: null,
-    ...partial
+    type: "attack",
+    ability: "str",
+    attackType: "melee",
+    attackClassification: "weapon",
+    damageTypes: ["slashing"],
+    dcAbility: null,
+    ...partial,
   };
 }
 
 export function rollDetails(partial: Partial<RollDetails> = {}): RollDetails {
   return {
-    abilityId: null, skillId: null, toolKeys: [], saveAbility: null, isDeath: false, isConcentration: false,
-    attackMode: null, proficiency: null, rollMode: null,
-    ...partial
+    abilityId: null,
+    skillId: null,
+    toolKeys: [],
+    saveAbility: null,
+    isDeath: false,
+    isConcentration: false,
+    attackMode: null,
+    proficiency: null,
+    rollMode: null,
+    ...partial,
   };
 }
 
@@ -56,6 +82,6 @@ export function rollFacts(partial: Partial<RollFacts> = {}): RollFacts {
     activity: activityFacts(),
     target: creatureFacts(),
     roll: rollDetails(),
-    ...partial
+    ...partial,
   };
 }

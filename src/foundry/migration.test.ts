@@ -2,14 +2,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { LEGACY_FIXTURES } from "../core/legacy/fixtures";
 import { deleteBackups, runMigration, scanMigration } from "./migration";
 
-function doc(documentName: string, name: string, flags: Record<string, unknown>, embedded: Record<string, unknown> = {}) {
+function doc(
+  documentName: string,
+  name: string,
+  flags: Record<string, unknown>,
+  embedded: Record<string, unknown> = {},
+) {
   const updates: Record<string, unknown>[] = [];
   return {
-    documentName, name, uuid: `${documentName}.${name}`, flags: { "build-n-action": flags }, updates, ...embedded,
+    documentName,
+    name,
+    uuid: `${documentName}.${name}`,
+    flags: { "build-n-action": flags },
+    updates,
+    ...embedded,
     update(changes: Record<string, unknown>) {
       updates.push(changes);
       return Promise.resolve(this);
-    }
+    },
   };
 }
 
@@ -18,7 +28,7 @@ function world(parts: { actors?: unknown[]; items?: unknown[]; scenes?: unknown[
     actors: parts.actors ?? [],
     items: parts.items ?? [],
     scenes: parts.scenes ?? [],
-    packs: Object.assign([], { get: () => undefined })
+    packs: Object.assign([], { get: () => undefined }),
   });
 }
 
@@ -33,7 +43,7 @@ describe("world migration", () => {
     world({ actors: [hero], items: [broken], scenes: [{ regions: [region], templates: [] }] });
     const report = await scanMigration();
     expect(report).toMatchObject({ documents: 3, converted: 2, failed: 1, errors: 0 });
-    expect(report.entries.map(entry => entry.label)).toEqual(["Sword", "Broken", "Shrine"]);
+    expect(report.entries.map((entry) => entry.label)).toEqual(["Sword", "Broken", "Shrine"]);
     expect(sword.updates).toEqual([]);
   });
 
@@ -43,9 +53,9 @@ describe("world migration", () => {
     cursed.update = () => Promise.reject(new Error("locked"));
     world({ items: [sword, cursed] });
     const progress: number[] = [];
-    const report = await runMigration({ onProgress: done => progress.push(done) });
+    const report = await runMigration({ onProgress: (done) => progress.push(done) });
     expect(report).toMatchObject({ documents: 2, converted: 1, errors: 1 });
-    expect(report.entries.find(entry => entry.label === "Cursed")?.error).toBe("locked");
+    expect(report.entries.find((entry) => entry.label === "Cursed")?.error).toBe("locked");
     expect(sword.updates).toHaveLength(1);
     expect(progress.at(-1)).toBe(2);
   });
@@ -54,14 +64,21 @@ describe("world migration", () => {
     const mine = doc("Item", "BNA Live Sword", { bonuses: [LEGACY_FIXTURES.attackAura] });
     const theirs = doc("Item", "Their Sword", { bonuses: [LEGACY_FIXTURES.optionalAttack] });
     world({ items: [mine, theirs] });
-    const report = await runMigration({ include: document => document.name.startsWith("BNA Live") });
-    expect(report.entries.map(entry => entry.label)).toEqual(["BNA Live Sword"]);
+    const report = await runMigration({ include: (document) => document.name.startsWith("BNA Live") });
+    expect(report.entries.map((entry) => entry.label)).toEqual(["BNA Live Sword"]);
     expect(theirs.updates).toEqual([]);
   });
 
   it("deletes backups where there are any, with the v14 deletion operator", async () => {
     class ForcedDeletion {}
-    vi.stubGlobal("foundry", { data: { operators: { ForcedDeletion, ForcedReplacement: { create: (value: unknown) => ({ replace: value }) } } } });
+    vi.stubGlobal("foundry", {
+      data: {
+        operators: {
+          ForcedDeletion,
+          ForcedReplacement: { create: (value: unknown) => ({ replace: value }) },
+        },
+      },
+    });
     const kept = doc("Item", "Kept", { legacyBackup: { x: {} } });
     const clean = doc("Item", "Clean", {});
     world({ items: [kept, clean] });

@@ -7,25 +7,41 @@ import type { CountersHost } from "../host";
 import { renderWithServices } from "../testing/render";
 import { TitleBlock } from "./TitleBlock";
 
-const blueprint = createBlueprint({ id: "aB3dE5gH7jK9mN1p", name: "Rage", counters: [{ name: "hits", min: 0, max: 3, initial: 0, reset: "turnStart" }] });
+const blueprint = createBlueprint({
+  id: "aB3dE5gH7jK9mN1p",
+  name: "Rage",
+  counters: [{ name: "hits", min: 0, max: 3, initial: 0, reset: "turnStart" }],
+});
 
 function host(overrides: Partial<CountersHost> = {}): CountersHost {
   let defs: CounterDef[] = [{ name: "rage", min: 0, max: 3, initial: 3, reset: "longRest" }];
   return {
-    rows: () => [{ name: "rage", scope: "actor", value: 2 }, { name: "hits", scope: "blueprint", value: 1 }],
+    rows: () => [
+      { name: "rage", scope: "actor", value: 2 },
+      { name: "hits", scope: "blueprint", value: 1 },
+    ],
     names: () => ["rage", "hits"],
     reset: vi.fn(async () => undefined),
     actorDefs: () => defs,
-    saveActorDefs: vi.fn(async (next: readonly CounterDef[]) => { defs = [...next]; }),
+    saveActorDefs: vi.fn(async (next: readonly CounterDef[]) => {
+      defs = [...next];
+    }),
     subscribe: () => () => undefined,
-    ...overrides
+    ...overrides,
   };
 }
 
 function renderStamp(counters: CountersHost, dispatch = vi.fn()) {
   renderWithServices(
-    <TitleBlock blueprint={blueprint} carrier="Barbarian" saving={false} lint={{ error: 0, warning: 0, info: 0 }} onShowIssues={vi.fn()} dispatch={dispatch} />,
-    { host: { counters } }
+    <TitleBlock
+      blueprint={blueprint}
+      carrier="Barbarian"
+      saving={false}
+      lint={{ error: 0, warning: 0, info: 0 }}
+      onShowIssues={vi.fn()}
+      dispatch={dispatch}
+    />,
+    { host: { counters } },
   );
   return dispatch;
 }
@@ -53,14 +69,25 @@ describe("counters in the title block", () => {
       type: "setCounters",
       counters: [
         { name: "hits", min: 0, max: 3, initial: 0, reset: "turnStart" },
-        { name: "streak", min: 0, max: null, initial: 0, reset: "manual" }
-      ]
+        { name: "streak", min: 0, max: null, initial: 0, reset: "manual" },
+      ],
     });
-    expect(counters.saveActorDefs).toHaveBeenCalledWith([{ name: "rage", min: 0, max: 3, initial: 3, reset: "longRest" }]);
+    expect(counters.saveActorDefs).toHaveBeenCalledWith([
+      { name: "rage", min: 0, max: 3, initial: 3, reset: "longRest" },
+    ]);
   });
 
   it("shows no counters row without a counters host", () => {
-    renderWithServices(<TitleBlock blueprint={blueprint} carrier="x" saving={false} lint={{ error: 0, warning: 0, info: 0 }} onShowIssues={vi.fn()} dispatch={vi.fn()} />);
+    renderWithServices(
+      <TitleBlock
+        blueprint={blueprint}
+        carrier="x"
+        saving={false}
+        lint={{ error: 0, warning: 0, info: 0 }}
+        onShowIssues={vi.fn()}
+        dispatch={vi.fn()}
+      />,
+    );
     expect(screen.queryByText("Counters")).not.toBeInTheDocument();
   });
 });

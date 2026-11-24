@@ -7,7 +7,7 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: "core", include: ["src/**/*.test.ts"], environment: "node" }
+        test: { name: "core", include: ["src/**/*.test.ts"], environment: "node" },
       },
       {
         extends: true,
@@ -15,9 +15,9 @@ export default defineConfig({
           name: "ui",
           include: ["src/**/*.test.tsx"],
           environment: "jsdom",
-          setupFiles: ["src/ui/test-setup.ts"]
-        }
-      }
-    ]
-  }
+          setupFiles: ["src/ui/test-setup.ts"],
+        },
+      },
+    ],
+  },
 });

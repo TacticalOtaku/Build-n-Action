@@ -11,21 +11,33 @@ import { normalizeSearch } from "../text-search";
 import { FieldList } from "./FieldList";
 
 /** Checks offered in the picker: "only this item" is the condition's own tick now; old blueprints keep the check. */
-const PICKABLE = CHECKS.filter(definition => definition.type !== "thisItem");
+const PICKABLE = CHECKS.filter((definition) => definition.type !== "thisItem");
 
-export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
-  node: BlueprintNode; upstream: readonly EventType[]; dispatch: Dispatch<EditorAction>; itemCarrier: boolean;
+export function ChecksEditor({
+  node,
+  upstream,
+  dispatch,
+  itemCarrier,
+}: {
+  node: BlueprintNode;
+  upstream: readonly EventType[];
+  dispatch: Dispatch<EditorAction>;
+  itemCarrier: boolean;
 }) {
   const t = useT();
   const { fmt } = useServices();
   const [picking, setPicking] = useState(false);
   const [query, setQuery] = useState("");
-  const checks = Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [];
-  const relevant = (definition: CheckDefinition) => !upstream.length || definition.relevantTo.some(event => upstream.includes(event));
+  const checks = Array.isArray(node.data.checks) ? (node.data.checks as ConditionCheck[]) : [];
+  const relevant = (definition: CheckDefinition) =>
+    !upstream.length || definition.relevantTo.some((event) => upstream.includes(event));
   const needle = normalizeSearch(query);
-  const candidates = PICKABLE.filter(definition => !needle
-    || normalizeSearch(t(`BNA.Check.${definition.type}.Label`)).includes(needle)
-    || normalizeSearch(t(`BNA.Check.${definition.type}.Summary`)).includes(needle));
+  const candidates = PICKABLE.filter(
+    (definition) =>
+      !needle ||
+      normalizeSearch(t(`BNA.Check.${definition.type}.Label`)).includes(needle) ||
+      normalizeSearch(t(`BNA.Check.${definition.type}.Summary`)).includes(needle),
+  );
 
   const add = (definition: CheckDefinition) => {
     dispatch({ type: "addCheck", nodeId: node.id, check: createCheck(definition.type) });
@@ -37,7 +49,11 @@ export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
     <section className="bna-inspector__section">
       <h3 className="bna-inspector__section-title">{t("BNA.UI.Inspector.checks")}</h3>
       <FieldList
-        fields={(itemCarrier || (node.data.thisItem === true)) ? CONDITION_NODE_FIELDS : CONDITION_NODE_FIELDS.filter(field => field.key !== "thisItem")}
+        fields={
+          itemCarrier || node.data.thisItem === true
+            ? CONDITION_NODE_FIELDS
+            : CONDITION_NODE_FIELDS.filter((field) => field.key !== "thisItem")
+        }
         data={node.data}
         path={[]}
         upstream={upstream}
@@ -45,7 +61,7 @@ export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
       />
       {checks.length ? null : <p className="bna-field__hint">{t("BNA.UI.Inspector.noChecks")}</p>}
       <div>
-        {checks.map(check => {
+        {checks.map((check) => {
           const definition = getCheck(check.type);
           if (!definition) return null;
           const label = t(`BNA.Check.${definition.type}.Label`);
@@ -65,13 +81,17 @@ export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
                 </button>
               </div>
               <p className="bna-check__summary">{definition.phrase(check.data, fmt)}</p>
-              {relevant(definition) ? null : <p className="bna-check__warning">{t("BNA.UI.Inspector.irrelevantCheck")}</p>}
+              {relevant(definition) ? null : (
+                <p className="bna-check__warning">{t("BNA.UI.Inspector.irrelevantCheck")}</p>
+              )}
               <FieldList
                 fields={definition.fields}
                 data={check.data}
                 path={[]}
                 upstream={upstream}
-                onChange={(path, value) => dispatch({ type: "setCheckData", nodeId: node.id, checkId: check.id, path, value })}
+                onChange={(path, value) =>
+                  dispatch({ type: "setCheckData", nodeId: node.id, checkId: check.id, path, value })
+                }
               />
             </section>
           );
@@ -83,22 +103,33 @@ export function ChecksEditor({ node, upstream, dispatch, itemCarrier }: {
             autoFocus
             aria-label={t("BNA.UI.Inspector.searchChecks")}
             value={query}
-            onChange={event => setQuery(event.target.value)}
-            onKeyDown={event => { if (event.key === "Escape") setPicking(false); }}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setPicking(false);
+            }}
           />
           <ul className="bna-check-picker__list">
-            {CHECK_CATEGORIES.map(category => {
-              const list = candidates.filter(definition => definition.category === category);
+            {CHECK_CATEGORIES.map((category) => {
+              const list = candidates.filter((definition) => definition.category === category);
               if (!list.length) return null;
               return (
                 <li key={category}>
                   <div className="bna-palette__group">{t(`BNA.Category.Check.${category}`)}</div>
                   <ul>
-                    {list.map(definition => (
+                    {list.map((definition) => (
                       <li key={definition.type}>
-                        <button type="button" className="bna-check-picker__item" data-relevant={relevant(definition)} onClick={() => add(definition)}>
-                          <span className="bna-palette__label">{t(`BNA.Check.${definition.type}.Label`)}</span>
-                          <span className="bna-palette__summary">{t(`BNA.Check.${definition.type}.Summary`)}</span>
+                        <button
+                          type="button"
+                          className="bna-check-picker__item"
+                          data-relevant={relevant(definition)}
+                          onClick={() => add(definition)}
+                        >
+                          <span className="bna-palette__label">
+                            {t(`BNA.Check.${definition.type}.Label`)}
+                          </span>
+                          <span className="bna-palette__summary">
+                            {t(`BNA.Check.${definition.type}.Summary`)}
+                          </span>
                         </button>
                       </li>
                     ))}

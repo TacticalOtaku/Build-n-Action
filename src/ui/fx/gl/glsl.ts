@@ -2,7 +2,14 @@ import type { FxFlavor } from "../flavors";
 
 /** Uniforms every flavour shader declares; the stage sets them all each frame. */
 export const SHADER_UNIFORMS = [
-  "u_resolution", "u_scale", "u_time", "u_seed", "u_intensity", "u_color0", "u_color1", "u_color2"
+  "u_resolution",
+  "u_scale",
+  "u_time",
+  "u_seed",
+  "u_intensity",
+  "u_color0",
+  "u_color1",
+  "u_color2",
 ] as const;
 
 /** A full-screen triangle; the fragment shader does all the work. */
@@ -304,7 +311,7 @@ void main() {
   vec3 color = mix(u_color0, u_color1, 0.5 + 0.5 * sin(field * 0.7 + t));
   color = mix(color, u_color2, contour);
   emit(color, (contour * 0.6 + echo) * fade + haze * 0.22);
-}`
+}`,
 };
 
 export function buildFragment(flavor: FxFlavor): string {

@@ -4,16 +4,31 @@ import { asRecord, asString } from "../../core/registry/data";
 import { useHost, useT } from "../services";
 
 /** A source reference, kept separate from effect names and system statuses. */
-export function EffectReferenceInput({ id, value, describedBy, onChange }: {
-  id: string; value: unknown; describedBy?: string; onChange(value: unknown): void;
+export function EffectReferenceInput({
+  id,
+  value,
+  describedBy,
+  onChange,
+}: {
+  id: string;
+  value: unknown;
+  describedBy?: string;
+  onChange(value: unknown): void;
 }) {
   const t = useT();
   const host = useHost().effectSelection;
   const selected = effectReference(value);
   const [draft, setDraft] = useState(() => asString(asRecord(value).uuid));
-  const [status, setStatus] = useState<"idle" | "pending" | "invalid">(() => value != null && !selected ? "invalid" : "idle");
+  const [status, setStatus] = useState<"idle" | "pending" | "invalid">(() =>
+    value != null && !selected ? "invalid" : "idle",
+  );
   const request = useRef(0);
-  useEffect(() => () => { request.current++; }, []);
+  useEffect(
+    () => () => {
+      request.current++;
+    },
+    [],
+  );
 
   const markUnresolved = (uuid: string) => {
     setStatus("invalid");
@@ -44,9 +59,13 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
   const choices = host?.choices() ?? [];
   return (
     <div
-      role="group" aria-labelledby={`${id}-label`} aria-describedby={describedBy}
-      onDragOver={event => { event.preventDefault(); }}
-      onDrop={event => {
+      role="group"
+      aria-labelledby={`${id}-label`}
+      aria-describedby={describedBy}
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
         event.preventDefault();
         event.stopPropagation();
         const drop = host?.parseDrop?.(event.dataTransfer.getData("text/plain")) ?? null;
@@ -59,33 +78,87 @@ export function EffectReferenceInput({ id, value, describedBy, onChange }: {
         void resolve(drop.uuid);
       }}
     >
-      {selected ? <p className="bna-field__hint" aria-label={t("BNA.Field.activeEffect.selected")}>{selected.name || selected.uuid}</p> : null}
+      {selected ? (
+        <p className="bna-field__hint" aria-label={t("BNA.Field.activeEffect.selected")}>
+          {selected.name || selected.uuid}
+        </p>
+      ) : null}
       {host ? (
         <>
           <select
-            id={id} className="bna-select" aria-label={t("BNA.Field.activeEffect.choose")}
-            value={selected?.uuid ?? ""} onChange={event => { if (event.target.value) void resolve(event.target.value); }}
+            id={id}
+            className="bna-select"
+            aria-label={t("BNA.Field.activeEffect.choose")}
+            value={selected?.uuid ?? ""}
+            onChange={(event) => {
+              if (event.target.value) void resolve(event.target.value);
+            }}
           >
             <option value="">{t("BNA.Field.activeEffect.choose")}</option>
-            {selected && !choices.some(ref => ref.uuid === selected.uuid) ? <option value={selected.uuid}>{selected.name || selected.uuid}</option> : null}
-            {choices.map(ref => <option key={ref.uuid} value={ref.uuid}>{ref.name || ref.uuid}</option>)}
+            {selected && !choices.some((ref) => ref.uuid === selected.uuid) ? (
+              <option value={selected.uuid}>{selected.name || selected.uuid}</option>
+            ) : null}
+            {choices.map((ref) => (
+              <option key={ref.uuid} value={ref.uuid}>
+                {ref.name || ref.uuid}
+              </option>
+            ))}
           </select>
-          <label className="bna-field__label" htmlFor={`${id}-uuid`}>{t("BNA.Field.activeEffect.uuid")}</label>
+          <label className="bna-field__label" htmlFor={`${id}-uuid`}>
+            {t("BNA.Field.activeEffect.uuid")}
+          </label>
           <input
-            id={`${id}-uuid`} className="bna-input" value={draft} aria-invalid={status === "invalid"}
+            id={`${id}-uuid`}
+            className="bna-input"
+            value={draft}
+            aria-invalid={status === "invalid"}
             aria-describedby={status === "invalid" ? `${id}-error` : describedBy}
-            onChange={event => { request.current++; setDraft(event.target.value); setStatus("idle"); }}
-            onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); void resolve(draft); } }}
+            onChange={(event) => {
+              request.current++;
+              setDraft(event.target.value);
+              setStatus("idle");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void resolve(draft);
+              }
+            }}
           />
-          <button type="button" className="bna-button" onClick={() => { void resolve(draft); }}>{t("BNA.Field.activeEffect.resolve")}</button>
+          <button
+            type="button"
+            className="bna-button"
+            onClick={() => {
+              void resolve(draft);
+            }}
+          >
+            {t("BNA.Field.activeEffect.resolve")}
+          </button>
           <p className="bna-field__hint">{t("BNA.Field.activeEffect.dropHint")}</p>
         </>
-      ) : <p className="bna-field__hint">{t("BNA.Field.activeEffect.unavailable")}</p>}
+      ) : (
+        <p className="bna-field__hint">{t("BNA.Field.activeEffect.unavailable")}</p>
+      )}
       {value != null ? (
-        <button type="button" className="bna-button" onClick={() => { request.current++; setDraft(""); setStatus("idle"); onChange(null); }}>{t("BNA.Field.activeEffect.clear")}</button>
+        <button
+          type="button"
+          className="bna-button"
+          onClick={() => {
+            request.current++;
+            setDraft("");
+            setStatus("idle");
+            onChange(null);
+          }}
+        >
+          {t("BNA.Field.activeEffect.clear")}
+        </button>
       ) : null}
       {status === "pending" ? <p role="status">{t("BNA.Field.activeEffect.pending")}</p> : null}
-      {status === "invalid" ? <p id={`${id}-error`} role="alert">{t("BNA.Field.activeEffect.invalid")}</p> : null}
+      {status === "invalid" ? (
+        <p id={`${id}-error`} role="alert">
+          {t("BNA.Field.activeEffect.invalid")}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -27,7 +27,7 @@ export function nodeLints(issues: readonly LintIssue[], t: Translator["t"]): Rec
   const byNode: Record<string, { level: LintLevel; messages: string[] }> = {};
   for (const issue of sortIssues(issues)) {
     if (!issue.nodeId) continue;
-    const entry = byNode[issue.nodeId] ??= { level: issue.level, messages: [] };
+    const entry = (byNode[issue.nodeId] ??= { level: issue.level, messages: [] });
     entry.messages.push(lintMessage(issue, t));
   }
   return byNode;

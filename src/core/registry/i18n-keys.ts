@@ -11,9 +11,27 @@ const NODE_TEXT = ["Label", "Summary", "Help"] as const;
 
 /** Glue used by the phrase formatter and sentence builder. */
 const PHRASE_KEYS = [
-  "Sentence", "SentenceIf", "Then", "ThenIf", "And", "Or", "Not", "Any", "NotValues", "ButNot", "Optional", "Cost", "Unset",
-  "Limit.turn", "Limit.round", "Limit.shortRest", "Limit.longRest",
-  "Outcome.succeeded", "Outcome.failed", "OutcomeIf.succeeded", "OutcomeIf.failed"
+  "Sentence",
+  "SentenceIf",
+  "Then",
+  "ThenIf",
+  "And",
+  "Or",
+  "Not",
+  "Any",
+  "NotValues",
+  "ButNot",
+  "Optional",
+  "Cost",
+  "Unset",
+  "Limit.turn",
+  "Limit.round",
+  "Limit.shortRest",
+  "Limit.longRest",
+  "Outcome.succeeded",
+  "Outcome.failed",
+  "OutcomeIf.succeeded",
+  "OutcomeIf.failed",
 ] as const;
 
 /**
@@ -22,13 +40,14 @@ const PHRASE_KEYS = [
  */
 export function requiredI18nKeys(): string[] {
   const keys = new Set<string>();
-  const addFields = (fields: readonly FieldSpec[]) => walkFields(fields, field => {
-    keys.add(field.label);
-    if (field.hint) keys.add(field.hint);
-    if (((field.kind === "select") || (field.kind === "multiselect")) && ("static" in field.choices)) {
-      for (const choice of field.choices.static) keys.add(choice.label);
-    }
-  });
+  const addFields = (fields: readonly FieldSpec[]) =>
+    walkFields(fields, (field) => {
+      keys.add(field.label);
+      if (field.hint) keys.add(field.hint);
+      if ((field.kind === "select" || field.kind === "multiselect") && "static" in field.choices) {
+        for (const choice of field.choices.static) keys.add(choice.label);
+      }
+    });
 
   for (const kind of NODE_KINDS) keys.add(`BNA.Kind.${kind}`);
   for (const pin of PIN_IDS) {
@@ -66,7 +85,8 @@ export function requiredI18nKeys(): string[] {
   keys.add("BNA.Result.demandSave.DcSpell");
   keys.add("BNA.Result.demandSave.DcFormula");
   for (const who of ["self", "target"]) {
-    for (const action of ["add", "subtract", "set", "reset"]) keys.add(`BNA.Result.counter.Phrase.${who}.${action}`);
+    for (const action of ["add", "subtract", "set", "reset"])
+      keys.add(`BNA.Result.counter.Phrase.${who}.${action}`);
     keys.add(`BNA.Check.counter.Phrase.${who}`);
   }
   addFields(COMMON_RESULT_FIELDS);

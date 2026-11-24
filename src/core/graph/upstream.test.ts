@@ -9,14 +9,14 @@ const graph = {
     makeCondition("if", []),
     makeCondition("dangling", []),
     makeNode("result", "rollBonus", "bonus"),
-    makeNode("result", "reminder", "loose")
+    makeNode("result", "reminder", "loose"),
   ],
   edges: [
     makeEdge("dmg", "out", "if"),
     makeEdge("after", "hit", "if"),
     makeEdge("if", "yes", "bonus"),
-    makeEdge("dmg", "out", "dangling")
-  ]
+    makeEdge("dmg", "out", "dangling"),
+  ],
 };
 
 describe("upstreamEvents", () => {
@@ -41,7 +41,7 @@ describe("upstreamEvents", () => {
 describe("resultEvents", () => {
   const chained = {
     nodes: [...graph.nodes, makeCondition("after-then", [])],
-    edges: [...graph.edges, makeEdge("bonus", "then", "after-then")]
+    edges: [...graph.edges, makeEdge("bonus", "then", "after-then")],
   };
 
   it("gives the events a result placed here would follow", () => {
@@ -51,8 +51,12 @@ describe("resultEvents", () => {
 
   it("names a demanded save's branch by the pin it leaves from", () => {
     const save = {
-      nodes: [makeNode("event", "afterAttack", "hit"), makeNode("result", "demandSave", "save"), makeCondition("branch", [])],
-      edges: [makeEdge("hit", "hit", "save"), makeEdge("save", "failed", "branch")]
+      nodes: [
+        makeNode("event", "afterAttack", "hit"),
+        makeNode("result", "demandSave", "save"),
+        makeCondition("branch", []),
+      ],
+      edges: [makeEdge("hit", "hit", "save"), makeEdge("save", "failed", "branch")],
     };
     expect(resultEvents(save, "save", "failed")).toEqual(["demandedSave"]);
     expect(resultEvents(save, "branch")).toEqual(["demandedSave"]);

@@ -42,7 +42,7 @@ export function sortIntents(intents: readonly ChainIntent[]): SortedIntents {
     }
     choice.intents.push(intent);
     const cost = readCost(intent.common.cost);
-    if ((choice.cost.type === "none") && (cost.type !== "none")) choice.cost = cost;
+    if (choice.cost.type === "none" && cost.type !== "none") choice.cost = cost;
   }
   return sorted;
 }
@@ -115,7 +115,7 @@ export function readCost(value: unknown): CostSpec {
     max: asString(cost.max),
     step: asNumber(cost.step) ?? 1,
     scales: asBoolean(cost.scales),
-    formula: asString(cost.formula)
+    formula: asString(cost.formula),
   };
 }
 
@@ -124,31 +124,43 @@ export function resolveCost(cost: CostSpec, evaluate: (formula: string) => numbe
   const number = (formula: string) => (formula.trim() ? evaluate(formula) : null);
   let min = number(cost.min) ?? 1;
   let max = number(cost.max);
-  if ((max !== null) && (min > max)) [min, max] = [max, min];
+  if (max !== null && min > max) [min, max] = [max, min];
   return { ...cost, min, max };
 }
 
 function slotsFrom(state: CostState, min: number) {
-  return state.slots.filter(slot => slot.value && slot.max && slot.level && (slot.level >= min));
+  return state.slots.filter((slot) => slot.value && slot.max && slot.level && slot.level >= min);
 }
 
 function hitDiceAvailable(cost: ResolvedCost, state: CostState): number {
   if (!state.hitDice) return 0;
-  return ["smallest", "largest"].includes(cost.subtype) ? state.hitDice.value : (state.hitDice.bySize[cost.subtype] ?? 0);
+  return ["smallest", "largest"].includes(cost.subtype)
+    ? state.hitDice.value
+    : (state.hitDice.bySize[cost.subtype] ?? 0);
 }
 
 function valid(cost: ResolvedCost, state: CostState): boolean {
-  const invalidScale = cost.scales && ((cost.max ?? Infinity) < cost.min);
+  const invalidScale = cost.scales && (cost.max ?? Infinity) < cost.min;
   switch (cost.type) {
-    case "uses": return !invalidScale && !!state.uses?.limited && (cost.min > 0);
-    case "quantity": return !invalidScale && (state.quantity !== null) && (cost.min > 0);
-    case "effect": return true;
+    case "uses":
+      return !invalidScale && !!state.uses?.limited && cost.min > 0;
+    case "quantity":
+      return !invalidScale && state.quantity !== null && cost.min > 0;
+    case "effect":
+      return true;
     case "health":
-    case "slots": return !invalidScale && (cost.min > 0);
-    case "currency": return !invalidScale && state.currencies.includes(cost.subtype) && (cost.min > 0);
-    case "inspiration": return true;
-    case "hitdice": return !invalidScale && ["smallest", "largest", ...state.hitDieTypes].includes(cost.subtype) && (cost.min > 0);
-    default: return false;
+    case "slots":
+      return !invalidScale && cost.min > 0;
+    case "currency":
+      return !invalidScale && state.currencies.includes(cost.subtype) && cost.min > 0;
+    case "inspiration":
+      return true;
+    case "hitdice":
+      return (
+        !invalidScale && ["smallest", "largest", ...state.hitDieTypes].includes(cost.subtype) && cost.min > 0
+      );
+    default:
+      return false;
   }
 }
 
@@ -158,15 +170,24 @@ export function costAvailable(cost: ResolvedCost, state: CostState): boolean {
   if (!valid(cost, state) || !state.owner) return false;
   const hp = state.hp;
   switch (cost.type) {
-    case "uses": return (state.uses?.value ?? 0) >= cost.min;
-    case "quantity": return (state.quantity ?? 0) >= cost.min;
-    case "effect": return state.effect;
-    case "slots": return slotsFrom(state, cost.min).length > 0;
-    case "health": return !!hp && ((hp.value + hp.temp) >= cost.min);
-    case "currency": return (state.currency?.[cost.subtype] ?? 0) >= cost.min;
-    case "inspiration": return (state.actorType === "character") && (state.inspiration === true);
-    case "hitdice": return (state.actorType === "character") && (hitDiceAvailable(cost, state) >= cost.min);
-    default: return false;
+    case "uses":
+      return (state.uses?.value ?? 0) >= cost.min;
+    case "quantity":
+      return (state.quantity ?? 0) >= cost.min;
+    case "effect":
+      return state.effect;
+    case "slots":
+      return slotsFrom(state, cost.min).length > 0;
+    case "health":
+      return !!hp && hp.value + hp.temp >= cost.min;
+    case "currency":
+      return (state.currency?.[cost.subtype] ?? 0) >= cost.min;
+    case "inspiration":
+      return state.actorType === "character" && state.inspiration === true;
+    case "hitdice":
+      return state.actorType === "character" && hitDiceAvailable(cost, state) >= cost.min;
+    default:
+      return false;
   }
 }
 
@@ -182,9 +203,9 @@ export function costScales(cost: ResolvedCost, state: CostState): boolean {
 export function lowestSlot(state: CostState, min: number): CostState["slots"][number] | null {
   const slots = slotsFrom(state, min);
   if (!slots.length) return null;
-  const level = Math.min(...slots.map(slot => slot.level));
-  const lowest = slots.filter(slot => slot.level === level);
-  return lowest.find(slot => !slot.key.startsWith("spell")) ?? lowest[0] ?? null;
+  const level = Math.min(...slots.map((slot) => slot.level));
+  const lowest = slots.filter((slot) => slot.level === level);
+  return lowest.find((slot) => !slot.key.startsWith("spell")) ?? lowest[0] ?? null;
 }
 
 function stepped(from: number, to: number, step: number, available: string, min: number): CostOption[] {
@@ -204,20 +225,24 @@ export interface ClassHitDice {
 }
 
 /** New `spent` values after spending `amount` hit dice of a size, or the smallest/largest first (v1 buildHitDiceUpdates). */
-export function hitDiceSpend(classes: readonly ClassHitDice[], subtype: string, amount: number): { id: string; spent: number }[] {
+export function hitDiceSpend(
+  classes: readonly ClassHitDice[],
+  subtype: string,
+  amount: number,
+): { id: string; spent: number }[] {
   const bySize = ["smallest", "largest"].includes(subtype);
-  let eligible = classes.filter(cls => bySize || (cls.denomination === subtype));
+  let eligible = classes.filter((cls) => bySize || cls.denomination === subtype);
   if (bySize) {
     eligible = [...eligible].sort((left, right) => {
       const order = left.denomination.localeCompare(right.denomination, "en", { numeric: true });
-      return (subtype === "largest") ? -order : order;
+      return subtype === "largest" ? -order : order;
     });
   }
   const updates: { id: string; spent: number }[] = [];
   let remaining = Math.trunc(amount);
   for (const cls of eligible) {
-    const available = ((remaining > 0) ? cls.levels : 0) - cls.spent;
-    const delta = (remaining > 0) ? Math.min(remaining, available) : Math.max(remaining, available);
+    const available = (remaining > 0 ? cls.levels : 0) - cls.spent;
+    const delta = remaining > 0 ? Math.min(remaining, available) : Math.max(remaining, available);
     if (!delta) continue;
     updates.push({ id: cls.id, spent: cls.spent + delta });
     remaining -= delta;
@@ -235,13 +260,22 @@ export function costOptions(cost: ResolvedCost, state: CostState): CostOption[] 
   const hpAvailable = hp ? Math.max(0, hp.value) + Math.max(0, hp.temp) : 0;
   const available = (() => {
     switch (cost.type) {
-      case "uses": return uses ? `${uses.value}/${uses.max}` : "";
-      case "quantity": return String(state.quantity ?? 0);
-      case "health": return hp ? `${hpAvailable}/${Math.max(0, hp.max) + Math.max(0, hp.tempmax)}` : "";
-      case "currency": return String(state.currency?.[cost.subtype] ?? 0);
-      case "hitdice": return state.hitDice ? (["smallest", "largest"].includes(cost.subtype)
-        ? `${state.hitDice.value}/${state.hitDice.max}` : String(hitDiceAvailable(cost, state))) : "";
-      default: return "";
+      case "uses":
+        return uses ? `${uses.value}/${uses.max}` : "";
+      case "quantity":
+        return String(state.quantity ?? 0);
+      case "health":
+        return hp ? `${hpAvailable}/${Math.max(0, hp.max) + Math.max(0, hp.tempmax)}` : "";
+      case "currency":
+        return String(state.currency?.[cost.subtype] ?? 0);
+      case "hitdice":
+        return state.hitDice
+          ? ["smallest", "largest"].includes(cost.subtype)
+            ? `${state.hitDice.value}/${state.hitDice.max}`
+            : String(hitDiceAvailable(cost, state))
+          : "";
+      default:
+        return "";
     }
   })();
 
@@ -257,14 +291,17 @@ export function costOptions(cost: ResolvedCost, state: CostState): CostOption[] 
   switch (cost.type) {
     case "uses":
     case "quantity": {
-      const have = (cost.type === "uses") ? (uses?.value ?? 0) : (state.quantity ?? 0);
+      const have = cost.type === "uses" ? (uses?.value ?? 0) : (state.quantity ?? 0);
       return stepped(Math.max(1, min), Math.min(have, max), 1, available, min);
     }
     case "slots":
       return slotsFrom(state, min)
-        .sort((a, b) => (a.level - b.level) || a.key.localeCompare(b.key))
-        .map(slot => ({
-          value: slot.key, amount: 1, scale: Math.min(slot.level - min, max - 1), available: `${slot.value}/${slot.max}`
+        .sort((a, b) => a.level - b.level || a.key.localeCompare(b.key))
+        .map((slot) => ({
+          value: slot.key,
+          amount: 1,
+          scale: Math.min(slot.level - min, max - 1),
+          available: `${slot.value}/${slot.max}`,
         }));
     case "health": {
       const capacity = hp ? Math.max(0, hp.max) + Math.max(0, hp.tempmax) : 0;

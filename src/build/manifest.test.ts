@@ -17,39 +17,42 @@ describe("createManifest", () => {
       changelog: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/CHANGELOG.md",
       bugs: "https://github.com/TacticalOtaku/Build-n-Action/issues",
       license: "https://github.com/TacticalOtaku/Build-n-Action/blob/main/LICENSE",
-      socket: true
+      socket: true,
     });
     expect(manifest.media).toEqual([
       {
         type: "cover",
         url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-graph.png",
-        caption: "Visual When → If → Then blueprint editor and inspector in dark theme"
+        caption: "Visual When → If → Then blueprint editor and inspector in dark theme",
       },
       {
         type: "screenshot",
         url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-test-simulator.png",
-        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses"
+        caption: "Built-in Test simulator showing evaluated steps and applied roll bonuses",
       },
       {
         type: "screenshot",
         url: "https://raw.githubusercontent.com/TacticalOtaku/Build-n-Action/main/docs/screenshots/editor-templates.png",
-        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets"
-      }
+        caption: "Built-in template gallery with 14 ready-to-use D&D 5e blueprint presets",
+      },
     ]);
     expect(manifest.relationships.systems).toEqual([
-      { id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } }
+      { id: "dnd5e", type: "system", compatibility: { minimum: "5.3.3", verified: "5.3.3" } },
     ]);
   });
 
   it("recommends Midi QOL 14.0.12 and DAE 14.0.14", () => {
     expect(manifest.relationships.recommends).toEqual([
       { id: "midi-qol", type: "module", compatibility: { minimum: "14.0.12", verified: "14.0.12" } },
-      { id: "dae", type: "module", compatibility: { minimum: "14.0.14", verified: "14.0.14" } }
+      { id: "dae", type: "module", compatibility: { minimum: "14.0.14", verified: "14.0.14" } },
     ]);
   });
 
   it("ships English and Russian", () => {
-    expect(manifest.languages.map(language => [language.lang, language.path])).toEqual([["en", "lang/en.json"], ["ru", "lang/ru.json"]]);
+    expect(manifest.languages.map((language) => [language.lang, language.path])).toEqual([
+      ["en", "lang/en.json"],
+      ["ru", "lang/ru.json"],
+    ]);
   });
 
   it("declares the region behavior that hears tokens entering and leaving", () => {
@@ -58,7 +61,7 @@ describe("createManifest", () => {
 
   it("points the download at the release of this version", () => {
     expect(createManifest("2.1.0").download).toBe(
-      "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.1.0/build-n-action-v2.1.0.zip"
+      "https://github.com/TacticalOtaku/Build-n-Action/releases/download/v2.1.0/build-n-action-v2.1.0.zip",
     );
   });
 });

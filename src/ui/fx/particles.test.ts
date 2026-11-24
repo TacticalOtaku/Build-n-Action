@@ -4,9 +4,17 @@ import { MAX_PARTICLES, ParticleSystem, seededRandom } from "./particles";
 
 function spec(overrides: Partial<FlavorSpec> = {}): FlavorSpec {
   return {
-    shape: "mote", rate: 10, life: [5, 5], vx: [0, 0], vy: [0, 0], size: [1, 1], gravity: 0, spawn: "anywhere", overlay: 1,
+    shape: "mote",
+    rate: 10,
+    life: [5, 5],
+    vx: [0, 0],
+    vy: [0, 0],
+    size: [1, 1],
+    gravity: 0,
+    spawn: "anywhere",
+    overlay: 1,
     colors: { dark: ["#fff"], light: ["#000"] },
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -59,7 +67,7 @@ describe("ParticleSystem", () => {
     const { x, y } = particle;
     fx.step(0.5, 0);
     expect(particle.x).toBeCloseTo(x + 5);
-    expect(particle.y).toBeCloseTo(y + ((-20 - 5) * 0.5));
+    expect(particle.y).toBeCloseTo(y + (-20 - 5) * 0.5);
   });
 
   it("is deterministic for a given seed", () => {

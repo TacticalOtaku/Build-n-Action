@@ -48,7 +48,10 @@ declare global {
     update(changes: Record<string, unknown>): Promise<unknown>;
     setFlag(scope: string, key: string, value: unknown): Promise<unknown>;
     getRollData?(options?: { deterministic?: boolean }): Record<string, unknown>;
-    readonly sheet?: { render(options?: Record<string, unknown>): unknown; close?(): Promise<unknown> } | null;
+    readonly sheet?: {
+      render(options?: Record<string, unknown>): unknown;
+      close?(): Promise<unknown>;
+    } | null;
     createEmbeddedDocuments?(name: string, data: Record<string, unknown>[]): Promise<FoundryDocument[]>;
     deleteEmbeddedDocuments?(name: string, ids: string[]): Promise<unknown>;
   }
@@ -102,7 +105,11 @@ declare global {
   interface RollClass {
     new (formula: string, data?: Record<string, unknown>): RollLike;
     create(formula: string, data?: Record<string, unknown>): RollLike;
-    replaceFormulaData(formula: string, data: Record<string, unknown>, options?: { missing?: string | number; warn?: boolean }): string;
+    replaceFormulaData(
+      formula: string,
+      data: Record<string, unknown>,
+      options?: { missing?: string | number; warn?: boolean },
+    ): string;
     validate(formula: string): boolean;
     fromTerms(terms: unknown[]): RollLike;
   }
@@ -181,13 +188,17 @@ declare global {
     readonly actors: Iterable<FoundryDocument>;
     readonly items: Iterable<FoundryDocument>;
     readonly packs: Iterable<CompendiumLike> & { get(id: string): CompendiumLike | undefined };
-    readonly modules: { get(id: string): { readonly active: boolean; readonly version: string; api?: unknown } | undefined };
-    readonly combat: (FoundryDocument & {
-      readonly started: boolean;
-      readonly round: number;
-      readonly turn: number | null;
-      readonly turns: unknown[];
-    }) | null;
+    readonly modules: {
+      get(id: string): { readonly active: boolean; readonly version: string; api?: unknown } | undefined;
+    };
+    readonly combat:
+      | (FoundryDocument & {
+          readonly started: boolean;
+          readonly round: number;
+          readonly turn: number | null;
+          readonly turns: unknown[];
+        })
+      | null;
     readonly socket: {
       /** Foundry passes the id of the user who sent the message; the message itself cannot be trusted to say. */
       on(channel: string, fn: (message: unknown, senderId: string) => void): void;
@@ -221,11 +232,16 @@ declare global {
     readonly canvas: {
       readonly animation: {
         readonly CanvasAnimation: {
-          animate(attributes: { parent: unknown; attribute: string; to: number }[], options: { name: string; duration: number }): Promise<unknown>;
+          animate(
+            attributes: { parent: unknown; attribute: string; to: number }[],
+            options: { name: string; duration: number },
+          ): Promise<unknown>;
         };
       };
       readonly geometry: {
-        readonly ClockwiseSweepPolygon: { create(origin: { x: number; y: number }, config: Record<string, unknown>): ShapeLike };
+        readonly ClockwiseSweepPolygon: {
+          create(origin: { x: number; y: number }, config: Record<string, unknown>): ShapeLike;
+        };
       };
     };
     readonly dice: {
@@ -260,7 +276,9 @@ declare global {
       };
       readonly ux: {
         readonly TextEditor: {
-          readonly implementation: { enrichHTML(content: string, options?: Record<string, unknown>): Promise<string> };
+          readonly implementation: {
+            enrichHTML(content: string, options?: Record<string, unknown>): Promise<string>;
+          };
         };
       };
     };

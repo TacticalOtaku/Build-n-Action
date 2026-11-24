@@ -1,6 +1,12 @@
 import { createEdge } from "../../core/blueprint/factory";
 import { randomId } from "../../core/blueprint/ids";
-import type { BlueprintNode, BlueprintSource, ConditionCheck, CounterDef, Position } from "../../core/blueprint/types";
+import type {
+  BlueprintNode,
+  BlueprintSource,
+  ConditionCheck,
+  CounterDef,
+  Position,
+} from "../../core/blueprint/types";
 import { canConnect, outputPins } from "../../core/graph/connections";
 import type { PinId } from "../../core/registry/constants";
 
@@ -14,7 +20,7 @@ export function setIn<T>(target: T, path: readonly string[], value: unknown): T 
     copy[Number(head)] = setIn(copy[Number(head)], rest, value);
     return copy as T;
   }
-  const record = (source && (typeof source === "object")) ? source as Record<string, unknown> : {};
+  const record = source && typeof source === "object" ? (source as Record<string, unknown>) : {};
   return { ...record, [head]: setIn(record[head], rest, value) } as T;
 }
 
@@ -61,9 +67,13 @@ function commit(state: EditorState, blueprint: BlueprintSource): EditorState {
   return { ...state, blueprint, past, future: [], dragOrigin: null };
 }
 
-function mapNode(blueprint: BlueprintSource, id: string, update: (node: BlueprintNode) => BlueprintNode): BlueprintSource {
+function mapNode(
+  blueprint: BlueprintSource,
+  id: string,
+  update: (node: BlueprintNode) => BlueprintNode,
+): BlueprintSource {
   let changed = false;
-  const nodes = blueprint.nodes.map(node => {
+  const nodes = blueprint.nodes.map((node) => {
     if (node.id !== id) return node;
     const next = update(node);
     if (next !== node) changed = true;
@@ -75,27 +85,27 @@ function mapNode(blueprint: BlueprintSource, id: string, update: (node: Blueprin
 function mapChecks(
   blueprint: BlueprintSource,
   nodeId: string,
-  update: (checks: ConditionCheck[]) => ConditionCheck[]
+  update: (checks: ConditionCheck[]) => ConditionCheck[],
 ): BlueprintSource {
-  return mapNode(blueprint, nodeId, node => {
+  return mapNode(blueprint, nodeId, (node) => {
     if (node.kind !== "condition") return node;
-    const checks = Array.isArray(node.data.checks) ? node.data.checks as ConditionCheck[] : [];
+    const checks = Array.isArray(node.data.checks) ? (node.data.checks as ConditionCheck[]) : [];
     return { ...node, data: { ...node.data, checks: update(checks) } };
   });
 }
 
 /** Drop wires leaving a result's outputs that no longer exist (its "And then" was turned off). */
 function pruneOutputs(blueprint: BlueprintSource, nodeId: string): BlueprintSource {
-  const node = blueprint.nodes.find(candidate => candidate.id === nodeId);
+  const node = blueprint.nodes.find((candidate) => candidate.id === nodeId);
   if (node?.kind !== "result") return blueprint;
   const pins = outputPins(node);
-  const edges = blueprint.edges.filter(edge => (edge.source !== nodeId) || pins.includes(edge.sourcePin));
-  return (edges.length === blueprint.edges.length) ? blueprint : { ...blueprint, edges };
+  const edges = blueprint.edges.filter((edge) => edge.source !== nodeId || pins.includes(edge.sourcePin));
+  return edges.length === blueprint.edges.length ? blueprint : { ...blueprint, edges };
 }
 
 function keepExisting(selection: readonly string[], blueprint: BlueprintSource): string[] {
-  const ids = new Set(blueprint.nodes.map(node => node.id));
-  return selection.filter(id => ids.has(id));
+  const ids = new Set(blueprint.nodes.map((node) => node.id));
+  return selection.filter((id) => ids.has(id));
 }
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
@@ -114,20 +124,20 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     }
 
     case "moveNode": {
-      const next = mapNode(blueprint, action.id, node => ({ ...node, position: { ...action.position } }));
+      const next = mapNode(blueprint, action.id, (node) => ({ ...node, position: { ...action.position } }));
       if (action.dragging) return { ...state, blueprint: next, dragOrigin: state.dragOrigin ?? blueprint };
       return commit(state, next);
     }
 
     case "removeNodes": {
       const ids = new Set(action.ids);
-      if (!blueprint.nodes.some(node => ids.has(node.id))) return state;
+      if (!blueprint.nodes.some((node) => ids.has(node.id))) return state;
       const next: BlueprintSource = {
         ...blueprint,
-        nodes: blueprint.nodes.filter(node => !ids.has(node.id)),
-        edges: blueprint.edges.filter(edge => !ids.has(edge.source) && !ids.has(edge.target))
+        nodes: blueprint.nodes.filter((node) => !ids.has(node.id)),
+        edges: blueprint.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target)),
       };
-      return { ...commit(state, next), selection: state.selection.filter(id => !ids.has(id)) };
+      return { ...commit(state, next), selection: state.selection.filter((id) => !ids.has(id)) };
     }
 
     case "connect": {
@@ -138,37 +148,57 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
 
     case "removeEdges": {
       const ids = new Set(action.ids);
-      const edges = blueprint.edges.filter(edge => !ids.has(edge.id));
-      return (edges.length === blueprint.edges.length) ? state : commit(state, { ...blueprint, edges });
+      const edges = blueprint.edges.filter((edge) => !ids.has(edge.id));
+      return edges.length === blueprint.edges.length ? state : commit(state, { ...blueprint, edges });
     }
 
     case "setNodeData": {
-      const next = mapNode(blueprint, action.id, node => ({ ...node, data: setIn(node.data, action.path, action.value) }));
+      const next = mapNode(blueprint, action.id, (node) => ({
+        ...node,
+        data: setIn(node.data, action.path, action.value),
+      }));
       return commit(state, pruneOutputs(next, action.id));
     }
 
     case "addCheck":
-      return commit(state, mapChecks(blueprint, action.nodeId, checks => [...checks, action.check]));
+      return commit(
+        state,
+        mapChecks(blueprint, action.nodeId, (checks) => [...checks, action.check]),
+      );
 
     case "removeCheck":
-      return commit(state, mapChecks(blueprint, action.nodeId, checks => checks.filter(check => check.id !== action.checkId)));
+      return commit(
+        state,
+        mapChecks(blueprint, action.nodeId, (checks) =>
+          checks.filter((check) => check.id !== action.checkId),
+        ),
+      );
 
     case "setCheckData":
-      return commit(state, mapChecks(blueprint, action.nodeId, checks => checks.map(check => {
-        return (check.id === action.checkId) ? { ...check, data: setIn(check.data, action.path, action.value) } : check;
-      })));
+      return commit(
+        state,
+        mapChecks(blueprint, action.nodeId, (checks) =>
+          checks.map((check) => {
+            return check.id === action.checkId
+              ? { ...check, data: setIn(check.data, action.path, action.value) }
+              : check;
+          }),
+        ),
+      );
 
     case "rename":
-      return (action.name === blueprint.name) ? state : commit(state, { ...blueprint, name: action.name });
+      return action.name === blueprint.name ? state : commit(state, { ...blueprint, name: action.name });
 
     case "setEnabled":
-      return (action.enabled === blueprint.enabled) ? state : commit(state, { ...blueprint, enabled: action.enabled });
+      return action.enabled === blueprint.enabled
+        ? state
+        : commit(state, { ...blueprint, enabled: action.enabled });
 
     case "setCounters":
-      return commit(state, { ...blueprint, counters: action.counters.map(def => ({ ...def })) });
+      return commit(state, { ...blueprint, counters: action.counters.map((def) => ({ ...def })) });
 
     case "layout": {
-      const nodes = blueprint.nodes.map(node => {
+      const nodes = blueprint.nodes.map((node) => {
         const position = action.positions[node.id];
         return position ? { ...node, position: { ...position } } : node;
       });
@@ -178,23 +208,29 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case "duplicateNodes": {
       const ids = new Set(action.ids);
       const renamed = new Map<string, string>();
-      const copies = blueprint.nodes.filter(node => ids.has(node.id)).map(node => {
-        const id = randomId(8);
-        renamed.set(node.id, id);
-        return {
-          ...structuredClone(node),
-          id,
-          position: { x: node.position.x + action.offset.x, y: node.position.y + action.offset.y }
-        };
-      });
+      const copies = blueprint.nodes
+        .filter((node) => ids.has(node.id))
+        .map((node) => {
+          const id = randomId(8);
+          renamed.set(node.id, id);
+          return {
+            ...structuredClone(node),
+            id,
+            position: { x: node.position.x + action.offset.x, y: node.position.y + action.offset.y },
+          };
+        });
       if (!copies.length) return state;
-      const edges = blueprint.edges.flatMap(edge => {
+      const edges = blueprint.edges.flatMap((edge) => {
         const source = renamed.get(edge.source);
         const target = renamed.get(edge.target);
-        return (source && target) ? [createEdge(source, edge.sourcePin, target)] : [];
+        return source && target ? [createEdge(source, edge.sourcePin, target)] : [];
       });
-      const next: BlueprintSource = { ...blueprint, nodes: [...blueprint.nodes, ...copies], edges: [...blueprint.edges, ...edges] };
-      return { ...commit(state, next), selection: copies.map(node => node.id) };
+      const next: BlueprintSource = {
+        ...blueprint,
+        nodes: [...blueprint.nodes, ...copies],
+        edges: [...blueprint.edges, ...edges],
+      };
+      return { ...commit(state, next), selection: copies.map((node) => node.id) };
     }
 
     case "select":
@@ -209,7 +245,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         past: state.past.slice(0, -1),
         future: [blueprint, ...state.future],
         dragOrigin: null,
-        selection: keepExisting(state.selection, previous)
+        selection: keepExisting(state.selection, previous),
       };
     }
 
@@ -222,7 +258,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         past: [...state.past, blueprint].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
         dragOrigin: null,
-        selection: keepExisting(state.selection, next)
+        selection: keepExisting(state.selection, next),
       };
     }
   }

@@ -4,10 +4,19 @@ import { modifyDie, resolveModifiers, type DieLike, type ModifierSpec } from "./
 const off = { enabled: false, value: "" };
 
 function spec(data: Record<string, unknown>): ModifierSpec {
-  const resolved = resolveModifiers({
-    amount: { ...off, mode: "add" }, size: { ...off, mode: "add" }, reroll: off, explode: off, minimum: off, maximum: off,
-    firstOnly: false, ...data
-  }, formula => (Number.isFinite(Number(formula)) ? Number(formula) : null));
+  const resolved = resolveModifiers(
+    {
+      amount: { ...off, mode: "add" },
+      size: { ...off, mode: "add" },
+      reroll: off,
+      explode: off,
+      minimum: off,
+      maximum: off,
+      firstOnly: false,
+      ...data,
+    },
+    (formula) => (Number.isFinite(Number(formula)) ? Number(formula) : null),
+  );
   if (!resolved) throw new Error("no modifiers");
   return resolved;
 }
@@ -29,7 +38,10 @@ describe("resolveModifiers", () => {
   });
 
   it("rounds values and ignores non-positive limits", () => {
-    const resolved = spec({ reroll: { enabled: true, value: "2.6", invert: false, recursive: true, limit: "-1" }, firstOnly: true });
+    const resolved = spec({
+      reroll: { enabled: true, value: "2.6", invert: false, recursive: true, limit: "-1" },
+      firstOnly: true,
+    });
     expect(resolved.reroll).toEqual({ value: 3, invert: false, recursive: true, limit: null });
     expect(resolved.firstOnly).toBe(true);
   });
@@ -44,7 +56,8 @@ describe("modifyDie", () => {
 
   it("rerolls low results", () => {
     const reroll = (value: string, extra: Record<string, unknown> = {}) =>
-      apply({ reroll: { enabled: true, value, invert: false, recursive: false, limit: "", ...extra } }).modifiers;
+      apply({ reroll: { enabled: true, value, invert: false, recursive: false, limit: "", ...extra } })
+        .modifiers;
     expect(reroll("")).toEqual(["r=1"]);
     expect(reroll("1")).toEqual(["r=1"]);
     expect(reroll("3")).toEqual(["r<3"]);
@@ -56,7 +69,8 @@ describe("modifyDie", () => {
   });
 
   it("rerolls high results when inverted", () => {
-    const reroll = (value: string) => apply({ reroll: { enabled: true, value, invert: true, recursive: false, limit: "" } }).modifiers;
+    const reroll = (value: string) =>
+      apply({ reroll: { enabled: true, value, invert: true, recursive: false, limit: "" } }).modifiers;
     expect(reroll("6")).toEqual(["r>6"]);
     expect(reroll("8")).toEqual(["r=8"]);
     expect(reroll("0")).toEqual(["r=8"]);
@@ -85,12 +99,18 @@ describe("modifyDie", () => {
   });
 
   it("leaves modifiers of the same kind alone", () => {
-    const die = apply({ reroll: { enabled: true, value: "2", invert: false, recursive: false, limit: "" } }, d8(["r=1"]));
+    const die = apply(
+      { reroll: { enabled: true, value: "2", invert: false, recursive: false, limit: "" } },
+      d8(["r=1"]),
+    );
     expect(die.modifiers).toEqual(["r=1"]);
   });
 
   it("skips dice whose size is not a number", () => {
-    const die = apply({ explode: { enabled: true, value: "", once: false, limit: "" } }, { number: 1, faces: null, modifiers: [] });
+    const die = apply(
+      { explode: { enabled: true, value: "", once: false, limit: "" } },
+      { number: 1, faces: null, modifiers: [] },
+    );
     expect(die.modifiers).toEqual([]);
   });
 });

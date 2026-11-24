@@ -6,12 +6,12 @@ import { ICON_NAMES, Icon } from "./icons";
 
 describe("Icon", () => {
   it("knows every icon the registry uses", () => {
-    const used = [...EVENTS, ...CHECKS, ...RESULTS].map(definition => definition.icon);
-    expect(used.filter(name => !ICON_NAMES.includes(name))).toEqual([]);
+    const used = [...EVENTS, ...CHECKS, ...RESULTS].map((definition) => definition.icon);
+    expect(used.filter((name) => !ICON_NAMES.includes(name))).toEqual([]);
   });
 
   it("knows every preset icon", () => {
-    expect(PRESETS.map(preset => preset.icon).filter(name => !ICON_NAMES.includes(name))).toEqual([]);
+    expect(PRESETS.map((preset) => preset.icon).filter((name) => !ICON_NAMES.includes(name))).toEqual([]);
   });
 
   it("renders an aria-hidden svg", () => {

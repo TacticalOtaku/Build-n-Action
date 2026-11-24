@@ -21,7 +21,7 @@ function labelOf(entry: unknown, key: string): string {
 
 function childrenOf(node: unknown): TraitTree | null {
   const children = read(node, "children");
-  return (children && (typeof children === "object")) ? children as TraitTree : null;
+  return children && typeof children === "object" ? (children as TraitTree) : null;
 }
 
 function choice(value: string, label: string, group?: string): Choice {
@@ -29,7 +29,9 @@ function choice(value: string, label: string, group?: string): Choice {
 }
 
 function fromRecord(record: unknown, data: ChoiceSourceData): Choice[] {
-  return Object.entries(asRecord(record)).map(([value, entry]) => choice(value, data.localize(labelOf(entry, value))));
+  return Object.entries(asRecord(record)).map(([value, entry]) =>
+    choice(value, data.localize(labelOf(entry, value))),
+  );
 }
 
 /** Every entry of a trait tree, grouped under its parent's label. */
@@ -53,8 +55,12 @@ function leaves(tree: TraitTree | null | undefined, data: ChoiceSourceData, grou
 }
 
 function properties(kind: string, data: ChoiceSourceData): Choice[] {
-  const valid = new Set(listOf(read(data.dnd5e, `validProperties.${kind}`)).filter((key): key is string => typeof key === "string"));
-  return fromRecord(data.dnd5e.itemProperties, data).filter(entry => valid.has(entry.value));
+  const valid = new Set(
+    listOf(read(data.dnd5e, `validProperties.${kind}`)).filter(
+      (key): key is string => typeof key === "string",
+    ),
+  );
+  return fromRecord(data.dnd5e.itemProperties, data).filter((entry) => valid.has(entry.value));
 }
 
 /** The options of one dynamic choice list. */
@@ -85,12 +91,13 @@ export function choicesFor(source: DynamicChoiceSource, data: ChoiceSourceData):
       return fromRecord(config.spellcasting, data);
     case "spellSlotLevels":
       return [
-        ...Object.entries(asRecord(config.spellLevels)).filter(([level]) => Number(level) > 0)
+        ...Object.entries(asRecord(config.spellLevels))
+          .filter(([level]) => Number(level) > 0)
           .map(([level, entry]) => choice(`spell${level}`, data.localize(labelOf(entry, level)))),
-        choice("pact", data.localize("DND5E.SpellLevelPact"))
+        choice("pact", data.localize("DND5E.SpellLevelPact")),
       ];
     case "statusEffects":
-      return data.statusEffects.flatMap(effect => {
+      return data.statusEffects.flatMap((effect) => {
         const id = asString(read(effect, "id"));
         return id ? [choice(id, data.localize(labelOf(effect, id)))] : [];
       });
@@ -100,7 +107,7 @@ export function choicesFor(source: DynamicChoiceSource, data: ChoiceSourceData):
       return [
         ...fromRecord(config.abilities, data),
         choice("death", data.localize("DND5E.DeathSave")),
-        choice("concentration", data.localize("DND5E.Concentration"))
+        choice("concentration", data.localize("DND5E.Concentration")),
       ];
     case "languages":
       return fromTree(data.trees.languages, data);
@@ -109,6 +116,6 @@ export function choicesFor(source: DynamicChoiceSource, data: ChoiceSourceData):
     case "weaponTypes":
       return [...fromRecord(config.weaponTypes, data), ...leaves(data.trees.weapon, data)];
     case "documentEffects":
-      return data.effects.map(effect => choice(effect.id, effect.name));
+      return data.effects.map((effect) => choice(effect.id, effect.name));
   }
 }

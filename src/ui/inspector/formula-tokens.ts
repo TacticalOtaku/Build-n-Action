@@ -10,12 +10,12 @@ const PATH_CHAR = /[\w.]/;
 /** The @ token the caret is in, or null. A token starts at "@" that follows a non-path character. */
 export function tokenAt(text: string, caret: number): FormulaToken | null {
   let start = caret;
-  while ((start > 0) && PATH_CHAR.test(text.charAt(start - 1))) start--;
-  if ((start === 0) || (text.charAt(start - 1) !== "@")) return null;
+  while (start > 0 && PATH_CHAR.test(text.charAt(start - 1))) start--;
+  if (start === 0 || text.charAt(start - 1) !== "@") return null;
   const at = start - 1;
-  if ((at > 0) && PATH_CHAR.test(text.charAt(at - 1))) return null;
+  if (at > 0 && PATH_CHAR.test(text.charAt(at - 1))) return null;
   let end = caret;
-  while ((end < text.length) && PATH_CHAR.test(text.charAt(end))) end++;
+  while (end < text.length && PATH_CHAR.test(text.charAt(end))) end++;
   return { start: at, end, query: text.slice(start, caret) };
 }
 
@@ -33,5 +33,8 @@ export function matchPaths(paths: readonly string[], query: string, limit = 8): 
 }
 
 export function insertPath(text: string, token: FormulaToken, path: string): { text: string; caret: number } {
-  return { text: text.slice(0, token.start) + path + text.slice(token.end), caret: token.start + path.length };
+  return {
+    text: text.slice(0, token.start) + path + text.slice(token.end),
+    caret: token.start + path.length,
+  };
 }

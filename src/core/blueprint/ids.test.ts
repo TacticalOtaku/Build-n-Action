@@ -21,7 +21,7 @@ describe("isValidId", () => {
     expect(isValidId("aB3dE5gH7jK9mN1p")).toBe(true);
   });
 
-  it.each([["short"], [42], [null], ["aB3dE5gH7jK9mN1!"], ["aB3dE5gH7jK9mN1pX"]])("rejects %s", value => {
+  it.each([["short"], [42], [null], ["aB3dE5gH7jK9mN1!"], ["aB3dE5gH7jK9mN1pX"]])("rejects %s", (value) => {
     expect(isValidId(value)).toBe(false);
   });
 });

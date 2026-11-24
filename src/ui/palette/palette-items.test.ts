@@ -11,7 +11,7 @@ const NONE = { from: null, upstream: [] } as const;
 describe("PALETTE_ITEMS", () => {
   it("lists every event, the condition and every result", () => {
     expect(PALETTE_ITEMS).toHaveLength(18 + 1 + 15);
-    expect(PALETTE_ITEMS.find(item => item.kind === "condition")?.type).toBe("condition");
+    expect(PALETTE_ITEMS.find((item) => item.kind === "condition")?.type).toBe("condition");
   });
 
   it("has translated labels and summaries", () => {
@@ -29,36 +29,52 @@ describe("filterPaletteItems", () => {
 
   it("hides events when continuing from an output", () => {
     const items = filterPaletteItems(PALETTE_ITEMS, "", { from: "condition", upstream: [] }, tEn);
-    expect(items.some(item => item.kind === "event")).toBe(false);
-    expect(items.some(item => item.kind === "condition")).toBe(true);
+    expect(items.some((item) => item.kind === "event")).toBe(false);
+    expect(items.some((item) => item.kind === "condition")).toBe(true);
   });
 
   it("keeps only results compatible with the upstream events", () => {
     const types = filterPaletteItems(PALETTE_ITEMS, "", { from: "event", upstream: ["afterAttack"] }, tEn)
-      .filter(item => item.kind === "result").map(item => item.type);
+      .filter((item) => item.kind === "result")
+      .map((item) => item.type);
     expect(types).toContain("applyEffect");
     expect(types).not.toContain("rollBonus");
   });
 
-  it("keeps only results that leave the roll alone after \"And then\"", () => {
+  it('keeps only results that leave the roll alone after "And then"', () => {
     const types = filterPaletteItems(PALETTE_ITEMS, "", { from: "result", upstream: ["afterResult"] }, tEn)
-      .filter(item => item.kind === "result").map(item => item.type);
-    expect(types).toEqual(["reminder", "rider", "applyEffect", "removeEffect", "resource", "signal", "demandSave", "counter"]);
+      .filter((item) => item.kind === "result")
+      .map((item) => item.type);
+    expect(types).toEqual([
+      "reminder",
+      "rider",
+      "applyEffect",
+      "removeEffect",
+      "resource",
+      "signal",
+      "demandSave",
+      "counter",
+    ]);
   });
 
   it("ranks label prefixes above other matches", () => {
-    const labels = filterPaletteItems(PALETTE_ITEMS, "dam", NONE, tEn).map(item => tEn(item.labelKey));
+    const labels = filterPaletteItems(PALETTE_ITEMS, "dam", NONE, tEn).map((item) => tEn(item.labelKey));
     expect(labels[0]).toBe("Damage roll");
   });
 
   it("matches summaries and scattered letters", () => {
-    expect(filterPaletteItems(PALETTE_ITEMS, "spend", NONE, tEn).map(item => item.type)).toContain("resource");
-    expect(filterPaletteItems(PALETTE_ITEMS, "rllbns", NONE, tEn).map(item => item.type)).toContain("rollBonus");
+    expect(filterPaletteItems(PALETTE_ITEMS, "spend", NONE, tEn).map((item) => item.type)).toContain(
+      "resource",
+    );
+    expect(filterPaletteItems(PALETTE_ITEMS, "rllbns", NONE, tEn).map((item) => item.type)).toContain(
+      "rollBonus",
+    );
   });
 
   it("treats ё and е alike", () => {
-    expect(filterPaletteItems(PALETTE_ITEMS, "ещё", NONE, tRu).length)
-      .toBe(filterPaletteItems(PALETTE_ITEMS, "еще", NONE, tRu).length);
+    expect(filterPaletteItems(PALETTE_ITEMS, "ещё", NONE, tRu).length).toBe(
+      filterPaletteItems(PALETTE_ITEMS, "еще", NONE, tRu).length,
+    );
   });
 
   it("returns nothing for gibberish", () => {

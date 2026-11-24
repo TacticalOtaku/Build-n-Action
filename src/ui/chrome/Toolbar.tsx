@@ -7,7 +7,7 @@ import type { ThemeName } from "../theme/theme";
 const FX_LABELS: Record<FxLevel, string> = {
   full: "BNA.UI.Toolbar.fxFull",
   reduced: "BNA.UI.Toolbar.fxReduced",
-  off: "BNA.UI.Toolbar.fxOff"
+  off: "BNA.UI.Toolbar.fxOff",
 };
 
 export interface ToolbarProps {
@@ -29,7 +29,11 @@ export interface ToolbarProps {
   onTour?: () => void;
 }
 
-function Tool({ label, icon, ...rest }: { label: string; icon: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
+function Tool({
+  label,
+  icon,
+  ...rest
+}: { label: string; icon: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button type="button" className="bna-iconbtn" aria-label={label} title={label} {...rest}>
       <Icon name={icon} size={17} />
@@ -39,7 +43,7 @@ function Tool({ label, icon, ...rest }: { label: string; icon: string } & Button
 
 export function Toolbar(props: ToolbarProps) {
   const t = useT();
-  const themeLabel = (props.theme === "dark") ? t("BNA.UI.Toolbar.themeLight") : t("BNA.UI.Toolbar.themeDark");
+  const themeLabel = props.theme === "dark" ? t("BNA.UI.Toolbar.themeLight") : t("BNA.UI.Toolbar.themeDark");
   return (
     <div className="bna-toolbar" role="toolbar" aria-label={t("BNA.UI.Toolbar.label")}>
       <Tool label={t("BNA.UI.Toolbar.add")} icon="plus" onClick={props.onAdd} />
@@ -61,9 +65,16 @@ export function Toolbar(props: ToolbarProps) {
         </>
       ) : null}
       <span className="bna-toolbar__sep" aria-hidden="true" />
-      <Tool label={themeLabel} icon={(props.theme === "dark") ? "sun" : "moon"} onClick={props.onToggleTheme} />
-      <Tool label={t(FX_LABELS[props.fxLevel])} icon="wand-sparkles" aria-pressed={props.fxLevel !== "off"} onClick={props.onCycleFx} />
-      {props.onTour ? <Tool label={t("BNA.UI.Toolbar.tour")} icon="circle-help" onClick={props.onTour} /> : null}
+      <Tool label={themeLabel} icon={props.theme === "dark" ? "sun" : "moon"} onClick={props.onToggleTheme} />
+      <Tool
+        label={t(FX_LABELS[props.fxLevel])}
+        icon="wand-sparkles"
+        aria-pressed={props.fxLevel !== "off"}
+        onClick={props.onCycleFx}
+      />
+      {props.onTour ? (
+        <Tool label={t("BNA.UI.Toolbar.tour")} icon="circle-help" onClick={props.onTour} />
+      ) : null}
     </div>
   );
 }

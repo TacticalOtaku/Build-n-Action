@@ -6,7 +6,8 @@ import { useServices } from "../services";
 export function useChoiceOptions(spec: ChoiceSpec): Choice[] {
   const { translator, choices } = useServices();
   return useMemo(() => {
-    if ("static" in spec) return spec.static.map(choice => ({ value: choice.value, label: translator.t(choice.label) }));
+    if ("static" in spec)
+      return spec.static.map((choice) => ({ value: choice.value, label: translator.t(choice.label) }));
     return [...choices.choices(spec.source)];
   }, [spec, translator, choices]);
 }

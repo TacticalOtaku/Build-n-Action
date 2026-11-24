@@ -9,7 +9,9 @@ import { FieldList, slugify } from "./FieldList";
 
 function renderFields(fields: readonly FieldSpec[], data: Record<string, unknown>, upstream: string[] = []) {
   const onChange = vi.fn();
-  renderWithServices(<FieldList fields={fields} data={data} path={[]} upstream={upstream as never} onChange={onChange} />);
+  renderWithServices(
+    <FieldList fields={fields} data={data} path={[]} upstream={upstream as never} onChange={onChange} />,
+  );
   return onChange;
 }
 
@@ -24,7 +26,7 @@ function Controlled({ onChange }: { onChange(path: readonly string[], value: unk
       upstream={[]}
       onChange={(path, value) => {
         onChange(path, value);
-        setData(previous => ({ ...previous, [String(path[0])]: value }));
+        setData((previous) => ({ ...previous, [String(path[0])]: value }));
       }}
     />
   );
@@ -36,7 +38,9 @@ describe("FieldList", () => {
     const onChange = renderFields(result.fields, { formula: "", damageTypes: [] });
     await userEvent.type(screen.getByLabelText("Bonus"), "2");
     expect(onChange).toHaveBeenLastCalledWith(["formula"], "2");
-    expect(screen.getByText("A number, dice or roll data, e.g. 1d4 or @abilities.cha.mod.")).toBeInTheDocument();
+    expect(
+      screen.getByText("A number, dice or roll data, e.g. 1d4 or @abilities.cha.mod."),
+    ).toBeInTheDocument();
   });
 
   it("hides fields meant for other events", () => {
@@ -118,13 +122,18 @@ describe("FieldList", () => {
     const rider = getResult("rider")!;
     const onChange = renderFields(rider.fields, defaultsFor(rider.fields));
     await userEvent.selectOptions(screen.getByLabelText("Change"), "rollBonus");
-    expect(onChange).toHaveBeenLastCalledWith(["effect"], { type: "rollBonus", data: { formula: "", damageTypes: [] } });
+    expect(onChange).toHaveBeenLastCalledWith(["effect"], {
+      type: "rollBonus",
+      data: { formula: "", damageTypes: [] },
+    });
   });
 
   it("suggests roll-data paths and previews the formula", async () => {
     const onChange = vi.fn();
     renderWithServices(<Controlled onChange={onChange} />, {
-      host: { formula: { paths: () => ["@abilities.cha.mod", "@prof"], preview: formula => `${formula}=` } }
+      host: {
+        formula: { paths: () => ["@abilities.cha.mod", "@prof"], preview: (formula) => `${formula}=` },
+      },
     });
     const field = screen.getByRole("combobox", { name: "Bonus" });
     await userEvent.type(field, "@pr");
@@ -151,7 +160,7 @@ describe("slugify", () => {
     ["Hunter's Mark!", "hunters-mark"],
     ["метка  охотника", "метка-охотника"],
     ["--a---b--", "a-b"],
-    ["!!!", ""]
+    ["!!!", ""],
   ])("turns %j into %j", (input, expected) => {
     expect(slugify(input)).toBe(expected);
   });
