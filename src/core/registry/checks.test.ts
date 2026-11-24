@@ -26,10 +26,10 @@ const spell = itemFacts({
 });
 
 describe("check definitions", () => {
-  it("defines 38 uniquely named checks", () => {
+  it("defines 39 uniquely named checks", () => {
     const types = CHECKS.map(check => check.type);
-    expect(types).toHaveLength(38);
-    expect(new Set(types).size).toBe(38);
+    expect(types).toHaveLength(39);
+    expect(new Set(types).size).toBe(39);
   });
 
   it("covers every v1 filter plus thisItem and targetMarkers", () => {
@@ -160,6 +160,11 @@ const cases: Case[] = [
   ["skillIds", "skillIds", { values: ["ste"] }, rollFacts({ roll: rollDetails({ skillId: "ste" }) }), true, "matched"],
   ["skillIds on a non-skill roll", "skillIds", { values: ["ste"] }, rollFacts(), false, "noValue"],
   ["baseTools by category", "baseTools", { values: ["art"] }, rollFacts({ roll: rollDetails({ toolKeys: ["smith", "art"] }) }), true, "matched"],
+  ["rollModes advantage", "rollModes", { values: ["advantage"] }, rollFacts({ roll: rollDetails({ rollMode: "advantage" }) }), true, "matched"],
+  ["rollModes mismatch", "rollModes", { values: ["advantage"] }, rollFacts({ roll: rollDetails({ rollMode: "normal" }) }), false, "notMatched"],
+  ["rollModes excludes disadvantage", "rollModes", { values: ["!disadvantage"] }, rollFacts({ roll: rollDetails({ rollMode: "normal" }) }), true, "matched"],
+  ["rollModes fails exclusion on match", "rollModes", { values: ["!disadvantage"] }, rollFacts({ roll: rollDetails({ rollMode: "disadvantage" }) }), false, "excluded"],
+  ["rollModes without value", "rollModes", { values: ["!disadvantage"] }, rollFacts(), false, "noValue"],
   ["comparisons with numbers", "arbitraryComparisons", { comparisons: [{ one: "@target.hp", operator: "LT", other: "10" }] }, rollFacts(), true, "matched"],
   ["comparisons failing", "arbitraryComparisons", { comparisons: [{ one: "@level", operator: "GE", other: "7" }] }, rollFacts(), false, "comparisonFailed"],
   ["comparisons with text", "arbitraryComparisons", { comparisons: [{ one: "ria", operator: "LT", other: "@name" }] }, rollFacts(), true, "matched"],

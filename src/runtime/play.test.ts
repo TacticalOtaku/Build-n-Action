@@ -5,8 +5,8 @@ import type { ChainEntry, ChainIntent } from "../core/engine/interpreter";
 import type { BlueprintSource } from "../core/blueprint/types";
 import { type CounterStore } from "../core/counters/counters";
 import { passed } from "../core/engine/reasons";
-import { actorFacts, creatureFacts, rollFacts } from "../core/testing/facts";
-import { makeEdge, makeNode } from "../core/testing/graph";
+import { actorFacts, creatureFacts, rollDetails, rollFacts } from "../core/testing/facts";
+import { makeCondition, makeEdge, makeNode } from "../core/testing/graph";
 import {
   attackPins, checkPins, continuationStarts, createOnce, createPlay, damagePins, limitAvailable, midiAttackPins,
   needsRegionBehavior, outcomePin, reminderKey, restEvent, saveDcFormula, saveKey, savePins, startsLater, turnTransitions,
@@ -132,7 +132,7 @@ describe("triggers & continuation pure helpers", () => {
 
 interface Doc { uuid: string; name: string }
 interface Token { document: Doc; actor: Doc }
-interface RollConfig { rolls?: Array<{ data?: Record<string, unknown> }> }
+interface RollConfig { advantage?: boolean; disadvantage?: boolean; rolls?: Array<{ data?: Record<string, unknown> }> }
 
 function harness(blueprints: BlueprintSource[]) {
   let idSeq = 0;
@@ -194,7 +194,8 @@ function harness(blueprints: BlueprintSource[]) {
     buildFacts: (event, roller) => rollFacts({
       event,
       actor: actorFacts({ uuid: roller.actor.uuid }),
-      target: roller.target ? creatureFacts() : null
+      target: roller.target ? creatureFacts() : null,
+      roll: rollDetails({ rollMode: roller.details.rollMode ?? null })
     }),
     counterStore: (actor): CounterStore => ({ values: counterValues[actor?.uuid ?? ""] ?? {}, defs: {} }),
     callPreEvaluate: () => true,
@@ -465,5 +466,64 @@ describe("createPlay orchestration", () => {
     env.play.preRoll("abilityCheck", cfg2, { configure: false }, roller, "chk3");
     env.play.postRoll(true, cfg2);
     expect(env.whisperedDetails).toHaveLength(2);
+  });
+
+  it("carries resolved attack rollMode across postRoll to same-activation damageRoll and afterDamage", async () => {
+    const bp = createBlueprint({
+      id: "SneakAdvBp000001",
+      nodes: [
+        makeNode("event", "damageRoll", "dmg"),
+        makeCondition("adv", [{ id: "c1", type: "rollModes", data: { values: ["advantage"] } }]),
+        makeNode("result", "rollBonus", "sneak", { formula: "2d6" }),
+        makeNode("event", "afterDamage", "afterDmg"),
+        makeCondition("notDis", [{ id: "c2", type: "rollModes", data: { values: ["!disadvantage"] } }]),
+        makeNode("result", "resource", "heal", { action: "restore", resource: "hp", amount: "3", who: "self" })
+      ],
+      edges: [
+        makeEdge("dmg", "out", "adv"), makeEdge("adv", "yes", "sneak"),
+        makeEdge("afterDmg", "dealt", "notDis"), makeEdge("notDis", "yes", "heal")
+      ]
+    });
+    const env = harness([bp]);
+    const roller = { actor: env.hero, item: env.sword, activity: null, token: env.heroToken, target: env.foeToken, details: {}, rollData: {} };
+
+    // Cancelled attack roll records nothing for the activation.
+    const cancelledAtk: RollConfig = { advantage: true, rolls: [{}] };
+    env.play.preRoll("attackRoll", cancelledAtk, {}, roller, "message:m1");
+    env.play.postRoll(false, cancelledAtk, "advantage");
+    env.play.preRoll("damageRoll", { rolls: [{}] }, {}, roller, "message:m1");
+    expect(env.appliedRoll).toHaveLength(0);
+
+    // Completed attack roll (even without any attackRoll blueprint) shares its submitted mode on the same activation.
+    const atkCfg: RollConfig = { rolls: [{}] };
+    env.play.preRoll("attackRoll", atkCfg, {}, roller, "message:m1");
+    env.play.postRoll(true, atkCfg, "advantage");
+
+    env.play.preRoll("damageRoll", { rolls: [{}] }, {}, roller, "message:m1");
+    expect(env.appliedRoll).toHaveLength(1);
+    expect(env.appliedRoll[0]?.intents.map(i => i.nodeId)).toEqual(["sneak"]);
+
+    // Unrelated activation does not inherit message:m1's attack rollMode.
+    env.play.preRoll("damageRoll", { rolls: [{}] }, {}, roller, "message:m2");
+    expect(env.appliedRoll).toHaveLength(1);
+
+    // afterDamage on message:m1 inherits the attack's rollMode; disadvantageous afterAttack overwrites it.
+    await env.play.runReaction({
+      event: "afterDamage", pins: ["dealt"], actor: env.hero, item: env.sword, activity: null,
+      target: env.foeToken, activation: "message:m1"
+    });
+    expect(env.performed).toHaveLength(1);
+    expect(env.performed[0]).toMatchObject({ kind: "resource", resource: "hp", delta: 3 });
+
+    env.performed.length = 0;
+    await env.play.runReaction({
+      event: "afterAttack", pins: ["hit"], actor: env.hero, item: env.sword, activity: null,
+      target: env.foeToken, activation: "message:m1", details: { rollMode: "disadvantage" }
+    });
+    await env.play.runReaction({
+      event: "afterDamage", pins: ["dealt"], actor: env.hero, item: env.sword, activity: null,
+      target: env.foeToken, activation: "message:m1"
+    });
+    expect(env.performed).toEqual([]);
   });
 });

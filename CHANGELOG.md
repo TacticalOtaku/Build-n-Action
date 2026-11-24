@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.5.0
+
+### Added
+- **Roll advantage** condition check (`rollModes`): match whether a roll (or the attack roll behind a damage roll in the same activation) is *Normal*, *Advantage*, or *Disadvantage*—including exclusion matching such as *anything but Disadvantage* for features like *Sneak Attack*—across `attackRoll`, `damageRoll`, `savingThrow`, `abilityCheck`, `afterAttack`, `afterDamage`, `afterCheck`, and `signal`.
+- **Test simulator roll mode control**: added a *Roll advantage* selector (*Normal*, *Advantage*, *Disadvantage*) to the Test tab when a blueprint checks `rollModes` on a compatible event, with localized failure reasons.
+
+### Changed
+- Propagated resolved D&D 5e roll modes from `D20Roll`, roll configurations, and Midi QOL workflows to runtime facts and same-activation damage events, honoring player dialog choices over stale pre-roll flags and ignoring cancelled attacks.
+- Generalized `listCheck` to accept static choice lists alongside dynamic sources.
+
 ## 2.4.1
 
 ### Changed

@@ -1,4 +1,4 @@
-import { isEffectUuid, type ActivityFacts, type ActorFacts, type CreatureFacts, type EffectFacts, type ItemFacts, type RollDetails, type RollFacts } from "../core/facts/types";
+import { isEffectUuid, type ActivityFacts, type ActorFacts, type CreatureFacts, type EffectFacts, type ItemFacts, type RollDetails, type RollFacts, type RollMode } from "../core/facts/types";
 import type { EventType } from "../core/registry/constants";
 import { asNumber, asRecord, asString, asStrings } from "../core/registry/data";
 import { callList, listOf, read, stringList } from "./read";
@@ -86,6 +86,7 @@ export interface RollDetailsInput {
   attackMode?: string | null;
   /** The level the spell is cast at, when it differs from the item's base level. */
   spellLevel?: number | null;
+  rollMode?: RollMode | null;
 }
 
 export interface RollInput {
@@ -267,7 +268,8 @@ function rollDetails(input: RollInput, trees: TraitTrees): RollDetails {
     isDeath: details.isDeath === true,
     isConcentration: details.isConcentration === true,
     attackMode: details.attackMode ?? null,
-    proficiency: proficiency(input)
+    proficiency: proficiency(input),
+    rollMode: details.rollMode ?? null
   };
 }
 

@@ -20,7 +20,8 @@ const RICH_CHECK_DATA: Record<string, Record<string, unknown>[]> = {
   tokenSizes: [{ size: 2, type: "atMost", self: true }, { size: 1, type: "atLeast", self: false }],
   arbitraryComparisons: [{ comparisons: [{ one: "@a", operator: "LT", other: "3" }] }],
   identifiers: [{ values: ["longsword"] }],
-  creatureTypes: [{ values: ["x", "!x"] }]
+  creatureTypes: [{ values: ["x", "!x"] }],
+  rollModes: [{ values: ["advantage"] }, { values: ["!disadvantage"] }, { values: ["normal", "advantage"] }]
 };
 
 const RICH_RESULT_DATA: Record<string, Record<string, unknown>[]> = {

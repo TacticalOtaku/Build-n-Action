@@ -1,6 +1,6 @@
 {
   "name": "build-n-action",
-  "version": "2.4.1",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "description": "Build-n-Action",

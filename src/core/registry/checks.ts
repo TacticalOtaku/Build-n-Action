@@ -65,14 +65,14 @@ function withoutImmune(values: readonly string[], immunities: readonly string[])
   return values.filter(value => !immunities.includes(value.replace(/^!+/, "")));
 }
 
-function anyOf(source: DynamicChoiceSource, exclusion: boolean): FieldSpec {
+function anyOf(choices: ChoiceSpec, exclusion: boolean): FieldSpec {
   return {
     key: "values",
     kind: "multiselect",
     label: "BNA.Field.anyOf.label",
     hint: exclusion ? "BNA.Field.anyOf.hintExclusion" : "BNA.Field.anyOf.hint",
     default: [],
-    choices: { source },
+    choices,
     exclusion
   };
 }
@@ -93,16 +93,16 @@ function listCheck(
   type: string,
   category: CheckCategory,
   icon: string,
-  source: DynamicChoiceSource,
+  source: DynamicChoiceSource | ChoiceSpec,
   relevantTo: readonly EventType[],
   rule: ListCheckRule
 ): CheckDefinition {
-  const spec: ChoiceSpec = { source };
+  const spec: ChoiceSpec = (typeof source === "string") ? { source } : source;
   const exclusion = rule.exclusion ?? true;
   return {
     type, category, icon, relevantTo,
     reasonChoices: spec,
-    fields: [anyOf(source, exclusion)],
+    fields: [anyOf(spec, exclusion)],
     phrase: (data, fmt) => fmt.t(`BNA.Check.${type}.Phrase`, { values: fmt.choices(asStrings(data.values), spec) }),
     evaluate: (data, facts) => {
       const raw = asStrings(data.values);
@@ -631,6 +631,14 @@ export const CHECKS: readonly CheckDefinition[] = [
   listCheck("baseTools", "roll", "wrench", "tools", ["abilityCheck", "afterCheck", "signal"], {
     absent: "noValue", actual: facts => facts.roll.toolKeys.length ? facts.roll.toolKeys : null
   }),
+  listCheck(
+    "rollModes", "roll", "scale", { static: STATIC.rollMode },
+    ["attackRoll", "damageRoll", "savingThrow", "abilityCheck", "afterAttack", "afterDamage", "afterCheck", "signal"],
+    {
+      contradiction: true, required: true, absent: "noValue",
+      actual: facts => facts.roll.rollMode ? [facts.roll.rollMode] : null
+    }
+  ),
   // Advanced
   arbitraryComparisons,
   customScripts

@@ -1,7 +1,7 @@
 import type { BlueprintSource } from "../core/blueprint/types";
 import { buildCounterLookups, substituteCounters, substituteDeep, type CounterStore } from "../core/counters/counters";
 import { MAX_SIGNAL_DEPTH, runWithSignals, type ChainEntry, type ChainIntent, type ChainResult, type LimitPeriod } from "../core/engine/interpreter";
-import type { RollFacts } from "../core/facts/types";
+import type { RollFacts, RollMode } from "../core/facts/types";
 import type { EventType, PinId } from "../core/registry/constants";
 import { asRecord, asString } from "../core/registry/data";
 import { mapFormulaFields } from "../core/registry/fields";
@@ -11,6 +11,7 @@ import type { RollDetailsInput } from "./facts";
 import { planCounter, planOperation, type Operation } from "./operations";
 import type { SourceKind } from "./reach";
 import { createRider, type Rider, type RiderClock } from "./riders";
+import { resolvedAdvantageMode, type ProcessConfig } from "./roll-config";
 import type { SaveOutcome, SaveRequest } from "./transport";
 
 const MEMORY_LIMIT = 20;
@@ -390,12 +391,38 @@ export function createPlay<TActor, TDocument, TItem, TToken, TConfig>(adapter: P
   const warnedHooks = new Set<string>();
   const pending = new Map<string, PendingRoll<TActor, TDocument, TItem, TToken>>();
   const afterRolls = new WeakMap<object, AfterRoll<TActor, TDocument, TItem, TToken>>();
+  const attackConfigs = new WeakMap<object, string>();
+  const attackModes = new Map<string, { mode: RollMode; at: number }>();
   const records: RollRecord[] = [];
   const activations = new Map<string, string>();
   const continued = createOnce(MEMORY_TTL_MS);
   const demanded = createOnce(MEMORY_TTL_MS);
   const triggered = createOnce(MEMORY_TTL_MS);
   const reacted = createOnce(MEMORY_TTL_MS);
+
+  function rememberAttackMode(activation: string | null, mode: RollMode | null | undefined): void {
+    if (!activation || !mode) return;
+    const now = adapter.now();
+    for (const [key, entry] of attackModes) if ((now - entry.at) > MEMORY_TTL_MS) attackModes.delete(key);
+    attackModes.delete(activation);
+    attackModes.set(activation, { mode, at: now });
+    while (attackModes.size > MEMORY_LIMIT) {
+      const oldest = attackModes.keys().next().value;
+      if (oldest === undefined) break;
+      attackModes.delete(oldest);
+    }
+  }
+
+  function attackModeFor(activation: string | null): RollMode | null {
+    if (!activation) return null;
+    const entry = attackModes.get(activation);
+    if (!entry) return null;
+    if ((adapter.now() - entry.at) > MEMORY_TTL_MS) {
+      attackModes.delete(activation);
+      return null;
+    }
+    return entry.mode;
+  }
 
   function warnOnce(name: string, error: unknown): void {
     if (warnedHooks.has(name)) return;
@@ -699,6 +726,9 @@ export function createPlay<TActor, TDocument, TItem, TToken, TConfig>(adapter: P
       return activations.get(activityUuid) ?? null;
     },
 
+    rememberAttackMode,
+    attackModeFor,
+
     preRoll(
       event: EventType,
       config: TConfig,
@@ -706,12 +736,18 @@ export function createPlay<TActor, TDocument, TItem, TToken, TConfig>(adapter: P
       roller: PlayRoller<TActor, TItem, TToken>,
       activation: string | null
     ): void {
-      const evaluation = evaluateEvent(event, roller, ["out"], activation);
+      if ((event === "attackRoll") && config && (typeof config === "object") && activation) {
+        attackConfigs.set(config, activation);
+      }
+      const activeRoller = ((event === "damageRoll") && (roller.details.rollMode === undefined) && activation)
+        ? { ...roller, details: { ...roller.details, rollMode: attackModeFor(activation) } }
+        : roller;
+      const evaluation = evaluateEvent(event, activeRoller, ["out"], activation);
       if (!evaluation || (!evaluation.chain.intents.length && !evaluation.chain.sent.length)) return;
-      const targetActor = roller.target ? adapter.tokenActor(roller.target) : null;
+      const targetActor = activeRoller.target ? adapter.tokenActor(activeRoller.target) : null;
       if (targetActor) adapter.injectTargetData(config, adapter.targetRollData(targetActor));
       const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));
-      const ctx: PlayApplyContext<TActor, TDocument, TItem, TToken> = { event, roller, sources: evaluation.collected.sources };
+      const ctx: PlayApplyContext<TActor, TDocument, TItem, TToken> = { event, roller: activeRoller, sources: evaluation.collected.sources };
       const tracker: ModifierTracker = { active: [], halted: new Set() };
       adapter.applyRollIntents(config, sorted.immediate, ctx, tracker);
       if (sorted.immediate.some(intent => intent.type === "rollAdvantage") && dialog && (typeof dialog === "object")) {
@@ -738,8 +774,13 @@ export function createPlay<TActor, TDocument, TItem, TToken, TConfig>(adapter: P
       }
     },
 
-    postRoll(hasRolls: boolean, config: unknown): void {
+    postRoll(hasRolls: boolean, config: unknown, rollMode?: RollMode | null): void {
       if (!config || (typeof config !== "object")) return;
+      const attackActivation = attackConfigs.get(config) ?? null;
+      attackConfigs.delete(config);
+      if (hasRolls && attackActivation) {
+        rememberAttackMode(attackActivation, rollMode ?? resolvedAdvantageMode(config as ProcessConfig));
+      }
       const after = afterRolls.get(config) ?? null;
       afterRolls.delete(config);
       if (!after || !hasRolls) return;
@@ -773,7 +814,13 @@ export function createPlay<TActor, TDocument, TItem, TToken, TConfig>(adapter: P
     async runReaction(input: ReactionInput<TActor, TItem, TToken>): Promise<void> {
       if (!input.pins.length) return;
       if (input.dedupeKey && !reacted(input.dedupeKey, adapter.now())) return;
-      const roller = adapter.makeRoller(input.actor, input.item, input.activity, input.target, { ...(input.details ?? {}) });
+      if ((input.event === "afterAttack") && input.activation && input.details?.rollMode) {
+        rememberAttackMode(input.activation, input.details.rollMode);
+      }
+      const details = ((input.event === "afterDamage") && (input.details?.rollMode === undefined) && input.activation)
+        ? { ...(input.details ?? {}), rollMode: attackModeFor(input.activation) }
+        : { ...(input.details ?? {}) };
+      const roller = adapter.makeRoller(input.actor, input.item, input.activity, input.target, details);
       const evaluation = evaluateEvent(input.event, roller, input.pins, input.activation);
       if (!evaluation?.chain.intents.length) return;
       const sorted = sortIntents(allowIntents(evaluation.chain.intents, evaluation.context));

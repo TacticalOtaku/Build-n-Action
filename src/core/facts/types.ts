@@ -77,6 +77,8 @@ export interface ActivityFacts {
   dcAbility: string | null;
 }
 
+export type RollMode = "normal" | "advantage" | "disadvantage";
+
 export interface RollDetails {
   /** Ability of an ability, skill or tool check. */
   abilityId: string | null;
@@ -91,6 +93,8 @@ export interface RollDetails {
   attackMode: string | null;
   /** Proficiency multiplier that applies to this roll (0, 0.5, 1, 2), or null when unknown. */
   proficiency: number | null;
+  /** Resolved 5e roll mode (or the attack's mode on damage rolls in the same activation), or null when unknown. */
+  rollMode: RollMode | null;
 }
 
 /** Everything the engine may ask about one roll; built by the runtime from Foundry documents. */

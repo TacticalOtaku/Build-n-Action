@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addCriticalBonus, adjustCriticalRanges, adjustSavingThrowRanges, appendDamagePart, appendRollPart, applyAdvantageMode,
-  injectTargetData, joinFormula, resolvedAdvantageMode, sanitizeCritical, type ProcessConfig
+  injectTargetData, joinFormula, resolvedAdvantageMode, resolvedConfigRollMode, resolvedSubmittedRollMode,
+  rollModeFromRoll, sanitizeCritical, workflowAttackRollMode, type ProcessConfig
 } from "./roll-config";
 
 function damageConfig(): ProcessConfig {
@@ -147,5 +148,24 @@ describe("advantage and disadvantage", () => {
     applyAdvantageMode(proneRoll, "advantage");
     expect(resolvedAdvantageMode(proneRoll)).toBe("normal");
     expect(proneRoll.rolls?.[0]?.options?.advantageMode).toBe(0);
+  });
+
+  it("extracts roll modes from pre-roll configs, submitted rolls, and Midi workflows", () => {
+    expect(resolvedConfigRollMode({ advantage: false }, { advantage: true, disadvantage: false })).toBe("advantage");
+    expect(resolvedConfigRollMode({ advantage: true }, { disadvantage: true })).toBe("normal");
+
+    // Dialog choice on the submitted roll (advantageMode: 0) overrides stale pre-roll config.advantage.
+    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 0 } }], { advantage: true })).toBe("normal");
+    expect(resolvedSubmittedRollMode([{ options: { advantageMode: 1 } }], { disadvantage: true })).toBe("advantage");
+    expect(resolvedSubmittedRollMode([{ hasAdvantage: false, hasDisadvantage: true }])).toBe("disadvantage");
+    expect(resolvedSubmittedRollMode([{ options: { advantage: true, disadvantage: false } }])).toBe("advantage");
+    expect(resolvedSubmittedRollMode([{}], { advantage: true })).toBe("advantage");
+    expect(rollModeFromRoll({ parts: ["1d8"] })).toBeNull();
+
+    // Midi-QOL workflow mode ignores save workflows without an attack unless allowFlags is set.
+    expect(workflowAttackRollMode({ advantage: true, disadvantage: false })).toBeNull();
+    expect(workflowAttackRollMode({ advantage: true, disadvantage: false }, true)).toBe("advantage");
+    expect(workflowAttackRollMode({ attackRoll: { options: { advantageMode: -1 } }, advantage: true })).toBe("disadvantage");
+    expect(workflowAttackRollMode({ attackTotal: 14, advantage: true, disadvantage: true })).toBe("normal");
   });
 });

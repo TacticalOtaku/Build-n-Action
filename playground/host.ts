@@ -5,7 +5,7 @@ import { passed } from "../src/core/engine/reasons";
 import type { ActivityFacts, ActorFacts, CreatureFacts, ItemFacts, RollFacts } from "../src/core/facts/types";
 import { exportBlueprints, importBlueprints, readLibrary, withLibraryEntry, withoutLibraryEntry } from "../src/core/storage/library";
 import { activityFacts, actorFacts, creatureFacts, itemFacts, rollDetails } from "../src/core/testing/facts";
-import { createEditorHost, defaultDragData, readDroppedBlueprint } from "../src/runtime/editor-host";
+import { createEditorHost, defaultDragData, readDroppedBlueprint, simulatedRollMode } from "../src/runtime/editor-host";
 import { rollDataPaths } from "../src/runtime/paths";
 import { read } from "../src/runtime/read";
 import type { EditorHost, LibraryHost, SimulationRequest } from "../src/ui/host";
@@ -132,7 +132,8 @@ function prepare(blueprint: BlueprintSource, request: SimulationRequest) {
       abilityId: save ? null : request.abilityId,
       skillId: request.skillId,
       saveAbility: save ? request.abilityId : null,
-      proficiency: 1
+      proficiency: 1,
+      rollMode: simulatedRollMode(request)
     })
   };
   const env: BlueprintEnv = {

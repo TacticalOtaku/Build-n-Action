@@ -11,7 +11,9 @@ import {
 } from "../runtime/play";
 import { matchDisposition } from "../runtime/reach";
 import { listOf, read, stringList } from "../runtime/read";
-import type { ProcessConfig } from "../runtime/roll-config";
+import {
+  resolvedConfigRollMode, resolvedSubmittedRollMode, rollModeFromRoll, workflowAttackRollMode, type ProcessConfig
+} from "../runtime/roll-config";
 import { applyRollIntents, applySaveDC } from "./apply";
 import { choiceData, promptChoices, renderRollPanel, syncDialogAdvantage } from "./choice-panel";
 import type { Operation } from "../runtime/operations";
@@ -44,9 +46,13 @@ function firstToken(targets: unknown): TokenPlaceable | null {
   return (listOf(targets)[0] as TokenPlaceable | undefined) ?? null;
 }
 
+function rollWorkflow(config: unknown): unknown {
+  return read(config, "workflow") ?? read(config, "midiOptions.workflow");
+}
+
 /** The roll's target: Midi's workflow targets (hit targets first for damage), else the user's first target. */
 function resolveRollTarget(config: unknown, preferHit: boolean): TokenPlaceable | null {
-  const workflow = read(config, "workflow") ?? read(config, "midiOptions.workflow");
+  const workflow = rollWorkflow(config);
   if (workflow && (typeof workflow === "object") && (("targets" in workflow) || ("hitTargets" in workflow))) {
     if (preferHit) {
       const hit = firstToken(read(workflow, "hitTargets"));
@@ -244,8 +250,13 @@ function activityRoll(event: "attackRoll" | "damageRoll", config: unknown, dialo
   if (!item || !actor) return;
   const activation = activationOf(config, message);
   if (event === "attackRoll") play.rememberActivation(asString(read(activity, "uuid")), activation);
+  const workflow = rollWorkflow(config);
+  const rollMode = (event === "attackRoll")
+    ? resolvedConfigRollMode(config as ProcessConfig, workflow)
+    : (play.attackModeFor(activation) ?? workflowAttackRollMode(workflow) ?? undefined);
   const roller = makeRoller(actor, item, activity, resolveRollTarget(config, event === "damageRoll"), {
-    attackMode: asString(read(config, "attackMode")) || null
+    attackMode: asString(read(config, "attackMode")) || null,
+    ...(rollMode === undefined ? {} : { rollMode })
   });
   play.preRoll(event, config as ProcessConfig, dialog, roller, activation);
 }
@@ -320,7 +331,8 @@ function registerPreRollHooks(): void {
     const roller = makeRoller(actor, null, null, resolveRollTarget(config, false), {
       saveAbility: asString(read(config, "ability")) || null,
       isConcentration: (read(config, "isConcentration") === true) || hookNames.includes("concentration"),
-      isDeath: hookNames.includes("deathSave")
+      isDeath: hookNames.includes("deathSave"),
+      rollMode: resolvedConfigRollMode(config as ProcessConfig, rollWorkflow(config))
     });
     play.preRoll("savingThrow", config as ProcessConfig, dialog, roller, activationOf(config, message));
   }));
@@ -331,7 +343,8 @@ function registerPreRollHooks(): void {
     const roller = makeRoller(actor, isDocument(item) ? item : null, null, resolveRollTarget(config, false), {
       abilityId: asString(read(config, "ability")) || null,
       skillId: asString(read(config, "skill")) || null,
-      toolId: asString(read(config, "tool")) || null
+      toolId: asString(read(config, "tool")) || null,
+      rollMode: resolvedConfigRollMode(config as ProcessConfig, rollWorkflow(config))
     });
     play.preRoll("abilityCheck", config as ProcessConfig, dialog, roller, activationOf(config, message));
   }));
@@ -339,7 +352,10 @@ function registerPreRollHooks(): void {
     const actor = subjectActor(config);
     if (actor) play.preRoll("hitDie", config as ProcessConfig, dialog, makeRoller(actor, null, null, resolveRollTarget(config, false), {}), activationOf(config, message));
   }));
-  Hooks.on("dnd5e.postRollConfiguration", (rolls: unknown, config: unknown) => play.postRoll(listOf(rolls).length > 0, config));
+  Hooks.on("dnd5e.postRollConfiguration", (rolls: unknown, config: unknown) => {
+    const list = listOf(rolls);
+    play.postRoll(list.length > 0, config, resolvedSubmittedRollMode(list, config as ProcessConfig));
+  });
   Hooks.on("dnd5e.postActivityConsumption", (activity: unknown, usageConfig: unknown) => guarded("save DC", () => {
     if (read(activity, "type") !== "save") return;
     const item = itemOf(activity);
@@ -380,13 +396,14 @@ function registerReactionHooks(): void {
       const attacker = attackerOfWorkflow(workflow);
       if (!attacker) return;
       const activation = midiActivation(workflow);
+      const rollMode = workflowAttackRollMode(workflow, true);
       const [isCritical, isFumble] = [read(workflow, "isCritical") === true, read(workflow, "isFumble") === true];
       const hits = new Set([...tokens(read(workflow, "hitTargets")), ...tokens(read(workflow, "hitTargetsEC"))]);
       const targets = tokens(read(workflow, "targets"));
       if (!targets.length) {
         await play.runReaction({
           ...attacker, event: "afterAttack", pins: attackPins({ total: null, targetAc: null, isCritical, isFumble }),
-          target: null, activation, dedupeKey: `afterAttack|${activation}|-`
+          target: null, activation, details: { rollMode }, dedupeKey: `afterAttack|${activation}|-`
         });
         return;
       }
@@ -397,7 +414,7 @@ function registerReactionHooks(): void {
           ? midiAttackPins(hits.has(target), isCritical, isFumble)
           : attackPins({ total, targetAc: targetAc(target), isCritical, isFumble });
         await play.runReaction({
-          ...attacker, event: "afterAttack", pins, target, activation,
+          ...attacker, event: "afterAttack", pins, target, activation, details: { rollMode },
           dedupeKey: `afterAttack|${activation}|${target.document.uuid}`
         });
       }
@@ -418,6 +435,7 @@ function registerReactionHooks(): void {
       const attacker = attackerOfWorkflow(workflow);
       if (!attacker) return;
       const activation = midiActivation(workflow);
+      const rollMode = play.attackModeFor(activation) ?? workflowAttackRollMode(workflow) ?? undefined;
       for (const entry of listOf(read(workflow, "damageList"))) {
         const actorUuid = asString(read(entry, "actorUuid"));
         const actor = documentFromUuid(actorUuid);
@@ -425,6 +443,7 @@ function registerReactionHooks(): void {
         const pins = damagePins(asNumber(read(entry, "hpDamage")) ?? 0, asNumber(read(entry, "newHP")));
         await play.runReaction({
           ...attacker, event: "afterDamage", pins, target, activation,
+          ...(rollMode === undefined ? {} : { details: { rollMode } }),
           dedupeKey: `afterDamage|${activation}|${target?.document.uuid ?? actorUuid}`
         });
       }
@@ -437,13 +456,14 @@ function registerReactionHooks(): void {
       if (!attacker || !roll) return;
       const [total, isCritical, isFumble] = [asNumber(read(roll, "total")), read(roll, "isCritical") === true, read(roll, "isFumble") === true];
       const activation = play.activationFor(asString(read(activity, "uuid")));
+      const details = { rollMode: rollModeFromRoll(roll) };
       const list = [...game.user.targets];
       if (!list.length) {
-        await play.runReaction({ ...attacker, event: "afterAttack", pins: attackPins({ total, targetAc: null, isCritical, isFumble }), target: null, activation });
+        await play.runReaction({ ...attacker, event: "afterAttack", pins: attackPins({ total, targetAc: null, isCritical, isFumble }), target: null, activation, details });
         return;
       }
       for (const target of list) {
-        await play.runReaction({ ...attacker, event: "afterAttack", pins: attackPins({ total, targetAc: targetAc(target), isCritical, isFumble }), target, activation });
+        await play.runReaction({ ...attacker, event: "afterAttack", pins: attackPins({ total, targetAc: targetAc(target), isCritical, isFumble }), target, activation, details });
       }
     }));
     Hooks.on("dnd5e.applyDamage", (actor: unknown, amount: unknown, options: unknown) => void guardedAsync("after damage", async () => {
@@ -469,7 +489,8 @@ function registerReactionHooks(): void {
         details: {
           abilityId: asString(read(data, "ability")) || null,
           skillId: asString(read(data, "skill")) || null,
-          toolId: asString(read(data, "tool")) || null
+          toolId: asString(read(data, "tool")) || null,
+          rollMode: rollModeFromRoll(roll)
         }
       });
     }));

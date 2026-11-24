@@ -2,7 +2,9 @@ import { type ReactNode, useEffect, useId, useMemo, useState, useSyncExternalSto
 import type { BlueprintNode, BlueprintSource } from "../../core/blueprint/types";
 import type { BlueprintRun, CheckTrace } from "../../core/engine/interpreter";
 import type { Reason } from "../../core/engine/reasons";
+import type { RollMode } from "../../core/facts/types";
 import type { Translator } from "../../core/i18n";
+import { STATIC } from "../../core/registry/choices";
 import { EVENT_TYPES, type EventType, type NodeKind, type PinId } from "../../core/registry/constants";
 import { asString } from "../../core/registry/data";
 import type { ChoiceSpec } from "../../core/registry/fields";
@@ -163,6 +165,7 @@ interface Setup {
   targetUuid: string;
   eventKey: string;
   outcome: string;
+  rollMode: RollMode;
   saveOutcome: "succeeded" | "failed";
   abilityId: string;
   skillId: string;
@@ -182,6 +185,11 @@ function itemKey(itemUuid: string, activityId: string): string {
   return `${itemUuid}#${activityId}`;
 }
 
+function usesRollModes(blueprint: BlueprintSource): boolean {
+  return blueprint.nodes.some(node => (node.kind === "condition") && Array.isArray(node.data.checks)
+    && (node.data.checks as { type?: unknown }[]).some(check => check.type === "rollModes"));
+}
+
 function initialSetup(simulator: SimulatorHost): Setup {
   const defaults = simulator.defaults();
   const actorUuid = defaults.actorUuid ?? simulator.actors()[0]?.value ?? "";
@@ -192,6 +200,7 @@ function initialSetup(simulator: SimulatorHost): Setup {
     targetUuid: defaults.targetUuid ?? "",
     eventKey: "",
     outcome: "",
+    rollMode: "normal",
     saveOutcome: "failed",
     abilityId: "",
     skillId: "",
@@ -239,6 +248,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
     [simulator, actorUuid, blueprint]
   );
   const counterKey = (row: { scope: string; name: string }) => `${row.scope}:${row.name}`;
+  const needsRollMode = !!event && usesRollModes(blueprint) && !!getCheck("rollModes")?.relevantTo.includes(event.event);
   const demands = blueprint.nodes.some(node => (node.kind === "result") && !!getResult(node.type)?.pins?.length);
   const eventKey = event?.key ?? null;
   const result = useMemo<Outcome>(() => {
@@ -257,6 +267,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
       signal: chosen.signal,
       abilityId,
       skillId,
+      ...(needsRollMode ? { rollMode: setup.rollMode } : {}),
       saveOutcome: setup.saveOutcome,
       counters: Object.fromEntries(counterRows.map(row => [counterKey(row), Number(setup.counters[counterKey(row)] ?? row.value) || 0]))
     };
@@ -266,7 +277,7 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
     } catch (error) {
       return { error: (error instanceof Error) ? error.message : String(error) };
     }
-  }, [simulator, blueprint, events, eventKey, setup.outcome, setup.saveOutcome, actorUuid, setup.item, targetUuid, abilityId, skillId, setup.counters, counterRows]);
+  }, [simulator, blueprint, events, eventKey, setup.outcome, needsRollMode, setup.rollMode, setup.saveOutcome, actorUuid, setup.item, targetUuid, abilityId, skillId, setup.counters, counterRows]);
 
   const trace = (result && ("summary" in result)) ? result.summary.trace : null;
   useEffect(() => onTrace(trace), [trace, onTrace]);
@@ -341,6 +352,24 @@ export function SimulatorPanel({ blueprint, simulator, onTrace, onFocus }: Simul
                   onClick={() => change({ outcome: entry.id })}
                 >
                   {t(`BNA.Pin.${entry.id}.Label`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {needsRollMode ? (
+          <div className="bna-sim__field" role="group" aria-label={t("BNA.UI.Sim.rollMode")}>
+            <span className="bna-sim__legend">{t("BNA.UI.Sim.rollMode")}</span>
+            <div className="bna-sim__outcomes">
+              {STATIC.rollMode.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="bna-sim__outcome"
+                  aria-pressed={option.value === setup.rollMode}
+                  onClick={() => change({ rollMode: option.value as RollMode })}
+                >
+                  {t(option.label)}
                 </button>
               ))}
             </div>

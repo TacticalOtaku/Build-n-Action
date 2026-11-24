@@ -946,6 +946,12 @@
         "Help": "Example: thieves' tools.",
         "Phrase": "the tool is {values}"
       },
+      "rollModes": {
+        "Label": "Roll advantage",
+        "Summary": "The roll (or the attack behind damage) is normal, or has advantage or disadvantage.",
+        "Help": "Uses the resolved D&D 5e roll mode after mutual cancellation. On damage rolls, checks the attack roll from the same activation. Example: require advantage or no disadvantage for Sneak Attack.",
+        "Phrase": "the roll mode is {values}"
+      },
       "arbitraryComparisons": {
         "Label": "Compare values",
         "Summary": "Compare two formulas; every comparison must hold.",
@@ -1443,6 +1449,7 @@
         "noTarget": "No target",
         "event": "Event",
         "outcome": "Outcome",
+        "rollMode": "Roll advantage",
         "ability": "Ability",
         "skill": "Skill",
         "noSkill": "No skill (ability check)",

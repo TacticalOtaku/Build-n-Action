@@ -7,7 +7,7 @@ import { runBlueprint, type BlueprintEnv } from "../../core/engine/interpreter";
 import { passed } from "../../core/engine/reasons";
 import { createTranslator } from "../../core/i18n";
 import { createPhraseFormatter } from "../../core/phrase/formatter";
-import { creatureFacts, rollFacts } from "../../core/testing/facts";
+import { creatureFacts, rollDetails, rollFacts } from "../../core/testing/facts";
 import { makeCondition, makeEdge, makeNode } from "../../core/testing/graph";
 import en from "../../lang/en.json";
 import type { SimulationRequest, SimulatorHost } from "../host";
@@ -109,6 +109,39 @@ describe("SimulatorPanel", () => {
   it("asks nothing about saves when the blueprint demands none", () => {
     renderWithServices(<SimulatorPanel blueprint={blueprint} simulator={simulator()} onTrace={vi.fn()} onFocus={vi.fn()} />);
     expect(screen.queryByRole("group", { name: "Demanded save" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Roll advantage" })).not.toBeInTheDocument();
+  });
+
+  it("shows a roll advantage selector when testing a blueprint with a rollModes check", async () => {
+    const withRollMode = createBlueprint({
+      id: "aB3dE5gH7jK9mN1s",
+      nodes: [
+        makeNode("event", "damageRoll", "ev"),
+        makeCondition("adv", [{ id: "c1", type: "rollModes", data: { values: ["advantage"] } }]),
+        makeNode("result", "rollBonus", "sneak", { formula: "1d6" })
+      ],
+      edges: [makeEdge("ev", "out", "adv"), makeEdge("adv", "yes", "sneak")]
+    });
+    const host = simulator({
+      run: (source, request) => {
+        host.requests.push(request);
+        return {
+          run: runBlueprint(source, { event: request.event, pins: request.pins }, rollFacts({
+            event: request.event,
+            roll: rollDetails({ rollMode: request.rollMode ?? null })
+          }), env),
+          notes: []
+        };
+      }
+    });
+    renderWithServices(<SimulatorPanel blueprint={withRollMode} simulator={host} onTrace={vi.fn()} onFocus={vi.fn()} />);
+    expect(host.requests.at(-1)?.rollMode).toBe("normal");
+    expect(screen.getByRole("heading", { name: "Nothing would apply" })).toBeInTheDocument();
+    expect(screen.getAllByText(/Normal is not one of: Advantage/)).not.toHaveLength(0);
+
+    await userEvent.click(within(screen.getByRole("group", { name: "Roll advantage" })).getByRole("button", { name: "Advantage" }));
+    expect(host.requests.at(-1)?.rollMode).toBe("advantage");
+    expect(screen.getByRole("heading", { name: "Would apply: 1" })).toBeInTheDocument();
   });
 
   it("takes counter values for the run, starting from the actor's", async () => {

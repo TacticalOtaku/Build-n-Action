@@ -130,12 +130,12 @@ describe("buildRollFacts", () => {
     expect(facts({})).toBeNull();
   });
 
-  it("describes checks, saves and tools", () => {
-    const check = buildRollFacts(input({ event: "abilityCheck", details: { abilityId: "str", toolId: "smith" } }), { tool: tools });
-    expect(check.roll).toMatchObject({ abilityId: "str", toolKeys: ["art", "smith"] });
-    const save = buildRollFacts(input({ event: "savingThrow", details: { saveAbility: "con", isConcentration: true } }), {});
-    expect(save.roll).toMatchObject({ saveAbility: "con", isConcentration: true, isDeath: false });
-    expect(buildRollFacts(input({ details: { toolId: "lute" } }), {}).roll.toolKeys).toEqual(["lute"]);
+  it("describes checks, saves, tools, and roll mode", () => {
+    const check = buildRollFacts(input({ event: "abilityCheck", details: { abilityId: "str", toolId: "smith", rollMode: "advantage" } }), { tool: tools });
+    expect(check.roll).toMatchObject({ abilityId: "str", toolKeys: ["art", "smith"], rollMode: "advantage" });
+    const save = buildRollFacts(input({ event: "savingThrow", details: { saveAbility: "con", isConcentration: true, rollMode: "disadvantage" } }), {});
+    expect(save.roll).toMatchObject({ saveAbility: "con", isConcentration: true, isDeath: false, rollMode: "disadvantage" });
+    expect(buildRollFacts(input({ details: { toolId: "lute" } }), {}).roll).toMatchObject({ toolKeys: ["lute"], rollMode: null });
   });
 
   it("describes the target token", () => {

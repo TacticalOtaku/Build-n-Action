@@ -7,7 +7,7 @@ import { rollFacts } from "../core/testing/facts";
 import { makeEdge, makeNode } from "../core/testing/graph";
 import {
   BLUEPRINT_DRAG, LEGACY_DRAG, createEditorHost, defaultDragData, parseBlueprintDrop,
-  parseDragText, parseEffectDrop, readDroppedBlueprint
+  parseDragText, parseEffectDrop, readDroppedBlueprint, simulatedRollMode
 } from "./editor-host";
 
 const blueprint = createBlueprint({ id: "aB3dE5gH7jK9mN1p", name: "Hex" });
@@ -105,5 +105,19 @@ describe("createEditorHost", () => {
     });
     expect(sim?.notes).toEqual(["suppressed", "noToken", "trigger", "chosen"]);
     expect(sim?.run.intents.some(intent => intent.nodeId === "rem")).toBe(true);
+
+    expect(simulatedRollMode({
+      actorUuid: "Actor.a", itemUuid: null, activityId: null, targetUuid: null,
+      event: "attackRoll", pins: ["out"], signal: null, abilityId: null, skillId: null, saveOutcome: "failed", counters: {}
+    })).toBe("normal");
+    expect(simulatedRollMode({
+      actorUuid: "Actor.a", itemUuid: null, activityId: null, targetUuid: null,
+      event: "damageRoll", pins: ["out"], signal: null, abilityId: null, skillId: null, saveOutcome: "failed", counters: {}
+    })).toBeNull();
+    expect(simulatedRollMode({
+      actorUuid: "Actor.a", itemUuid: null, activityId: null, targetUuid: null,
+      event: "damageRoll", pins: ["out"], signal: null, abilityId: null, skillId: null,
+      rollMode: "advantage", saveOutcome: "failed", counters: {}
+    })).toBe("advantage");
   });
 });

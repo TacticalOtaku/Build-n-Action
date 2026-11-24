@@ -1,6 +1,11 @@
 // Changes to dnd5e roll process configurations ({rolls: [{parts, data, options}], target, critical}),
 // the same mutations v1.0.6 applied in its pre-roll hooks and optional selector.
 
+import type { RollMode } from "../core/facts/types";
+import { asRecord } from "../core/registry/data";
+
+export type { RollMode };
+
 export interface RollConfigEntry {
   parts?: unknown[];
   data?: Record<string, unknown>;
@@ -17,7 +22,13 @@ export interface ProcessConfig {
 }
 
 export type RollAdvantageMode = "advantage" | "disadvantage";
-export type ResolvedAdvantageMode = "normal" | RollAdvantageMode;
+export type ResolvedAdvantageMode = RollMode;
+
+/** Combine advantage and disadvantage flags under 5e mutual-cancellation rules. */
+export function combineAdvantageFlags(advantage: boolean, disadvantage: boolean): RollMode {
+  if (advantage === disadvantage) return "normal";
+  return advantage ? "advantage" : "disadvantage";
+}
 
 function hasAdvantageFlag(config: ProcessConfig): boolean {
   return Boolean(config.advantage) || entries(config).some(roll =>
@@ -33,10 +44,57 @@ function hasDisadvantageFlag(config: ProcessConfig): boolean {
 
 /** Resolved 5e roll mode after mutual cancellation of any advantage and disadvantage sources. */
 export function resolvedAdvantageMode(config: ProcessConfig): ResolvedAdvantageMode {
-  const advantage = hasAdvantageFlag(config);
-  const disadvantage = hasDisadvantageFlag(config);
-  if (advantage === disadvantage) return "normal";
-  return advantage ? "advantage" : "disadvantage";
+  return combineAdvantageFlags(hasAdvantageFlag(config), hasDisadvantageFlag(config));
+}
+
+/** Resolved pre-roll mode from a process config and an optional Midi-QOL workflow. */
+export function resolvedConfigRollMode(config: ProcessConfig, workflow?: unknown): RollMode {
+  const wf = asRecord(workflow);
+  return combineAdvantageFlags(
+    hasAdvantageFlag(config) || (wf.advantage === true),
+    hasDisadvantageFlag(config) || (wf.disadvantage === true)
+  );
+}
+
+/** Extract the resolved roll mode from a single submitted d20 roll, or null when the roll carries none. */
+export function rollModeFromRoll(roll: unknown): RollMode | null {
+  if (!roll || (typeof roll !== "object")) return null;
+  const record = roll as Record<string, unknown>;
+  const options = asRecord(record.options);
+  if ((typeof options.advantageMode === "number") && Number.isFinite(options.advantageMode)) {
+    if (options.advantageMode > 0) return "advantage";
+    if (options.advantageMode < 0) return "disadvantage";
+    return "normal";
+  }
+  if ((typeof record.hasAdvantage === "boolean") || (typeof record.hasDisadvantage === "boolean")) {
+    return combineAdvantageFlags(record.hasAdvantage === true, record.hasDisadvantage === true);
+  }
+  if ((typeof options.advantage === "boolean") || (typeof options.disadvantage === "boolean")) {
+    return combineAdvantageFlags(options.advantage === true, options.disadvantage === true);
+  }
+  return null;
+}
+
+/** Resolve the mode of submitted rolls (dialog choices override stale pre-roll config), falling back to config. */
+export function resolvedSubmittedRollMode(rolls: readonly unknown[], config?: ProcessConfig): RollMode | null {
+  for (const roll of rolls) {
+    const mode = rollModeFromRoll(roll);
+    if (mode) return mode;
+  }
+  return config ? resolvedAdvantageMode(config) : null;
+}
+
+/** Resolve the attack roll mode from a Midi-QOL workflow (attackRoll first, then flags once an attack ran). */
+export function workflowAttackRollMode(workflow: unknown, allowFlags = false): RollMode | null {
+  if (!workflow || (typeof workflow !== "object")) return null;
+  const record = workflow as Record<string, unknown>;
+  const fromRoll = rollModeFromRoll(record.attackRoll);
+  if (fromRoll) return fromRoll;
+  const hasAttack = allowFlags || (record.attackRoll != null) || (typeof record.attackTotal === "number");
+  if (hasAttack && ((typeof record.advantage === "boolean") || (typeof record.disadvantage === "boolean"))) {
+    return combineAdvantageFlags(record.advantage === true, record.disadvantage === true);
+  }
+  return null;
 }
 
 /** Apply advantage or disadvantage onto the roll configuration while preserving mutual cancellation. */
@@ -59,7 +117,7 @@ function isEntry(roll: unknown): roll is RollConfigEntry {
 }
 
 function entries(config: ProcessConfig): RollConfigEntry[] {
-  return (config.rolls ?? []).filter(isEntry);
+  return Array.isArray(config.rolls) ? config.rolls.filter(isEntry) : [];
 }
 
 /** Append an additive part to every roll. */

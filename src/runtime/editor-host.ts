@@ -2,8 +2,8 @@ import type { BlueprintSource } from "../core/blueprint/types";
 import { validateBlueprintSource } from "../core/blueprint/validate";
 import { runThrough, type ChainEntry } from "../core/engine/interpreter";
 import { blueprintSignals } from "../core/engine/lint";
-import { isEffectUuid, type EffectReference, type RollFacts } from "../core/facts/types";
-import { TRIGGER_EVENTS } from "../core/registry/constants";
+import { isEffectUuid, type EffectReference, type RollFacts, type RollMode } from "../core/facts/types";
+import { TRIGGER_EVENTS, type EventType } from "../core/registry/constants";
 import { asRecord, asString } from "../core/registry/data";
 import { parseBlueprintUuid } from "../core/storage/repository";
 import type {
@@ -62,6 +62,14 @@ export function parseEffectDrop(raw: string): { uuid: string; valid: boolean } |
   if (data.type !== "ActiveEffect") return null;
   const uuid = asString(data.uuid).trim();
   return { uuid, valid: isEffectUuid(uuid) };
+}
+
+const D20_EVENTS: readonly EventType[] = ["attackRoll", "savingThrow", "abilityCheck", "afterAttack", "afterCheck"];
+
+/** Simulated roll mode from the test request, defaulting to normal on inherently d20 events. */
+export function simulatedRollMode(request: SimulationRequest): RollMode | null {
+  if (request.rollMode !== undefined) return request.rollMode;
+  return D20_EVENTS.includes(request.event) ? "normal" : null;
 }
 
 export interface SimulationPrepared {

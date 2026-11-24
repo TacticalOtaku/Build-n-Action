@@ -4,7 +4,7 @@ import { log } from "../../core/log";
 import { asRecord, asString } from "../../core/registry/data";
 import { blueprintUuid } from "../../core/storage/repository";
 import {
-  BLUEPRINT_DRAG, createEditorHost, parseBlueprintDrop, runSimulation, type SimulationPrepared
+  BLUEPRINT_DRAG, createEditorHost, parseBlueprintDrop, runSimulation, simulatedRollMode, type SimulationPrepared
 } from "../../runtime/editor-host";
 import { buildRollFacts, type RollDetailsInput } from "../../runtime/facts";
 import { rollDataPaths } from "../../runtime/paths";
@@ -83,8 +83,8 @@ function prepareSimulation(carrier: FoundryDocument, blueprint: BlueprintSource,
   const targetDocument = request.targetUuid ? documentFromUuid(request.targetUuid) : null;
   const target = (read(targetDocument, "object") as TokenPlaceable | null | undefined) ?? null;
   const details: RollDetailsInput = (request.event === "savingThrow")
-    ? { saveAbility: request.abilityId }
-    : { abilityId: request.abilityId, skillId: request.skillId };
+    ? { saveAbility: request.abilityId, rollMode: simulatedRollMode(request) }
+    : { abilityId: request.abilityId, skillId: request.skillId, rollMode: simulatedRollMode(request) };
   const roller = makeRoller(actor, item, activity, target, details, true);
   const { entry, suppressed } = entryFor(carrier, blueprint, roller, request.counters);
   const facts = buildRollFacts({

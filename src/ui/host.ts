@@ -1,5 +1,5 @@
 import type { BlueprintSource, CounterDef, CounterScope } from "../core/blueprint/types";
-import type { EffectReference } from "../core/facts/types";
+import type { EffectReference, RollMode } from "../core/facts/types";
 import type { BlueprintRun } from "../core/engine/interpreter";
 import type { LintEnv } from "../core/engine/lint";
 import type { EventType, PinId } from "../core/registry/constants";
@@ -34,6 +34,8 @@ export interface SimulationRequest {
   /** Ability of a check or saving throw; skill of a skill check. */
   abilityId: string | null;
   skillId: string | null;
+  /** Simulated roll mode when testing blueprints that inspect advantage/disadvantage. */
+  rollMode?: RollMode | null;
   /** Assumed outcome of demanded saves. */
   saveOutcome: "succeeded" | "failed";
   /** "My" counter values for the run, by "<scope>:<name>". */

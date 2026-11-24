@@ -42,7 +42,7 @@ export function activityFacts(partial: Partial<ActivityFacts> = {}): ActivityFac
 export function rollDetails(partial: Partial<RollDetails> = {}): RollDetails {
   return {
     abilityId: null, skillId: null, toolKeys: [], saveAbility: null, isDeath: false, isConcentration: false,
-    attackMode: null, proficiency: null,
+    attackMode: null, proficiency: null, rollMode: null,
     ...partial
   };
 }

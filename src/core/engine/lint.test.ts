@@ -136,6 +136,31 @@ describe("lintBlueprint", () => {
     expect(codes(lintBlueprint(blueprint))).toEqual(["contradiction:if:c2"]);
   });
 
+  it("flags rollModes contradictions in all-of conditions and flags rollModes on non-d20 triggers", () => {
+    const contradictory = createBlueprint({
+      nodes: [
+        makeNode("event", "attackRoll", "ev"),
+        makeCondition("if", [
+          { id: "c1", type: "rollModes", data: { values: ["advantage"] } },
+          { id: "c2", type: "rollModes", data: { values: ["disadvantage"] } }
+        ]),
+        makeNode("result", "rollBonus", "bonus", { formula: "1" })
+      ],
+      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus")]
+    });
+    expect(codes(lintBlueprint(contradictory))).toEqual(["contradiction:if:c2"]);
+
+    const irrelevant = createBlueprint({
+      nodes: [
+        makeNode("event", "hitDie", "ev"),
+        makeCondition("if", [{ id: "c1", type: "rollModes", data: { values: ["advantage"] } }]),
+        makeNode("result", "rollBonus", "bonus", { formula: "1" })
+      ],
+      edges: [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus")]
+    });
+    expect(codes(lintBlueprint(irrelevant))).toEqual(["irrelevant-check:if:c1"]);
+  });
+
   it("allows the same check twice in an any-of condition", () => {
     const blueprint = createBlueprint({
       nodes: [

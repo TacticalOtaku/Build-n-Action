@@ -235,4 +235,29 @@ describe("describeBlueprint", () => {
       ru: ["Когда начинается бой: напомнить (Только мастеру): «Check aura»."]
     });
   });
+
+  it("phrases rollModes checks including exclusions", () => {
+    expect(sentences(
+      [
+        makeNode("event", "damageRoll", "ev"),
+        makeCondition("if", [{ id: "c1", type: "rollModes", data: { values: ["advantage"] } }]),
+        makeNode("result", "rollBonus", "bonus", { formula: "1d6" })
+      ],
+      [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus")]
+    )).toEqual({
+      en: ["When I roll damage, if the roll mode is Advantage, then +1d6 to the roll."],
+      ru: ["Когда я бросаю урон, если режим броска\u00A0— С преимуществом, то +1d6 к броску."]
+    });
+    expect(sentences(
+      [
+        makeNode("event", "attackRoll", "ev"),
+        makeCondition("if", [{ id: "c1", type: "rollModes", data: { values: ["!disadvantage"] } }]),
+        makeNode("result", "rollBonus", "bonus", { formula: "1d4" })
+      ],
+      [makeEdge("ev", "out", "if"), makeEdge("if", "yes", "bonus")]
+    )).toEqual({
+      en: ["When I make an attack roll, if the roll mode is anything but Disadvantage, then +1d4 to the roll."],
+      ru: ["Когда я совершаю бросок атаки, если режим броска\u00A0— не С помехой, то +1d4 к броску."]
+    });
+  });
 });
