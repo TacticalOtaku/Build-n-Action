@@ -3,16 +3,19 @@
 ## 2.5.0
 
 ### Added
-- **Roll advantage** condition check (`rollModes`): match whether a roll (or the attack roll behind a damage roll in the same activation) is *Normal*, *Advantage*, or *Disadvantage*—including exclusion matching such as *anything but Disadvantage* for features like *Sneak Attack*—across `attackRoll`, `damageRoll`, `savingThrow`, `abilityCheck`, `afterAttack`, `afterDamage`, `afterCheck`, and `signal`.
-- **Test simulator roll mode control**: added a *Roll advantage* selector (*Normal*, *Advantage*, *Disadvantage*) to the Test tab when a blueprint checks `rollModes` on a compatible event, with localized failure reasons.
+
+- **Roll advantage** condition check (`rollModes`): match whether a roll (or the attack roll behind a damage roll in the same activation) is _Normal_, _Advantage_, or _Disadvantage_—including exclusion matching such as _anything but Disadvantage_ for features like _Sneak Attack_—across `attackRoll`, `damageRoll`, `savingThrow`, `abilityCheck`, `afterAttack`, `afterDamage`, `afterCheck`, and `signal`.
+- **Test simulator roll mode control**: added a _Roll advantage_ selector (_Normal_, _Advantage_, _Disadvantage_) to the Test tab when a blueprint checks `rollModes` on a compatible event, with localized failure reasons.
 
 ### Changed
+
 - Propagated resolved D&D 5e roll modes from `D20Roll`, roll configurations, and Midi QOL workflows to runtime facts and same-activation damage events, honoring player dialog choices over stale pre-roll flags and ignoring cancelled attacks.
 - Generalized `listCheck` to accept static choice lists alongside dynamic sources.
 
 ## 2.4.1
 
 ### Changed
+
 - **License & Notices**: Adopted **GNU GPL v3.0** (`GPL-3.0-only`) and bundled `LICENSE` and `THIRD-PARTY-NOTICES.txt` directly inside the Foundry release package.
 - **Manifest & Compatibility**: Removed the `dnd5e` `maximum: "5.3.3"` compatibility cap so newer `5.3.x` updates are not blocked, moved the manifest URL to `releases/latest/download/module.json`, and added `readme`, `changelog`, `bugs`, `license`, and `media` screenshot metadata.
 - **Release Pipeline & Docs**: Added automated GitHub Release publishing (`release.yml`), issue forms, `CONTRIBUTING.md`, and editor screenshots to `README.md`.
@@ -20,65 +23,78 @@
 ## 2.4.0
 
 ### Added
+
 - **Combat start** trigger event (`combatStart`): fires once per distinct combatant actor when combat begins, without requiring a roll.
 - **Roll advantage** result (`rollAdvantage`): grant advantage or disadvantage to attack rolls, saving throws, ability checks, or signals—including as an optional player choice in the roll dialog and through riders—while combining with existing roll flags under D&D 5e mutual-cancellation rules.
-- **Reminder audience filters**: choose who sees each reminder note (*As usual*, *Me only*, *GM only*, *Target's owner (and GM)*, or *Everyone (public chat)*). Player roll dialogs hide *GM only* notes, cancelled rolls post nothing, and skipped dialogs fall back to chat when the roll proceeds.
+- **Reminder audience filters**: choose who sees each reminder note (_As usual_, _Me only_, _GM only_, _Target's owner (and GM)_, or _Everyone (public chat)_). Player roll dialogs hide _GM only_ notes, cancelled rolls post nothing, and skipped dialogs fall back to chat when the roll proceeds.
 
 ### Changed
+
 - Consolidated runtime orchestration, multiplayer transport, editor host state, and shared evaluator/UI helpers across clean module boundaries without changing saved blueprint behavior.
 - Added [tests/live/features-check.js](tests/live/features-check.js) covering editor palette/inspector controls, combat-start deduplication, interactive advantage choices, mutual cancellation, riders, and reminder audience routing in Foundry VTT.
 
 ## 2.3.2
 
 ### Added
+
 - **My effects** and **Target effects** condition checks, including custom Active Effects created by the GM.
 - Match an effect by its full name (case-insensitive) or by its source: choose an available effect, drag an Active Effect into the field, or enter its UUID.
 - Require an effect to be **Present** or **Absent**. Effects must be active by default; **Include inactive effects** also counts disabled and suppressed applicable effects. Transferred item effects are included.
 
 ### Improved
+
 - Effects copied by **Apply effect** retain their source identity, including through repeated copies. Source checks distinguish effects with identical names. For older or third-party copies without a retained source link, use name matching.
 - Source selection preserves the previous choice on invalid input and ignores outdated asynchronous lookup results. Explicitly invalid references on new checks fail instead of leaving the check unrestricted.
 
 ## 2.3.1
 
 ### Added
+
 - **"Target hit points" check.** Like "My hit points", for the target: at most or at least a percentage of its hit points (temporary hit points not counted). Without a target the check fails.
 
 ### Fixed
+
 - **A broken bonus formula no longer cancels the roll.** A formula such as `2d +` in one blueprint made the whole roll fail, with every other bonus. It is now skipped, the console says so once, and the editor marks it as before.
 - **"After the target's save" works under Midi QOL when Midi does not roll saves.** With Midi's "Auto check saves" set to none, the targets roll from the save buttons on the card; those saves now start the reaction, as without Midi.
 - **No more `senses.*` deprecation warnings from `@target`.** The target's roll data now carries plain sense values; formulas such as `@target.attributes.senses.darkvision` still work, and the target's actor is left untouched.
 - **Aura previews and wall checks use the current Foundry canvas classes**, not globals that Foundry v15 removes.
 
 ### Development
+
 - `tests/live/edge-check.js`: limits in a real combat, unlinked tokens, broken formulas and throwing scripts, rollers without a token, and target hit points after damage.
 
 ## 2.3.0
 
 ### Security
+
 - **A script check runs only where no other player can edit it.** Before, a player's script ran in the GM's browser with the GM's rights whenever the GM evaluated that blueprint: at the start of the player's turn, or through an aura on an NPC's roll. Now the GM runs scripts only on documents no player owns, and a player runs only their own. Elsewhere the check fails, and the Test tab says why.
 - **The GM checks who asked for a change.** A change a player's reaction sends to the GM must touch something that player owns, or a creature on the scene they are looking at. The sender now comes from Foundry, not from the message. Each field of the change is checked before it is used. Rest triggers run only for the player's own actors. Demanded-save answers are accepted only from the player who was asked.
 
 ### Fixed
+
 - **Counter changes add up.** Two results changing the same counter on one roll (for example, two "+1 combo" blueprints) used to count once. With a GM connected, counter changes are made one at a time from the stored value.
 - **A cancelled roll spends nothing.** Closing the roll dialog no longer uses up a limited bonus ("once per turn") or a rider. The `build-n-action.applyResult` hook now fires for a roll's results once the roll actually goes ahead.
 - **Riders no longer overwrite each other.** A rider added by one client while another client uses a different one is kept. Riders are now stored by id; a list stored by an earlier version is converted the first time it changes.
 
 ### Development
+
 - `npm run release` works right after a version bump: every build writes the root `module.json`, and `npm run check` builds before it tests.
 - Removed unused code: `PRE_ROLL_EVENTS` and `getIn`.
 
 ## 2.2.1
 
 ### Fixed
+
 - **The template picker no longer breaks the editor.** In a world whose blueprint library had never been saved, the "Templates" and "Library" buttons crashed the editor with React error #185 and left the window blank.
 
 ## 2.2.0
 
 ### Added
+
 - **Debug logging** client setting: detailed diagnostics in the browser console, off by default.
 
 ### Development
+
 - One logger (`src/core/log.ts`) replaces direct console calls; every message keeps the `Build-n-Action |` prefix.
 - `npm run check` (typecheck, lint, tests, build), `npm run watch` (was `dev`), `npm run deploy`; `npm run release`
   runs the check first and never replaces an existing archive. Prettier with the shared configuration.
@@ -87,6 +103,7 @@
 ## 2.1.1
 
 ### Fixed
+
 - **No Foundry v14 deprecation warnings** when saving counters or deleting migration backups. The module now uses v14 update operators instead of the old `-=` keys, which Foundry will stop accepting.
 - **Attack reactions without Midi QOL** now listen to `dnd5e.rollAttack`, the hook dnd5e documents, not the `dnd5e.rollAttackV2` alias that newer dnd5e versions no longer call.
 - **Test tab:** the "Who rolls" and "Target" lists are no longer rebuilt on every redraw or when a token moves. They refresh when a token is placed, removed, renamed, hidden or given another actor, or when an actor is created, deleted or renamed.
@@ -94,6 +111,7 @@
 ## 2.1.0
 
 ### New
+
 - **Events without a roll:** turn start and end (in combat), a token entering or leaving a region, short and long rests. They run on the GM's side. Blueprints using them cannot be read by 2.0.x.
   - After updating, restart the world once: Foundry registers the module's region behavior only when a world starts.
 - **Counters:** named numbers on an actor that blueprints change, check and use in formulas (`@counters.name`), shared on the actor or private to a blueprint, reset by hand, on rests or at the start of a turn. Blueprints using them cannot be read by 2.0.x.
@@ -101,13 +119,15 @@
 - **"And then" output on every result:** continue the chain once the result has really been applied (chosen, within its limit, not vetoed). Blueprints with wires from results cannot be read by 2.0.x.
 
 ### Changed
-- **"Only this item" is now a tick on the condition** (*Only rolls with this item*), shown for blueprints on items.
+
+- **"Only this item" is now a tick on the condition** (_Only rolls with this item_), shown for blueprints on items.
   - It is required on top of the other checks, even when the condition passes on any one of them.
   - The node card and the blueprint's sentence show it.
   - The linter notes it on a blueprint that is not on an item, where it has no effect.
 - **Old blueprints keep working.** An "only this item" check in an all-of condition is read as the tick. v1 "exclusive" bonuses convert to it.
 
 ### Fixed
+
 - Lint messages named events by their internal id (e.g. "damageRoll") instead of their label.
 - The `build-n-action.applyResult` hook no longer reports reaction results that could not be applied.
 - The palette's "Reminder" summary now says that without a roll dialog the note goes to chat.
@@ -116,22 +136,25 @@
 ## 2.0.1
 
 ### Fixed
+
 - **Migration and v1 bonuses no longer gain a "My hit points ≤ 50%" check.** v1 stored every filter with default values, and a filter counted only once its type was chosen. 2.0.0 read the stored hit-point and token-size filters as turned on, so v1 bonuses stopped working above 50% hit points. This hit bonuses read directly and bonuses converted by "Migrate the world" alike.
-- **Repair a migrated world:** run *Settings → Build-n-Action → Migrate the world* again.
+- **Repair a migrated world:** run _Settings → Build-n-Action → Migrate the world_ again.
   - The scan reports how many blueprints it will repair.
   - The repair removes the wrong checks, and a condition left empty goes too.
   - It works from the v1 originals kept as backups, so worlds whose backups were already deleted cannot be repaired this way.
   - Checks you changed yourself are left as they are.
 
 ### Changed
+
 - **The sheet header control is called "Build-n-Action" again.**
 - **Its icon lights up** while the document carries a blueprint that works now, as v1 marked documents with bonuses.
 
 ## 2.0.0
 
-Build-n-Action 2.0 replaces contextual bonuses with **blueprints**: small graphs that read *When → If → Then*. A blueprint changes a roll before it is made, or reacts to its outcome. Everything a v1 bonus did can be built as a blueprint, and existing v1 bonuses keep working.
+Build-n-Action 2.0 replaces contextual bonuses with **blueprints**: small graphs that read _When → If → Then_. A blueprint changes a roll before it is made, or reacts to its outcome. Everything a v1 bonus did can be built as a blueprint, and existing v1 bonuses keep working.
 
 ### New
+
 - **Blueprint editor.** It opens from every actor, item, effect and region sheet (header menu, or a title-bar button with the setting on). It provides:
   - a node canvas with a palette, an inspector and a title block;
   - a sentence describing each blueprint;
@@ -162,15 +185,17 @@ Build-n-Action 2.0 replaces contextual bonuses with **blueprints**: small graphs
 - **"Show aura ranges"** draws each aura a roll checks.
 
 ### Upgrading from 1.x
+
 - **Nothing breaks when you update.** v1 bonuses are read as blueprints until you migrate them.
 - **Old links keep working:**
   - old UUIDs `…ContextualBonus.<id>` resolve;
   - dragging a v1 bonus still works;
   - `buildNAction.hotbarToggle(uuid)` macros still switch them.
-- **Migrate when you are ready.** Run *Settings → Build-n-Action → Migrate the world*, check the report, then delete the backups.
+- **Migrate when you are ready.** Run _Settings → Build-n-Action → Migrate the world_, check the report, then delete the backups.
 - **Unlinked tokens are not migrated.** Their synthetic actors keep their v1 bonuses, which still work.
 
 ### Removed
+
 - **The `@BNA[uuid]` text enricher.** Existing links render as plain text. Switch blueprints through Active Effects and DAE instead.
 - **Creating hotbar macros by dragging a bonus.** Existing macros keep working.
 - **v1 windows, replaced by the editor and the roll-dialog panel:**
@@ -183,7 +208,16 @@ Build-n-Action 2.0 replaces contextual bonuses with **blueprints**: small graphs
   - `build-n-action.ready` now receives only the API.
 
 ### Requirements
+
 Foundry VTT 14.367 and dnd5e 5.3.3. Midi QOL 14.0.12 and DAE 14.0.14 are optional.
+
+## 1.0.7
+
+- added visual condition blueprints with named ports, branches, Boolean gates, validation, trial runs, undo and redo;
+- expanded condition help with examples and context requirements;
+- updated the interface and fixed resizing of the bonus editor and item bonus workshop;
+- added texture-driven fire, distinct elemental animations and HP threshold effects, with independent effects and motion settings;
+- preserved readable node content, reduced-motion support and idle renderer cleanup.
 
 ## 1.0.6
 
@@ -205,8 +239,33 @@ Foundry VTT 14.367 and dnd5e 5.3.3. Midi QOL 14.0.12 and DAE 14.0.14 are optiona
 
 ## 1.0.5
 
+- project files cleanup and bug fixes on top of 1.0.4;
 - verified for Foundry VTT 14.367 and midi-qol 14.0.11;
 - preserves midi-qol workflow targets for BnA filters and `@target` roll data;
 - opens the roll configuration only when an optional BnA bonus needs a choice, including midi-qol fast-forward rolls;
 - restores editable effect-bonus images with immediate preview and a safe fallback for broken paths;
 - keeps the dnd5e 5.3.3 character-sheet tab on public render and tab APIs.
+
+## 1.0.4
+
+- verified for Foundry VTT 14.367 and midi-qol 14.0.11;
+- preserves midi-qol workflow targets for BnA filters and `@target` roll data;
+- opens the roll configuration only when an optional BnA bonus needs a choice, including midi-qol fast-forward rolls;
+- restores editable effect-bonus images with preview and fallback for broken paths;
+- kept the dnd5e 5.3.3 character-sheet tab on public render and tab APIs.
+
+## 1.0.3
+
+- added roll-target resolution (`roll-target.mjs`) and updated mutators and filtering behavior.
+
+## 1.0.2
+
+- added bonus search and bonus image handling, and updated the character-sheet tab and bonus sheet styles.
+
+## 1.0.1
+
+- updated Foundry VTT verified compatibility to `14.367` and fixed manifest URLs.
+
+## 1.0.0
+
+- initial release of Build-n-Action for Foundry VTT (`14.363`) and `dnd5e` (`5.3.3`).
