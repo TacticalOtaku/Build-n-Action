@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [Русский](README.ru.md)
+
 # Build-n-Action
 
 **Visual `When → If → Then` blueprint automation for D&D 5e in Foundry VTT**
@@ -214,6 +216,14 @@ npm run release           # Check, then build dist/build-n-action-v<version>.zip
 | [CHANGELOG.md](CHANGELOG.md)                       | Version-by-version release notes           |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                 | Issue reporting guidelines                 |
 | [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) | Bundled third-party dependency licenses    |
+
+---
+
+## AI Disclosure
+
+AI-assisted tools were used during development for tasks such as code drafting, refactoring, tests, documentation, and localization drafts. All architecture, code, behavior, user-facing copy, and Russian/English translations are reviewed, tested, and maintained by **TacticalOtaku**, who retains sole authorship and responsibility for the module.
+
+All bundled package assets and user-facing materials comply with Foundry VTT's [AI Content Policy](https://foundryvtt.com/article/ai-policy/) — no pre-generated AI art, audio, or lore assets are included.
 
 ---
 
